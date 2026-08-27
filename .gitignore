@@ -16,9 +16,12 @@ ml/data/
 ml/crops/
 
 # Training artefacts. The exported ONNX models under mobile/assets/models are
-# committed - the app needs them at build time - but checkpoints are not.
-ml/runs/*.pt
-ml/runs/*.npy
+# committed because the app needs them at build time, and the *_best.pt
+# checkpoints are committed because they are the only way to fine-tune or
+# reproduce the reported metrics without a four-hour retrain. The *_last.pt
+# files carry optimiser state and exist only to resume an interrupted run.
+ml/runs/*_last.pt
+ml/data/
 
 # Python
 __pycache__/

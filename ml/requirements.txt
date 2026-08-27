@@ -1,7 +1,16 @@
-# CPU-only is deliberate: both models are small enough to train without a GPU,
-# which is the whole reason the pipeline is split into two stages.
-torch>=2.5
-torchvision>=0.20
+# Training runs on CPU or CUDA; nothing here is CPU-only. The models are small
+# enough that the original run trained on two CPU cores overnight, which is why
+# the architecture is split into two stages - but a GPU is dramatically faster
+# and there is no reason not to use one.
+#
+# On an RTX 50-series card (Blackwell, sm_120) install a CUDA 12.8 build first,
+# or torch will fall back to CPU without saying much about why:
+#
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+#
+# Then install the rest of this file.
+
+torch>=2.7
 numpy>=1.26
 opencv-python-headless>=4.10
 pillow>=10.0
