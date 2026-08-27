@@ -1,0 +1,76 @@
+{
+  "expo": {
+    "name": "Mahjong Scorer",
+    "slug": "mahjong-scorer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "mahjongscorer",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0F1412",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dylansken.mahjongscorer",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Photograph your hand so the app can read the tiles and score it.",
+        "NSPhotoLibraryUsageDescription": "Score a hand from a photo you have already taken."
+      }
+    },
+    "android": {
+      "package": "com.dylansken.mahjongscorer",
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "backgroundColor": "#0F1412",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0F1412",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 84
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Photograph your hand so the app can read the tiles and score it."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Score a hand from a photo you have already taken."
+        }
+      ],
+      "expo-updates"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "69784d63-a36d-4dfe-806c-888c0c849b70"
+      }
+    },
+    "owner": "dylanhuang"
+  }
+}

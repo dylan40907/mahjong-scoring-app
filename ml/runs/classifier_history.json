@@ -1,0 +1,164 @@
+[
+  {
+    "epoch": 0,
+    "loss": 1.1772453992451528,
+    "top1": 0.98869,
+    "top3": 0.99701,
+    "worst_class": 0.8924,
+    "worst_class_name": "man2",
+    "seconds": 304.3
+  },
+  {
+    "epoch": 1,
+    "loss": 0.44508970838178535,
+    "top1": 0.99413,
+    "top3": 0.99797,
+    "worst_class": 0.9407,
+    "worst_class_name": "season_spring",
+    "seconds": 318.5
+  },
+  {
+    "epoch": 2,
+    "loss": 0.4224722876013384,
+    "top1": 0.9952,
+    "top3": 0.99819,
+    "worst_class": 0.9623,
+    "worst_class_name": "flower_orchid",
+    "seconds": 312.0
+  },
+  {
+    "epoch": 3,
+    "loss": 0.41359038605250914,
+    "top1": 0.99616,
+    "top3": 0.99883,
+    "worst_class": 0.9608,
+    "worst_class_name": "season_autumn",
+    "seconds": 314.6
+  },
+  {
+    "epoch": 4,
+    "loss": 0.40653027245031614,
+    "top1": 0.99562,
+    "top3": 0.9984,
+    "worst_class": 0.9702,
+    "worst_class_name": "man9",
+    "seconds": 302.9
+  },
+  {
+    "epoch": 5,
+    "loss": 0.4028146336748835,
+    "top1": 0.99776,
+    "top3": 0.99883,
+    "worst_class": 0.9835,
+    "worst_class_name": "season_summer",
+    "seconds": 307.2
+  },
+  {
+    "epoch": 6,
+    "loss": 0.40115575042217727,
+    "top1": 0.99755,
+    "top3": 0.99936,
+    "worst_class": 0.9902,
+    "worst_class_name": "season_autumn",
+    "seconds": 309.6
+  },
+  {
+    "epoch": 7,
+    "loss": 0.3961294863932737,
+    "top1": 0.99819,
+    "top3": 0.99947,
+    "worst_class": 0.9835,
+    "worst_class_name": "season_summer",
+    "seconds": 314.5
+  },
+  {
+    "epoch": 8,
+    "loss": 0.3942324939471262,
+    "top1": 0.99829,
+    "top3": 0.99883,
+    "worst_class": 0.9831,
+    "worst_class_name": "season_spring",
+    "seconds": 307.9
+  },
+  {
+    "epoch": 9,
+    "loss": 0.3919671175938238,
+    "top1": 0.99765,
+    "top3": 0.99883,
+    "worst_class": 0.9752,
+    "worst_class_name": "season_summer",
+    "seconds": 314.0
+  },
+  {
+    "epoch": 10,
+    "loss": 0.3903841306493047,
+    "top1": 0.99883,
+    "top3": 0.99957,
+    "worst_class": 0.9821,
+    "worst_class_name": "flower_plum",
+    "seconds": 321.2
+  },
+  {
+    "epoch": 11,
+    "loss": 0.3886357965685054,
+    "top1": 0.9984,
+    "top3": 0.99936,
+    "worst_class": 0.9835,
+    "worst_class_name": "season_summer",
+    "seconds": 320.8
+  },
+  {
+    "epoch": 12,
+    "loss": 0.38767779114173184,
+    "top1": 0.99872,
+    "top3": 0.99936,
+    "worst_class": 0.9906,
+    "worst_class_name": "flower_orchid",
+    "seconds": 314.3
+  },
+  {
+    "epoch": 13,
+    "loss": 0.38626095787388826,
+    "top1": 0.99893,
+    "top3": 0.99957,
+    "worst_class": 0.9906,
+    "worst_class_name": "flower_orchid",
+    "seconds": 313.9
+  },
+  {
+    "epoch": 14,
+    "loss": 0.38588425704851287,
+    "top1": 0.99893,
+    "top3": 0.99957,
+    "worst_class": 0.9906,
+    "worst_class_name": "flower_orchid",
+    "seconds": 314.1
+  },
+  {
+    "epoch": 15,
+    "loss": 0.3850715571536001,
+    "top1": 0.99893,
+    "top3": 0.99968,
+    "worst_class": 0.9906,
+    "worst_class_name": "flower_orchid",
+    "seconds": 316.5
+  },
+  {
+    "epoch": 16,
+    "loss": 0.38457402919143774,
+    "top1": 0.99904,
+    "top3": 0.99968,
+    "worst_class": 0.9906,
+    "worst_class_name": "flower_orchid",
+    "seconds": 315.2
+  },
+  {
+    "epoch": 17,
+    "loss": 0.3845844479677943,
+    "top1": 0.99904,
+    "top3": 0.99968,
+    "worst_class": 0.9906,
+    "worst_class_name": "flower_orchid",
+    "seconds": 315.3
+  }
+]

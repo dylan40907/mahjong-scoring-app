@@ -1,0 +1,10 @@
+# CPU-only is deliberate: both models are small enough to train without a GPU,
+# which is the whole reason the pipeline is split into two stages.
+torch>=2.5
+torchvision>=0.20
+numpy>=1.26
+opencv-python-headless>=4.10
+pillow>=10.0
+cairosvg>=2.7
+onnx>=1.17
+onnxruntime>=1.20

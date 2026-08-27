@@ -1,0 +1,78 @@
+{
+  "detector": {
+    "file": "detector.onnx",
+    "inputSize": 320,
+    "trained": true,
+    "maxOnnxDrift": 6.103515625e-05,
+    "metrics": {
+      "ap50": 0.9997884154734749,
+      "precision": 0.9965004374453194,
+      "recall": 0.9956293702125549,
+      "exact_count": 0.94140625
+    }
+  },
+  "classifier": {
+    "file": "classifier.onnx",
+    "inputWidth": 48,
+    "inputHeight": 64,
+    "trained": true,
+    "top1": 0.9990394877267876,
+    "maxOnnxDrift": 2.1457672119140625e-06
+  },
+  "classes": [
+    "man1",
+    "man2",
+    "man3",
+    "man4",
+    "man5",
+    "man6",
+    "man7",
+    "man8",
+    "man9",
+    "pin1",
+    "pin2",
+    "pin3",
+    "pin4",
+    "pin5",
+    "pin6",
+    "pin7",
+    "pin8",
+    "pin9",
+    "sou1",
+    "sou2",
+    "sou3",
+    "sou4",
+    "sou5",
+    "sou6",
+    "sou7",
+    "sou8",
+    "sou9",
+    "east",
+    "south",
+    "west",
+    "north",
+    "red",
+    "green",
+    "white",
+    "flower_plum",
+    "flower_orchid",
+    "flower_chrysanthemum",
+    "flower_bamboo",
+    "season_spring",
+    "season_summer",
+    "season_autumn",
+    "season_winter"
+  ],
+  "normalisation": {
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  }
+}

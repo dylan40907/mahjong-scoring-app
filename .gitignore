@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Native builds
+ios/
+android/
+*.apk
+*.aab
+
+# Generated training data. Regenerate with ml/src/synth.py; it is deterministic
+# given the seed, so there is nothing here worth versioning.
+ml/data/
+ml/crops/
+
+# Training artefacts. The exported ONNX models under mobile/assets/models are
+# committed - the app needs them at build time - but checkpoints are not.
+ml/runs/*.pt
+ml/runs/*.npy
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors and OS
+.DS_Store
+.idea/
+*.swp
+
+# Logs
+*.log
+npm-debug.*
+yarn-debug.*
