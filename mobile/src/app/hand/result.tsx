@@ -63,7 +63,11 @@ export default function ResultScreen() {
       dealerId: session.dealerId,
       settlement: result.settlement,
     });
-  }, [session, result?.settlement, draft.winnerId, draft.discarderId]);
+    // Depends on `result` rather than `result?.settlement`: React Compiler
+    // cannot reason about an optional chain in a dependency array and bails out
+    // of memoising the whole component when it sees one. `result` is itself a
+    // useMemo output, so it is stable whenever its own inputs are.
+  }, [session, result, draft.winnerId, draft.discarderId]);
 
   const save = () => {
     if (!session || !draft.winnerId || !result?.settlement) return;

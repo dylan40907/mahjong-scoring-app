@@ -8,7 +8,6 @@
     "scheme": "mahjongscorer",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0F1412",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dylansken.mahjongscorer",
@@ -19,7 +18,6 @@
     },
     "android": {
       "package": "com.dylansken.mahjongscorer",
-      "edgeToEdgeEnabled": true,
       "adaptiveIcon": {
         "backgroundColor": "#0F1412",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
