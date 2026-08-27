@@ -1,6 +1,6 @@
-The MIT License (MIT)
+MIT License
 
-Copyright (c) 2015-present 650 Industries, Inc. (aka Expo)
+Copyright (c) 2026 Dylan Huang
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,13 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+Third-party assets
+
+The mahjong tile faces in ml/assets/tiles and mobile/assets/tiles are rendered
+from the tile set at https://github.com/FluffyStuff/riichi-mahjong-tiles, which
+is released into the public domain under CC0 1.0. The flower and season faces
+and the framed white dragon are not part of that set and were drawn by
+ml/src/render_tiles.py.
