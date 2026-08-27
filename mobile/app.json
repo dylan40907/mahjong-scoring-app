@@ -26,8 +26,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "permissions": [
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -47,16 +46,19 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Photograph your hand so the app can read the tiles and score it."
+          "cameraPermission": "Photograph your hand so the app can read the tiles and score it.",
+          "recordAudioAndroid": false
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Score a hand from a photo you have already taken."
+          "photosPermission": "Score a hand from a photo you have already taken.",
+          "microphonePermission": false
         }
       ],
-      "expo-updates"
+      "expo-updates",
+      "./plugins/with-onnxruntime-gradle9-fix"
     ],
     "experiments": {
       "typedRoutes": true,
