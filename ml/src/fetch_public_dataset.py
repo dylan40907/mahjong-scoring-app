@@ -196,6 +196,11 @@ def main() -> None:
         run(command)
 
         annotations = json.loads((out / "annotations.json").read_text(encoding="utf-8"))
+        if not annotations:
+            # Roboflow omits `test` entirely when a version was generated
+            # without one. Absent is not broken.
+            print(f"\n{split}: not present in this export; skipped.")
+            continue
         tiles = sum(len(record["labels"]) for record in annotations)
         total += len(annotations)
         print(f"\n{split}: {len(annotations)} photographs, {tiles} tiles -> {out}")

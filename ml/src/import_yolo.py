@@ -123,11 +123,18 @@ def read_class_names(root: Path) -> list[str]:
     return names
 
 
-def split_dirs(root: Path, split: str) -> tuple[Path, Path]:
+def split_dirs(root: Path, split: str) -> tuple[Path, Path] | None:
+    """The split's image and label directories, or None if it does not exist.
+
+    Not every export carries every split - Roboflow omits `test` entirely when
+    a version was generated without one. That is a fact about the dataset, not
+    an error, so callers skip rather than abort: dying here would throw away a
+    successfully imported `valid` because `test` happened to be absent.
+    """
     images = root / split / "images"
     labels = root / split / "labels"
     if not images.is_dir() or not labels.is_dir():
-        raise SystemExit(f"Missing {images} or {labels}")
+        return None
     return images, labels
 
 
@@ -143,7 +150,10 @@ def convert_split(
     min_aspect: float,
     max_aspect: float,
 ) -> tuple[list[dict], dict[str, int]]:
-    images_dir, labels_dir = split_dirs(root, split)
+    located = split_dirs(root, split)
+    if located is None:
+        return [], {f"split {split!r} is not in this export": 1}
+    images_dir, labels_dir = located
     out_images = out_dir / "images"
     out_images.mkdir(parents=True, exist_ok=True)
 
@@ -298,8 +308,15 @@ def main() -> None:
              "around 1%% of a photographed hand; anything much larger is a pile "
              "annotated as one object.",
     )
-    parser.add_argument("--min-aspect", type=float, default=0.7,
-                        help="Minimum box height/width. A tile face is about 1.33.")
+    parser.add_argument(
+        "--min-aspect", type=float, default=0.55,
+        help="Minimum box height/width. An upright tile face is 1.33, but the "
+             "axis-aligned hull of a tilted one tends toward square and a "
+             "foreshortened one goes wider still - real datasets sit around 0.97 "
+             "median. Set loosely on purpose: the size gate catches the pile "
+             "annotations, and trimming hard here would discard exactly the "
+             "steeply-viewed tiles worth training on.",
+    )
     parser.add_argument("--max-aspect", type=float, default=2.6)
     parser.add_argument("--max-width", type=int, default=MAX_SOURCE_WIDTH)
     parser.add_argument("--seed", type=int, default=0)
