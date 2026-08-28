@@ -59,7 +59,7 @@ DATASETS: dict[str, dict] = {
     "riichi-6810": {
         "workspace": "project-xv49e",
         "project": "mahjong-x5dzz",
-        "version": 1,
+        "version": 2,
         "licence": "CC BY 4.0",
         "classes": 34,
         "bonus": False,
@@ -122,11 +122,24 @@ def download(destination: Path, spec: dict) -> Path:
     print(f"Downloading {spec['workspace']}/{spec['project']} "
           f"v{spec['version']} as {FORMAT} ({spec['licence']})...")
     roboflow = Roboflow(api_key=key)
-    version = (
-        roboflow.workspace(spec["workspace"])
-        .project(spec["project"])
-        .version(spec["version"])
-    )
+    project = roboflow.workspace(spec["workspace"]).project(spec["project"])
+
+    # Version numbers are not stable across datasets and a wrong one fails only
+    # after the key prompt and two network round trips. Ask the project what it
+    # actually has, and fall back to its newest rather than guessing.
+    wanted = spec.get("version")
+    try:
+        version = project.version(wanted)
+    except RuntimeError:
+        available = sorted(
+            int(str(v.version).rsplit("/", 1)[-1]) for v in project.versions()
+        )
+        if not available:
+            raise SystemExit(f"{spec['workspace']}/{spec['project']} has no versions.")
+        newest = available[-1]
+        print(f"Version {wanted} is gone; this project has {available}. Using {newest}.")
+        version = project.version(newest)
+
     dataset = version.download(FORMAT, location=str(destination))
     return Path(dataset.location)
 
