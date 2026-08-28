@@ -121,15 +121,25 @@ export function isVisionSupported(): boolean {
  * turns that into one build.
  */
 export function visionDiagnostics(): string {
-  let turbo = 'absent';
+  const bridge = NativeModules.Onnxruntime != null ? 'yes' : 'no';
+
+  let turbo: string;
   try {
-    turbo = TurboModuleRegistry.get('Onnxruntime') != null ? 'present' : 'absent';
+    // getEnforcing rather than get: it throws with the registry's own
+    // explanation, which is the difference between "not registered" and
+    // "registered but failed to construct".
+    turbo = TurboModuleRegistry.getEnforcing('Onnxruntime') != null ? 'yes' : 'null';
   } catch (error) {
-    turbo = `threw ${(error as Error).message}`;
+    turbo = `no (${(error as Error).message.slice(0, 90)})`;
   }
-  const bridge = NativeModules.Onnxruntime != null ? 'present' : 'absent';
-  const visible = Object.keys(NativeModules ?? {}).length;
-  return `NativeModules.Onnxruntime ${bridge}; TurboModuleRegistry ${turbo}; ${visible} bridge modules visible; RN bridgeless`;
+
+  // The JSI global is what inference actually needs; the native module only
+  // exists to install it. If this is present the module worked even if the
+  // lookups above look odd.
+  const ortApi =
+    typeof (globalThis as Record<string, unknown>).OrtApi !== 'undefined' ? 'yes' : 'no';
+
+  return `bridge:${bridge} turbo:${turbo} OrtApi:${ortApi}`;
 }
 
 /**

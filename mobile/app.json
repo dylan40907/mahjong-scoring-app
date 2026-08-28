@@ -56,7 +56,8 @@
         }
       ],
       "expo-updates",
-      "./plugins/with-onnxruntime-gradle9-fix"
+      "./plugins/with-onnxruntime-gradle9-fix",
+      "./plugins/with-onnxruntime-bridgeless-fix"
     ],
     "experiments": {
       "typedRoutes": true,
