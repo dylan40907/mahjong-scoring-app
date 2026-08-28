@@ -346,16 +346,29 @@ class CropDataset(Dataset):
 
         if self.train:
             # Random-resized crop: geometric jitter on top of what was baked in.
-            sw = int(CROP_STORE_W * rng.uniform(0.86, 1.0))
-            sh = int(CROP_STORE_H * rng.uniform(0.86, 1.0))
+            sw = int(CROP_STORE_W * rng.uniform(0.78, 1.0))
+            sh = int(CROP_STORE_H * rng.uniform(0.78, 1.0))
             x = int(rng.integers(0, CROP_STORE_W - sw + 1))
             y = int(rng.integers(0, CROP_STORE_H - sh + 1))
             crop = crop[y : y + sh, x : x + sw]
 
-            if rng.random() < 0.35:
-                angle = rng.uniform(-7, 7)
+            # Rotation is the augmentation that matters most here, and it used
+            # to be far too timid at +/-7 degrees on a third of samples. A
+            # detector box is the axis-aligned hull of a tile, so a tile lying
+            # at an angle arrives inside the crop at that same angle - real
+            # crops from photographs sit at 30 to 45 degrees routinely. The
+            # cost falls almost entirely on flowers and seasons, whose
+            # distinguishing marks (a corner numeral, a small glyph) rotate out
+            # of frame while a suit tile's whole face still reads.
+            if rng.random() < 0.75:
+                angle = rng.uniform(-24, 24)
                 h, w = crop.shape[:2]
                 matrix = cv2.getRotationMatrix2D((w / 2, h / 2), angle, 1.0)
+                # Shift the centre too: detector boxes are rarely centred on
+                # the tile, and a corner mark is the first thing an off-centre
+                # crop loses.
+                matrix[0, 2] += rng.normal(0, w * 0.035)
+                matrix[1, 2] += rng.normal(0, h * 0.035)
                 crop = cv2.warpAffine(crop, matrix, (w, h), borderMode=cv2.BORDER_REPLICATE)
 
         crop = cv2.resize(crop, (CROP_TRAIN_W, CROP_TRAIN_H), interpolation=cv2.INTER_AREA)

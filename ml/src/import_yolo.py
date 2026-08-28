@@ -51,6 +51,7 @@ MAX_SOURCE_WIDTH = 1280
 # marked below are conventional-order assumptions and are what --contact-sheet
 # exists to verify.
 CLASS_MAP: dict[str, str] = {
+    # --- Jon Chan's naming: suit letter after the rank -------------------
     **{f"{rank}B": f"sou{rank}" for rank in range(1, 10)},   # Bamboo
     **{f"{rank}C": f"man{rank}" for rank in range(1, 10)},   # Characters
     **{f"{rank}D": f"pin{rank}" for rank in range(1, 10)},   # Dots
@@ -61,9 +62,28 @@ CLASS_MAP: dict[str, str] = {
     "3F": "flower_chrysanthemum", "4F": "flower_bamboo",
     "1S": "season_spring", "2S": "season_summer",
     "3S": "season_autumn", "4S": "season_winter",
+
+    # --- Spelled-out naming (Roman Nguyen and similar) -------------------
+    **{f"bamboo_{rank}": f"sou{rank}" for rank in range(1, 10)},
+    **{f"character_{rank}": f"man{rank}" for rank in range(1, 10)},
+    **{f"circle_{rank}": f"pin{rank}" for rank in range(1, 10)},
+    # east/south/west/north and red/green/white already match our codes.
+    **{code: code for code in
+       ("east", "south", "west", "north", "red", "green", "white")},
+
+    # --- Riichi shorthand: 1m/1p/1s suits, 1z-7z honours -----------------
+    # The honour order here is the standard one - E, S, W, N, haku, hatsu,
+    # chun - which is NOT our dragon order (red, green, white). Getting it
+    # backwards silently swaps two dragons, so --contact-sheet covers it.
+    **{f"{rank}m": f"man{rank}" for rank in range(1, 10)},
+    **{f"{rank}p": f"pin{rank}" for rank in range(1, 10)},
+    **{f"{rank}s": f"sou{rank}" for rank in range(1, 10)},
+    "1z": "east", "2z": "south", "3z": "west", "4z": "north",
+    "5z": "white", "6z": "green", "7z": "red",
 }
 
-UNVERIFIED = {"1F", "2F", "3F", "4F", "1S", "2S", "3S", "4S"}
+UNVERIFIED = {"1F", "2F", "3F", "4F", "1S", "2S", "3S", "4S",
+              "5z", "6z", "7z"}
 
 
 def read_class_names(root: Path) -> list[str]:

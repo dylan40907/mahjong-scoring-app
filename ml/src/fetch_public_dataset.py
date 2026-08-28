@@ -40,10 +40,32 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ML_ROOT = HERE.parent
 
-WORKSPACE = "jon-chan-gnsoa"
-PROJECT = "mahjong-baq4s"
-VERSION = 83
 FORMAT = "yolov8"
+
+# Public sources worth pulling, with their licence recorded here rather than in
+# a comment somewhere else. `bonus` marks the ones that carry flowers and
+# seasons: most public mahjong data is Riichi, which has none, so those sets
+# broaden the 34 suit and honour classes but cannot help the other eight.
+DATASETS: dict[str, dict] = {
+    "jon-chan": {
+        "workspace": "jon-chan-gnsoa",
+        "project": "mahjong-baq4s",
+        "version": 83,
+        "licence": "CC BY 4.0",
+        "classes": 42,
+        "bonus": True,
+        "note": "Physical sets on real tables; the only public 42-class set found.",
+    },
+    "roman-nguyen": {
+        "workspace": "roman-nguyen",
+        "project": "mahjong-vtacs",
+        "version": 1,
+        "licence": "MIT",
+        "classes": 34,
+        "bonus": False,
+        "note": "A different physical set, laid out in grids. Suits and honours only.",
+    },
+}
 
 
 def read_key() -> str:
@@ -77,7 +99,7 @@ def read_key() -> str:
     )
 
 
-def download(destination: Path) -> Path:
+def download(destination: Path, spec: dict) -> Path:
     if (destination / "data.yaml").exists():
         print(f"Already downloaded -> {destination}")
         return destination
@@ -89,9 +111,14 @@ def download(destination: Path) -> Path:
     except ImportError:
         raise SystemExit("pip install roboflow")
 
-    print(f"Downloading {WORKSPACE}/{PROJECT} v{VERSION} as {FORMAT}...")
+    print(f"Downloading {spec['workspace']}/{spec['project']} "
+          f"v{spec['version']} as {FORMAT} ({spec['licence']})...")
     roboflow = Roboflow(api_key=key)
-    version = roboflow.workspace(WORKSPACE).project(PROJECT).version(VERSION)
+    version = (
+        roboflow.workspace(spec["workspace"])
+        .project(spec["project"])
+        .version(spec["version"])
+    )
     dataset = version.download(FORMAT, location=str(destination))
     return Path(dataset.location)
 
@@ -107,23 +134,33 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("--download-dir", type=Path, default=ML_ROOT / "downloads" / "mahjong-83")
-    parser.add_argument("--out", type=Path, default=ML_ROOT / "data" / "real" / "public")
+    parser.add_argument("--dataset", choices=sorted(DATASETS), default="jon-chan",
+                        help="Which public source to pull; see DATASETS.")
+    parser.add_argument("--download-dir", type=Path, default=None)
+    parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--runs", type=Path, default=ML_ROOT / "runs")
     parser.add_argument("--contact-sheet", type=Path,
-                        default=ML_ROOT.parent / "docs" / "images" / "public-classes.png")
+                        default=None)
     parser.add_argument("--splits", nargs="+", default=["valid", "test"])
     parser.add_argument("--no-eval", action="store_true", help="Stop after importing")
     args = parser.parse_args()
 
-    root = download(args.download_dir)
+    spec = DATASETS[args.dataset]
+    download_dir = args.download_dir or ML_ROOT / "downloads" / args.dataset
+    out_base = args.out or ML_ROOT / "data" / "real" / args.dataset
+
+    if not spec["bonus"]:
+        print(f"Note: {args.dataset} has {spec['classes']} classes and no flowers or "
+              "seasons. It broadens the suits and honours; it cannot help the bonus tiles.")
+
+    root = download(download_dir, spec)
 
     # One directory per split, never merged. Validation and test have to stay
     # separable or the best epoch gets chosen against the same photographs the
     # final number is reported on.
     total = 0
     for index, split in enumerate(args.splits):
-        out = args.out.parent / f"{args.out.name}_{split}"
+        out = out_base.parent / f"{out_base.name}_{split}"
         command = [
             sys.executable, str(HERE / "import_yolo.py"),
             "--root", str(root),
@@ -131,8 +168,10 @@ def main() -> None:
             "--merge",
             "--splits", split,
         ]
+        sheet = args.contact_sheet or (
+            ML_ROOT.parent / "docs" / "images" / f"classes-{args.dataset}.png")
         if index == 0:
-            command += ["--contact-sheet", str(args.contact_sheet)]
+            command += ["--contact-sheet", str(sheet)]
         run(command)
 
         annotations = json.loads((out / "annotations.json").read_text(encoding="utf-8"))
@@ -154,7 +193,7 @@ def main() -> None:
 
     run([
         sys.executable, str(HERE / "evaluate.py"),
-        "--roots", str(args.out.parent / f"{args.out.name}_test"),
+        "--roots", str(out_base.parent / f"{out_base.name}_test"),
         "--runs", str(args.runs),
         "--out", str(args.runs / "evaluation-real.json"),
     ])

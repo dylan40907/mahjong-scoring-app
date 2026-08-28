@@ -29,20 +29,20 @@ detector, so detection here is measured honestly.
 | Detection AP@0.5 | 0.9106 |
 | Detection precision @ 0.40 | 0.9552 |
 | Detection recall @ 0.40 | 0.9185 |
-| Classifier top-1, on found tiles | 0.9824 |
-| Classifier top-3, on found tiles | 0.9944 |
-| **Per-tile accuracy, end to end** | **0.9024** |
-| **Hand read perfectly** | **0.5933** |
+| Classifier top-1, on found tiles | 0.9888 |
+| Classifier top-3, on found tiles | 0.9958 |
+| **Per-tile accuracy, end to end** | **0.9082** |
+| **Hand read perfectly** | **0.6250** |
 | Tile count correct | 0.6972 |
 
 "Hand read perfectly" means every tile in a scene was found *and* named
 correctly: no misses, no extras, no misreads. It is much harsher than the
 component figures and it is the number that describes what a user experiences.
 13 tiles is 13 independent
-chances to be wrong, so 90.2% per-tile accuracy yields about
-59% of hands clean.
+chances to be wrong, so 90.8% per-tile accuracy yields about
+62% of hands clean.
 
-Top-3 at 0.994 matters more than it looks. The review screen offers
+Top-3 at 0.996 matters more than it looks. The review screen offers
 the three most likely tiles when a detection is tapped, so top-3 is the
 accuracy of the correction path: when the model is wrong, the right answer is
 almost always one tap away.
@@ -61,9 +61,9 @@ training data.
 | Metric | Original models | Current models |
 |---|---|---|
 | Detection AP@0.5 | 0.9910 | 0.9916 |
-| Classifier top-1 | 0.9998 | 0.9963 |
-| Per-tile accuracy | 0.9910 | 0.9884 |
-| Hand read perfectly | 0.8760 | 0.8340 |
+| Classifier top-1 | 0.9998 | 0.9977 |
+| Per-tile accuracy | 0.9910 | 0.9897 |
+| Hand read perfectly | 0.8760 | 0.8460 |
 
 Fine-tuning on real photographs *alone* was tried first and rejected: it
 reached 0.521 on real hands but collapsed to
@@ -79,19 +79,18 @@ against the metric the app actually cares about:
 
 | Threshold | Hand read perfectly | Tile count correct |
 |---|---|---|
-| 0.20 | 0.408 | 0.463 |
-| 0.30 | 0.539 | 0.646 |
-| 0.35 | 0.578 | 0.688 |
-| 0.40 | 0.593 | 0.697 |
-| 0.50 | 0.491 | 0.555 |
-| 0.60 | 0.167 | 0.176 |
+| 0.30 | 0.569 | 0.646 |
+| 0.35 | 0.607 | 0.688 |
+| 0.40 | 0.625 | 0.697 |
+| 0.45 | 0.595 | 0.653 |
+| 0.50 | 0.511 | 0.555 |
 
 The app ships at 0.40. Below it, partial tiles at the frame edge start being
 detected as whole ones; above it, genuine tiles are dropped.
 
 ### Latency
 
-24.3 ms median per photograph, 68.5 ms at the 95th
+19.4 ms median per photograph, 27.8 ms at the 95th
 percentile, measured single-threaded on CPU. A phone is comparable; the models
 are small enough that decoding the JPEG is a meaningful share of the total.
 
@@ -142,7 +141,7 @@ or heavy wear is still out of distribution. `ml/src/ingest_photos.py` and
 **Bonus tiles are the weakest classes.** Flowers and seasons have the thinnest
 real support, and the two sources disagree about what they look like - the
 renders draw the CJK glyphs, the photographs show pictorial illustrations. They
-sit around 0.86 where the suits sit near 1.00.
+sit around 0.91 where the suits sit near 1.00.
 
 **Face-down and edge-on tiles are detected but not named.** The real data
 contains tiles standing in a wall, so the detector often finds them. The
@@ -195,8 +194,8 @@ python src/export_onnx.py --runs runs/mixed --out ../mobile/assets/models
 ```
 
 Checkpoints selected: detector epoch 16 (validation AP@0.5
-0.9623), classifier epoch 13 (validation top-1
-0.9831), both against the mixed validation set.
+0.9623), classifier epoch 20 (validation top-1
+0.9871), both against the mixed validation set.
 
 ## Export
 

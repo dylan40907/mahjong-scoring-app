@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.utils.data import ConcatDataset, DataLoader
+from torch.utils.data import ConcatDataset, DataLoader, WeightedRandomSampler
 
 sys.path.insert(0, str(Path(__file__).parent))
 from data import CropDataset  # noqa: E402
@@ -84,6 +84,12 @@ def main() -> None:
              "entry point. See train_detector.py for why this is not resuming.",
     )
     parser.add_argument("--device", type=str, default="auto", help="cuda, cpu, or auto")
+    parser.add_argument(
+        "--balance", action="store_true",
+        help="Sample classes evenly. Bonus tiles are 8 of 144 in a real wall and "
+             "correspondingly thin in the crops, so without this the eight classes "
+             "that actually need the attention are outvoted three to one.",
+    )
     args = parser.parse_args()
 
     device = torch.device(
@@ -97,8 +103,21 @@ def main() -> None:
 
     train_set = ConcatDataset([CropDataset(store, train=True) for store in args.train_store])
     val_set = ConcatDataset([CropDataset(store, train=False) for store in args.val_store])
+    labels = np.concatenate([dataset.labels for dataset in train_set.datasets])
+    sampler = None
+    if args.balance:
+        counts = np.bincount(labels, minlength=NUM_CLASSES).astype(np.float64)
+        weight = np.divide(1.0, counts, out=np.zeros_like(counts), where=counts > 0)
+        sampler = WeightedRandomSampler(
+            weights=torch.from_numpy(weight[labels]),
+            num_samples=len(labels),
+            replacement=True,
+        )
+        print(f"balanced sampling: support ranged {int(counts[counts > 0].min())} "
+              f"to {int(counts.max())} before weighting")
+
     train_loader = DataLoader(
-        train_set, batch_size=args.batch_size, shuffle=True,
+        train_set, batch_size=args.batch_size, shuffle=sampler is None, sampler=sampler,
         num_workers=args.workers, drop_last=True, persistent_workers=args.workers > 0,
     )
     val_loader = DataLoader(

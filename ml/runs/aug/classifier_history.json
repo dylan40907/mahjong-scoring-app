@@ -1,0 +1,200 @@
+[
+  {
+    "epoch": 0,
+    "loss": 0.6544529406391845,
+    "top1": 0.98054,
+    "top3": 0.99321,
+    "worst_class": 0.8704,
+    "worst_class_name": "season_spring",
+    "seconds": 40.9
+  },
+  {
+    "epoch": 1,
+    "loss": 0.645047410742029,
+    "top1": 0.98139,
+    "top3": 0.9934,
+    "worst_class": 0.9,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 22.4
+  },
+  {
+    "epoch": 2,
+    "loss": 0.6310881296646175,
+    "top1": 0.98289,
+    "top3": 0.99412,
+    "worst_class": 0.8929,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 20.8
+  },
+  {
+    "epoch": 3,
+    "loss": 0.620264166693077,
+    "top1": 0.98263,
+    "top3": 0.99412,
+    "worst_class": 0.9044,
+    "worst_class_name": "season_autumn",
+    "seconds": 21.0
+  },
+  {
+    "epoch": 4,
+    "loss": 0.6127503109553307,
+    "top1": 0.98407,
+    "top3": 0.99406,
+    "worst_class": 0.9071,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 24.5
+  },
+  {
+    "epoch": 5,
+    "loss": 0.6023137013744113,
+    "top1": 0.98315,
+    "top3": 0.99393,
+    "worst_class": 0.9214,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 26.6
+  },
+  {
+    "epoch": 6,
+    "loss": 0.5952072983991237,
+    "top1": 0.98361,
+    "top3": 0.99425,
+    "worst_class": 0.9214,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 28.6
+  },
+  {
+    "epoch": 7,
+    "loss": 0.5898394151720355,
+    "top1": 0.98394,
+    "top3": 0.99367,
+    "worst_class": 0.8929,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 22.5
+  },
+  {
+    "epoch": 8,
+    "loss": 0.5845529168899515,
+    "top1": 0.98518,
+    "top3": 0.99406,
+    "worst_class": 0.8857,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 24.0
+  },
+  {
+    "epoch": 9,
+    "loss": 0.5804873545669669,
+    "top1": 0.98629,
+    "top3": 0.99451,
+    "worst_class": 0.9357,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 24.9
+  },
+  {
+    "epoch": 10,
+    "loss": 0.5754762138749762,
+    "top1": 0.98452,
+    "top3": 0.99406,
+    "worst_class": 0.9143,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 24.5
+  },
+  {
+    "epoch": 11,
+    "loss": 0.5686171620476003,
+    "top1": 0.9855,
+    "top3": 0.99445,
+    "worst_class": 0.9,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 22.5
+  },
+  {
+    "epoch": 12,
+    "loss": 0.56582018185635,
+    "top1": 0.98459,
+    "top3": 0.99445,
+    "worst_class": 0.9191,
+    "worst_class_name": "season_autumn",
+    "seconds": 24.2
+  },
+  {
+    "epoch": 13,
+    "loss": 0.5599349605572688,
+    "top1": 0.98609,
+    "top3": 0.99458,
+    "worst_class": 0.9286,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 23.4
+  },
+  {
+    "epoch": 14,
+    "loss": 0.5560408313663638,
+    "top1": 0.98596,
+    "top3": 0.99438,
+    "worst_class": 0.9198,
+    "worst_class_name": "season_spring",
+    "seconds": 23.5
+  },
+  {
+    "epoch": 15,
+    "loss": 0.5545452639101166,
+    "top1": 0.98661,
+    "top3": 0.99445,
+    "worst_class": 0.9143,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 22.8
+  },
+  {
+    "epoch": 16,
+    "loss": 0.549227201374652,
+    "top1": 0.98674,
+    "top3": 0.99438,
+    "worst_class": 0.9214,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 22.6
+  },
+  {
+    "epoch": 17,
+    "loss": 0.5475005241515243,
+    "top1": 0.98648,
+    "top3": 0.99451,
+    "worst_class": 0.9286,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 24.0
+  },
+  {
+    "epoch": 18,
+    "loss": 0.5454807375490334,
+    "top1": 0.98661,
+    "top3": 0.99438,
+    "worst_class": 0.9286,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 23.4
+  },
+  {
+    "epoch": 19,
+    "loss": 0.5449527635313364,
+    "top1": 0.98655,
+    "top3": 0.99445,
+    "worst_class": 0.9286,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 23.9
+  },
+  {
+    "epoch": 20,
+    "loss": 0.5458047639350502,
+    "top1": 0.98707,
+    "top3": 0.99432,
+    "worst_class": 0.9286,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 23.6
+  },
+  {
+    "epoch": 21,
+    "loss": 0.5459579240413234,
+    "top1": 0.98687,
+    "top3": 0.99445,
+    "worst_class": 0.9357,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 23.8
+  }
+]

@@ -16,8 +16,8 @@
     "inputWidth": 48,
     "inputHeight": 64,
     "trained": true,
-    "top1": 0.9830873710330417,
-    "maxOnnxDrift": 2.86102294921875e-06
+    "top1": 0.9870706543032519,
+    "maxOnnxDrift": 2.1457672119140625e-06
   },
   "classes": [
     "man1",
