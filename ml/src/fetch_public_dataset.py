@@ -56,16 +56,24 @@ DATASETS: dict[str, dict] = {
         "bonus": True,
         "note": "Physical sets on real tables; the only public 42-class set found.",
     },
-    "roman-nguyen": {
-        "workspace": "roman-nguyen",
-        "project": "mahjong-vtacs",
+    "riichi-6810": {
+        "workspace": "project-xv49e",
+        "project": "mahjong-x5dzz",
         "version": 1,
-        "licence": "MIT",
+        "licence": "CC BY 4.0",
         "classes": 34,
         "bonus": False,
-        "note": "A different physical set, laid out in grids. Suits and honours only.",
+        "note": "6,810 photographs, one tight box per tile, Riichi 1m/1z naming.",
     },
 }
+
+# Checked and rejected, recorded so nobody pays to rediscover it:
+#
+#   roman-nguyen/mahjong-vtacs - boxes bound whole piles rather than tiles.
+#     Median box covers 20% of the image against 0.8% for a real tile
+#     annotation; only 74 of 4,673 boxes survive the import gate.
+#   test-wmo8i/mahjong_yolo - 86 classes named by opaque integers with no key.
+#   core-wlsb7/mahjong-soul - screenshots of a video game, not photographs.
 
 
 def read_key() -> str:

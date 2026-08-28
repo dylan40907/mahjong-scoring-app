@@ -139,6 +139,9 @@ def convert_split(
     max_width: int,
     samples: dict[int, list[np.ndarray]] | None,
     samples_per_class: int,
+    max_box_fraction: float,
+    min_aspect: float,
+    max_aspect: float,
 ) -> tuple[list[dict], dict[str, int]]:
     images_dir, labels_dir = split_dirs(root, split)
     out_images = out_dir / "images"
@@ -182,6 +185,25 @@ def convert_split(
             if our_code is None:
                 skipped[f"unmapped class {their_name}"] = (
                     skipped.get(f"unmapped class {their_name}", 0) + 1
+                )
+                continue
+
+            # Sanity-check the annotation before trusting it. Public mahjong
+            # datasets vary wildly in what a "box" means: some annotate each
+            # tile, some draw one box round a whole pile and label it with a
+            # single class. The second kind is poison - it teaches the detector
+            # that a tile fills half the frame, and hands the classifier a crop
+            # containing thirty tiles under one label. A tile is about 1% of a
+            # photographed hand and has a 3:4 face, so both are checkable.
+            if bw * bh > max_box_fraction:
+                skipped["box too large to be one tile"] = (
+                    skipped.get("box too large to be one tile", 0) + 1
+                )
+                continue
+            aspect = (bh * height) / max(1e-6, bw * width)
+            if not (min_aspect <= aspect <= max_aspect):
+                skipped["implausible aspect for a tile"] = (
+                    skipped.get("implausible aspect for a tile", 0) + 1
                 )
                 continue
 
@@ -270,6 +292,15 @@ def main() -> None:
     parser.add_argument("--contact-sheet", type=Path, default=None,
                         help="Write a per-class verification sheet here")
     parser.add_argument("--samples-per-class", type=int, default=8)
+    parser.add_argument(
+        "--max-box-fraction", type=float, default=0.06,
+        help="Reject boxes covering more than this fraction of the image. A tile is "
+             "around 1%% of a photographed hand; anything much larger is a pile "
+             "annotated as one object.",
+    )
+    parser.add_argument("--min-aspect", type=float, default=0.7,
+                        help="Minimum box height/width. A tile face is about 1.33.")
+    parser.add_argument("--max-aspect", type=float, default=2.6)
     parser.add_argument("--max-width", type=int, default=MAX_SOURCE_WIDTH)
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args()
@@ -288,7 +319,8 @@ def main() -> None:
     for split in args.splits:
         out_dir = args.out if args.merge else args.out / split
         records, skipped = convert_split(
-            args.root, split, names, out_dir, args.max_width, samples, args.samples_per_class
+            args.root, split, names, out_dir, args.max_width, samples,
+            args.samples_per_class, args.max_box_fraction, args.min_aspect, args.max_aspect,
         )
         tiles = sum(len(record["labels"]) for record in records)
         print(f"\n{split}: {len(records)} images, {tiles} tiles -> {out_dir}")
