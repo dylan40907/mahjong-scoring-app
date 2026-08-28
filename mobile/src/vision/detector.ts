@@ -1,5 +1,6 @@
 import { NativeModules, Platform } from 'react-native';
 import { Asset } from 'expo-asset';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { decode as decodeJpeg } from 'jpeg-js';
 import type { InferenceSession as OrtSession, Tensor as OrtTensor } from 'onnxruntime-react-native';
@@ -83,13 +84,23 @@ export function isVisionSupported(): boolean {
   return NativeModules.Onnxruntime != null;
 }
 
-/** Why inference is unavailable, phrased for the capture screen. */
+/**
+ * Why inference is unavailable, phrased for the capture screen.
+ *
+ * Expo Go and a development build missing the native module produce the same
+ * `NativeModules.Onnxruntime == null`, but they need opposite advice: one is
+ * "make a development build", the other is "your build is stale, rebuild it".
+ * Blaming Expo Go in both cases sends you off to make a build you already have.
+ */
 export function visionUnavailableReason(): string | null {
   if (isVisionSupported()) return null;
   if (Platform.OS === 'web') {
     return 'Reading tiles from a photo needs the native app. Enter the hand by hand here.';
   }
-  return 'Expo Go cannot load the tile models. Everything else works — enter the hand by hand, or make a development build to read tiles from photos.';
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+    return 'Expo Go cannot load the tile models. Everything else works — enter the hand by hand, or open this in the development build to read tiles from photos.';
+  }
+  return 'This build is missing the tile-reading module. Rebuild it with "eas build --profile development --platform android" and install the new APK. Enter the hand by hand meanwhile.';
 }
 
 // ---------------------------------------------------------------------------
