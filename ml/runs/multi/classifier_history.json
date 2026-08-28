@@ -79,5 +79,122 @@
     "worst_class": 0.9109,
     "worst_class_name": "man3",
     "seconds": 42.5
+  },
+  {
+    "epoch": 9,
+    "loss": 0.5333074635890517,
+    "top1": 0.96551,
+    "top3": 0.99033,
+    "worst_class": 0.9071,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 39.5
+  },
+  {
+    "epoch": 10,
+    "loss": 0.5298441862673753,
+    "top1": 0.96829,
+    "top3": 0.99135,
+    "worst_class": 0.9057,
+    "worst_class_name": "sou9",
+    "seconds": 49.8
+  },
+  {
+    "epoch": 11,
+    "loss": 0.5270172801741093,
+    "top1": 0.96826,
+    "top3": 0.99172,
+    "worst_class": 0.8958,
+    "worst_class_name": "sou9",
+    "seconds": 48.1
+  },
+  {
+    "epoch": 12,
+    "loss": 0.5265680117442084,
+    "top1": 0.96923,
+    "top3": 0.99223,
+    "worst_class": 0.8909,
+    "worst_class_name": "sou9",
+    "seconds": 53.3
+  },
+  {
+    "epoch": 13,
+    "loss": 0.5209839736853502,
+    "top1": 0.96935,
+    "top3": 0.9912,
+    "worst_class": 0.9119,
+    "worst_class_name": "man3",
+    "seconds": 54.1
+  },
+  {
+    "epoch": 14,
+    "loss": 0.5182928494746977,
+    "top1": 0.96977,
+    "top3": 0.99135,
+    "worst_class": 0.9155,
+    "worst_class_name": "sou9",
+    "seconds": 52.9
+  },
+  {
+    "epoch": 15,
+    "loss": 0.5160678085241472,
+    "top1": 0.97059,
+    "top3": 0.99205,
+    "worst_class": 0.9109,
+    "worst_class_name": "man3",
+    "seconds": 33.1
+  },
+  {
+    "epoch": 16,
+    "loss": 0.5125948376789009,
+    "top1": 0.97019,
+    "top3": 0.99193,
+    "worst_class": 0.9032,
+    "worst_class_name": "sou9",
+    "seconds": 33.7
+  },
+  {
+    "epoch": 17,
+    "loss": 0.5128446978040928,
+    "top1": 0.96935,
+    "top3": 0.99148,
+    "worst_class": 0.8827,
+    "worst_class_name": "sou9",
+    "seconds": 35.3
+  },
+  {
+    "epoch": 18,
+    "loss": 0.5110550681252543,
+    "top1": 0.97186,
+    "top3": 0.99172,
+    "worst_class": 0.919,
+    "worst_class_name": "man3",
+    "seconds": 38.3
+  },
+  {
+    "epoch": 19,
+    "loss": 0.5095370548814315,
+    "top1": 0.97065,
+    "top3": 0.99184,
+    "worst_class": 0.916,
+    "worst_class_name": "man3",
+    "seconds": 38.1
+  },
+  {
+    "epoch": 20,
+    "loss": 0.5059904582546105,
+    "top1": 0.97146,
+    "top3": 0.9922,
+    "worst_class": 0.9057,
+    "worst_class_name": "sou9",
+    "seconds": 40.3
+  },
+  {
+    "epoch": 21,
+    "loss": 0.5068111612800295,
+    "top1": 0.97162,
+    "top3": 0.99178,
+    "worst_class": 0.9081,
+    "worst_class_name": "sou9",
+    "seconds": 37.4
   }
 ]

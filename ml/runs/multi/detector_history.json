@@ -43,5 +43,32 @@
     "precision": 0.9766,
     "recall": 0.9319,
     "exact_count": 0.681
+  },
+  {
+    "epoch": 5,
+    "loss": 0.7056363321344058,
+    "seconds": 166.7,
+    "ap50": 0.9589,
+    "precision": 0.9704,
+    "recall": 0.9412,
+    "exact_count": 0.7281
+  },
+  {
+    "epoch": 6,
+    "loss": 0.6881525747974714,
+    "seconds": 164.6,
+    "ap50": 0.9586,
+    "precision": 0.9611,
+    "recall": 0.9483,
+    "exact_count": 0.7609
+  },
+  {
+    "epoch": 7,
+    "loss": 0.6830855950713157,
+    "seconds": 161.2,
+    "ap50": 0.9613,
+    "precision": 0.9683,
+    "recall": 0.944,
+    "exact_count": 0.7256
   }
 ]

@@ -95,6 +95,14 @@ CLASS_MAP: dict[str, str] = {
     "f3": "flower_chrysanthemum", "f4": "flower_bamboo",
     "f5": "season_spring", "f6": "season_summer",
     "f7": "season_autumn", "f8": "season_winter",
+
+    # --- Stragglers from datasets merged without deduplicating their class
+    # --- lists, so the same tile appears under two names (m2 and 2man both
+    # --- exist in mahjong-tiles-merged). Harmless: both map to one code.
+    **{f"{rank}man": f"man{rank}" for rank in range(1, 10)},
+    **{f"{rank}pin": f"pin{rank}" for rank in range(1, 10)},
+    **{f"{rank}sou": f"sou{rank}" for rank in range(1, 10)},
+    "haku": "white", "hatsu": "green", "chun": "red",
 }
 
 UNVERIFIED = {"1F", "2F", "3F", "4F", "1S", "2S", "3S", "4S",

@@ -65,16 +65,16 @@ DATASETS: dict[str, dict] = {
         "bonus": False,
         "note": "6,810 photographs, one tight box per tile, Riichi 1m/1z naming.",
     },
-    "non-riichi": {
+    "merged-bonus": {
         "workspace": "test-ag8z6",
-        "project": "mahjong-tiles-non-riichi",
-        "version": None,          # discovered; this project exposes no version list
+        "project": "mahjong-tiles-merged",
+        "version": 1,
         "licence": "CC BY 4.0",
-        "classes": 42,
+        "classes": 54,
         "bonus": True,
-        "note": "905 photographs of a hand laid out in a row on a table, seen "
-                "from the player's seat - the app's own scenario - and one of "
-                "only two public sources with flowers and seasons.",
+        "note": "1,744 photographs including flowers and seasons. 54 classes "
+                "because two datasets were merged without deduplicating their "
+                "class lists - m2 and 2man both appear - but every name maps.",
     },
 }
 
@@ -85,6 +85,11 @@ DATASETS: dict[str, dict] = {
 #     annotation; only 74 of 4,673 boxes survive the import gate.
 #   test-wmo8i/mahjong_yolo - 86 classes named by opaque integers with no key.
 #   core-wlsb7/mahjong-soul - screenshots of a video game, not photographs.
+#   test-ag8z6/mahjong-tiles-non-riichi - 905 images, 42 classes, and the best
+#     match to the app's own framing, but no version was ever generated, so
+#     there is nothing to download. Fork it on Roboflow and generate one if it
+#     is ever worth the effort; mahjong-tiles-merged from the same owner
+#     appears to contain it and is downloadable.
 
 
 def read_key() -> str:
