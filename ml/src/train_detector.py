@@ -63,7 +63,7 @@ def average_precision(
     rows: list[tuple[float, int]] = []
     total_truth = 0
     exact_count_hits = 0
-    operating_threshold = 0.40  # keep in step with evaluate.SCORE_THRESHOLD
+    operating_threshold = 0.35  # keep in step with evaluate.SCORE_THRESHOLD
 
     for (boxes, scores), truth in zip(predictions, truths):
         total_truth += len(truth)

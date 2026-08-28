@@ -65,17 +65,6 @@ DATASETS: dict[str, dict] = {
         "bonus": False,
         "note": "6,810 photographs, one tight box per tile, Riichi 1m/1z naming.",
     },
-    "on-table": {
-        "workspace": "ethans-workspace-0lwzf",
-        "project": "mahjong-tiles-on-table-qkcez",
-        "version": 2,
-        "licence": "CC BY 4.0",
-        "classes": 39,
-        "bonus": True,
-        "note": "Tiles laid out on a table - the closest match to what the app is "
-                "pointed at. Jon Chan's naming, already verified. Four flowers and "
-                "no seasons; its aruco_marker class is unmapped and skipped.",
-    },
     "merged-bonus": {
         "workspace": "test-ag8z6",
         "project": "mahjong-tiles-merged",
@@ -99,6 +88,11 @@ DATASETS: dict[str, dict] = {
 #   roman-nguyen/mahjong-vtacs - boxes bound whole piles rather than tiles.
 #     Median box covers 20% of the image against 0.8% for a real tile
 #     annotation; only 74 of 4,673 boxes survive the import gate.
+#   ethans-workspace-0lwzf/mahjong-tiles-on-table - 827 images and the right
+#     subject, but the boxes are at the wrong scale entirely: huge overlapping
+#     rectangles across most of the frame while the tiles are specks. Median box
+#     covers 16% of the image and 86% of boxes fail the size gate. Looks like a
+#     robot-arm rig whose annotations were never rescaled to the images.
 #   test-wmo8i/mahjong_yolo - 86 classes named by opaque integers with no key.
 #   core-wlsb7/mahjong-soul - screenshots of a video game, not photographs.
 #   test-ag8z6/mahjong-tiles-non-riichi - 905 images, 42 classes, and the best

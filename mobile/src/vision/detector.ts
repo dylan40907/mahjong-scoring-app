@@ -35,10 +35,18 @@ const DETECTOR_INPUT = 320;
 const CROP_WIDTH = 48;
 const CROP_HEIGHT = 64;
 const MAX_SOURCE_WIDTH = 1280;
-// Swept against whole-hand accuracy on both held-out test splits after the
-// real-photo fine-tune; 0.40 is the joint peak (real 0.593, synthetic 0.834).
-// It was 0.35 when the models had only seen renders. See docs/model-card.md.
-const SCORE_THRESHOLD = 0.4;
+/**
+ * Swept against whole-hand accuracy on every held-out split.
+ *
+ * 0.35 and 0.40 are within noise of each other - about two scenes - but 0.35
+ * wins on the one benchmark the models have never trained on (0.620 against
+ * 0.609), and it sits further from the cliff: accuracy falls away sharply above
+ * 0.45 as genuine tiles start being dropped. On an unfamiliar tile set, margin
+ * from the cliff is worth more than a tenth of a point on a familiar one.
+ *
+ * See docs/model-card.md for both sweeps.
+ */
+const SCORE_THRESHOLD = 0.35;
 const MAX_TILES = 40;
 
 export type VisionAvailability = 'ready' | 'loading' | 'unsupported' | 'error';

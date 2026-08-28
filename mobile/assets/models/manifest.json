@@ -5,10 +5,10 @@
     "trained": true,
     "maxOnnxDrift": 3.0517578125e-05,
     "metrics": {
-      "ap50": 0.9622879411929439,
-      "precision": 0.9519900983649273,
-      "recall": 0.9542902112007141,
-      "exact_count": 0.7306397306397306
+      "ap50": 0.9648845682726348,
+      "precision": 0.9732184598944768,
+      "recall": 0.9515476226806641,
+      "exact_count": 0.7685185185185185
     }
   },
   "classifier": {
@@ -16,8 +16,8 @@
     "inputWidth": 48,
     "inputHeight": 64,
     "trained": true,
-    "top1": 0.9870706543032519,
-    "maxOnnxDrift": 2.1457672119140625e-06
+    "top1": 0.9718569571657447,
+    "maxOnnxDrift": 3.814697265625e-06
   },
   "classes": [
     "man1",
