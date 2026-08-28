@@ -65,6 +65,17 @@ DATASETS: dict[str, dict] = {
         "bonus": False,
         "note": "6,810 photographs, one tight box per tile, Riichi 1m/1z naming.",
     },
+    "on-table": {
+        "workspace": "ethans-workspace-0lwzf",
+        "project": "mahjong-tiles-on-table-qkcez",
+        "version": 2,
+        "licence": "CC BY 4.0",
+        "classes": 39,
+        "bonus": True,
+        "note": "Tiles laid out on a table - the closest match to what the app is "
+                "pointed at. Jon Chan's naming, already verified. Four flowers and "
+                "no seasons; its aruco_marker class is unmapped and skipped.",
+    },
     "merged-bonus": {
         "workspace": "test-ag8z6",
         "project": "mahjong-tiles-merged",
