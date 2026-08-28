@@ -1,0 +1,110 @@
+[
+  {
+    "epoch": 0,
+    "loss": 1.781429447136916,
+    "top1": 0.86727,
+    "top3": 0.95713,
+    "worst_class": 0.2051,
+    "worst_class_name": "season_summer",
+    "seconds": 46.7
+  },
+  {
+    "epoch": 1,
+    "loss": 1.0491284229538658,
+    "top1": 0.92299,
+    "top3": 0.98112,
+    "worst_class": 0.369,
+    "worst_class_name": "season_autumn",
+    "seconds": 18.7
+  },
+  {
+    "epoch": 2,
+    "loss": 0.9009823938468834,
+    "top1": 0.94026,
+    "top3": 0.98534,
+    "worst_class": 0.5238,
+    "worst_class_name": "season_autumn",
+    "seconds": 19.4
+  },
+  {
+    "epoch": 3,
+    "loss": 0.8297509973699396,
+    "top1": 0.95341,
+    "top3": 0.98695,
+    "worst_class": 0.5116,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 20.6
+  },
+  {
+    "epoch": 4,
+    "loss": 0.7851524997067142,
+    "top1": 0.96094,
+    "top3": 0.98886,
+    "worst_class": 0.5955,
+    "worst_class_name": "season_spring",
+    "seconds": 21.7
+  },
+  {
+    "epoch": 5,
+    "loss": 0.7527316638401577,
+    "top1": 0.96265,
+    "top3": 0.98956,
+    "worst_class": 0.5955,
+    "worst_class_name": "season_spring",
+    "seconds": 21.7
+  },
+  {
+    "epoch": 6,
+    "loss": 0.7322433330795982,
+    "top1": 0.96817,
+    "top3": 0.98876,
+    "worst_class": 0.7528,
+    "worst_class_name": "season_spring",
+    "seconds": 21.9
+  },
+  {
+    "epoch": 7,
+    "loss": 0.71422941622796,
+    "top1": 0.96958,
+    "top3": 0.99016,
+    "worst_class": 0.75,
+    "worst_class_name": "season_autumn",
+    "seconds": 21.8
+  },
+  {
+    "epoch": 8,
+    "loss": 0.70343486349304,
+    "top1": 0.97068,
+    "top3": 0.99016,
+    "worst_class": 0.6854,
+    "worst_class_name": "season_spring",
+    "seconds": 21.3
+  },
+  {
+    "epoch": 9,
+    "loss": 0.6955790402053239,
+    "top1": 0.97249,
+    "top3": 0.98996,
+    "worst_class": 0.7791,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 20.1
+  },
+  {
+    "epoch": 10,
+    "loss": 0.6896029791274628,
+    "top1": 0.97229,
+    "top3": 0.99016,
+    "worst_class": 0.7303,
+    "worst_class_name": "season_spring",
+    "seconds": 21.0
+  },
+  {
+    "epoch": 11,
+    "loss": 0.6865279188403836,
+    "top1": 0.97249,
+    "top3": 0.99006,
+    "worst_class": 0.7674,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 20.9
+  }
+]

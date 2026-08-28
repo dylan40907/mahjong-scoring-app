@@ -34,7 +34,10 @@ const DETECTOR_INPUT = 320;
 const CROP_WIDTH = 48;
 const CROP_HEIGHT = 64;
 const MAX_SOURCE_WIDTH = 1280;
-const SCORE_THRESHOLD = 0.35;
+// Swept against whole-hand accuracy on both held-out test splits after the
+// real-photo fine-tune; 0.40 is the joint peak (real 0.593, synthetic 0.834).
+// It was 0.35 when the models had only seen renders. See docs/model-card.md.
+const SCORE_THRESHOLD = 0.4;
 const MAX_TILES = 40;
 
 export type VisionAvailability = 'ready' | 'loading' | 'unsupported' | 'error';

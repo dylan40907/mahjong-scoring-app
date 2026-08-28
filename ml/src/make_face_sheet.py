@@ -34,17 +34,31 @@ MUTED = (122, 132, 127)
 RULE = (208, 212, 209)
 PAPER = (250, 249, 246)
 
+# This sheet was first generated on Linux. Regenerating it anywhere else has to
+# find a different face, and falling through to Pillow's bitmap default renders
+# the class indices at 11px - too small to read from across a table, which is
+# the one job this page has. Each entry is (regular, bold).
 FONT_CANDIDATES = [
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+    ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/segoeuib.ttf"),
+    ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
+    ("/System/Library/Fonts/Supplemental/Arial.ttf",
+     "/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
 ]
 
 
-def _font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
-    path = FONT_CANDIDATES[1] if bold else FONT_CANDIDATES[0]
+def _font(size: int, bold: bool = False):
+    for regular, emphasis in FONT_CANDIDATES:
+        try:
+            return ImageFont.truetype(emphasis if bold else regular, size)
+        except OSError:
+            continue
+    # Pillow 10.1 made the built-in default scalable; older versions reject the
+    # argument and hand back the fixed-size bitmap face regardless.
     try:
-        return ImageFont.truetype(path, size)
-    except OSError:
+        return ImageFont.load_default(size)
+    except TypeError:
         return ImageFont.load_default()
 
 

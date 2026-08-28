@@ -3,12 +3,12 @@
     "file": "detector.onnx",
     "inputSize": 320,
     "trained": true,
-    "maxOnnxDrift": 6.103515625e-05,
+    "maxOnnxDrift": 3.0517578125e-05,
     "metrics": {
-      "ap50": 0.9997884154734749,
-      "precision": 0.9965004374453194,
-      "recall": 0.9956293702125549,
-      "exact_count": 0.94140625
+      "ap50": 0.9622879411929439,
+      "precision": 0.9519900983649273,
+      "recall": 0.9542902112007141,
+      "exact_count": 0.7306397306397306
     }
   },
   "classifier": {
@@ -16,8 +16,8 @@
     "inputWidth": 48,
     "inputHeight": 64,
     "trained": true,
-    "top1": 0.9990394877267876,
-    "maxOnnxDrift": 2.1457672119140625e-06
+    "top1": 0.9830873710330417,
+    "maxOnnxDrift": 2.86102294921875e-06
   },
   "classes": [
     "man1",

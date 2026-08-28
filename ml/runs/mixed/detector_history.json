@@ -1,0 +1,308 @@
+[
+  {
+    "epoch": 0,
+    "loss": 1.7351010249211238,
+    "seconds": 104.4,
+    "ap50": 0.8809,
+    "precision": 0.8782,
+    "recall": 0.8527,
+    "exact_count": 0.5269
+  },
+  {
+    "epoch": 1,
+    "loss": 1.1360310545334449,
+    "seconds": 71.7,
+    "ap50": 0.9182,
+    "precision": 0.9044,
+    "recall": 0.9073,
+    "exact_count": 0.6094
+  },
+  {
+    "epoch": 2,
+    "loss": 1.0185459992060295,
+    "seconds": 89.4,
+    "ap50": 0.9389,
+    "precision": 0.9308,
+    "recall": 0.9186,
+    "exact_count": 0.6178
+  },
+  {
+    "epoch": 3,
+    "loss": 0.9602381692482875,
+    "seconds": 122.7,
+    "ap50": 0.9377,
+    "precision": 0.9103,
+    "recall": 0.9333,
+    "exact_count": 0.601
+  },
+  {
+    "epoch": 4,
+    "loss": 0.9266670405864715,
+    "seconds": 161.8,
+    "ap50": 0.9428,
+    "precision": 0.918,
+    "recall": 0.9412,
+    "exact_count": 0.6473
+  },
+  {
+    "epoch": 5,
+    "loss": 0.8601666652239286,
+    "seconds": 172.8,
+    "ap50": 0.9486,
+    "precision": 0.9609,
+    "recall": 0.9197,
+    "exact_count": 0.6566
+  },
+  {
+    "epoch": 6,
+    "loss": 0.8717772807066257,
+    "seconds": 164.7,
+    "ap50": 0.951,
+    "precision": 0.9435,
+    "recall": 0.9406,
+    "exact_count": 0.6877
+  },
+  {
+    "epoch": 7,
+    "loss": 0.8233039298882852,
+    "seconds": 118.9,
+    "ap50": 0.9562,
+    "precision": 0.9513,
+    "recall": 0.9447,
+    "exact_count": 0.7205
+  },
+  {
+    "epoch": 8,
+    "loss": 0.8041021672578959,
+    "seconds": 78.3,
+    "ap50": 0.9583,
+    "precision": 0.9545,
+    "recall": 0.9436,
+    "exact_count": 0.7012
+  },
+  {
+    "epoch": 9,
+    "loss": 0.7867267310619355,
+    "seconds": 74.0,
+    "ap50": 0.9576,
+    "precision": 0.9363,
+    "recall": 0.9525,
+    "exact_count": 0.6911
+  },
+  {
+    "epoch": 10,
+    "loss": 0.7650170358327719,
+    "seconds": 59.8,
+    "ap50": 0.9536,
+    "precision": 0.9402,
+    "recall": 0.9483,
+    "exact_count": 0.7138
+  },
+  {
+    "epoch": 11,
+    "loss": 0.7568933733380758,
+    "seconds": 63.4,
+    "ap50": 0.9564,
+    "precision": 0.945,
+    "recall": 0.9467,
+    "exact_count": 0.6953
+  },
+  {
+    "epoch": 12,
+    "loss": 0.7376111949865635,
+    "seconds": 64.3,
+    "ap50": 0.9591,
+    "precision": 0.9392,
+    "recall": 0.9527,
+    "exact_count": 0.6961
+  },
+  {
+    "epoch": 13,
+    "loss": 0.7377078695939138,
+    "seconds": 62.5,
+    "ap50": 0.9548,
+    "precision": 0.9505,
+    "recall": 0.9456,
+    "exact_count": 0.7222
+  },
+  {
+    "epoch": 14,
+    "loss": 0.7074037283658982,
+    "seconds": 70.5,
+    "ap50": 0.9561,
+    "precision": 0.9551,
+    "recall": 0.9476,
+    "exact_count": 0.7382
+  },
+  {
+    "epoch": 15,
+    "loss": 0.709067462843198,
+    "seconds": 58.5,
+    "ap50": 0.9585,
+    "precision": 0.9594,
+    "recall": 0.9463,
+    "exact_count": 0.7424
+  },
+  {
+    "epoch": 16,
+    "loss": 0.6922008116657917,
+    "seconds": 64.5,
+    "ap50": 0.9623,
+    "precision": 0.952,
+    "recall": 0.9543,
+    "exact_count": 0.7306
+  },
+  {
+    "epoch": 17,
+    "loss": 0.6803972904498761,
+    "seconds": 61.8,
+    "ap50": 0.9598,
+    "precision": 0.9496,
+    "recall": 0.9517,
+    "exact_count": 0.7256
+  },
+  {
+    "epoch": 18,
+    "loss": 0.6793799114915041,
+    "seconds": 66.9,
+    "ap50": 0.9557,
+    "precision": 0.9559,
+    "recall": 0.9446,
+    "exact_count": 0.7348
+  },
+  {
+    "epoch": 19,
+    "loss": 0.6682770640804218,
+    "seconds": 67.3,
+    "ap50": 0.9588,
+    "precision": 0.9527,
+    "recall": 0.9492,
+    "exact_count": 0.734
+  },
+  {
+    "epoch": 20,
+    "loss": 0.6496860831975937,
+    "seconds": 65.0,
+    "ap50": 0.9577,
+    "precision": 0.9439,
+    "recall": 0.9508,
+    "exact_count": 0.7146
+  },
+  {
+    "epoch": 21,
+    "loss": 0.6513026734957328,
+    "seconds": 73.3,
+    "ap50": 0.9596,
+    "precision": 0.9509,
+    "recall": 0.9514,
+    "exact_count": 0.7492
+  },
+  {
+    "epoch": 22,
+    "loss": 0.6409251845799959,
+    "seconds": 58.5,
+    "ap50": 0.9584,
+    "precision": 0.9514,
+    "recall": 0.9514,
+    "exact_count": 0.729
+  },
+  {
+    "epoch": 23,
+    "loss": 0.6372109347811112,
+    "seconds": 67.3,
+    "ap50": 0.9572,
+    "precision": 0.9459,
+    "recall": 0.9506,
+    "exact_count": 0.7348
+  },
+  {
+    "epoch": 24,
+    "loss": 0.6299688429786608,
+    "seconds": 74.1,
+    "ap50": 0.9583,
+    "precision": 0.9529,
+    "recall": 0.95,
+    "exact_count": 0.7374
+  },
+  {
+    "epoch": 25,
+    "loss": 0.6357840778735968,
+    "seconds": 58.5,
+    "ap50": 0.958,
+    "precision": 0.9459,
+    "recall": 0.9513,
+    "exact_count": 0.7222
+  },
+  {
+    "epoch": 26,
+    "loss": 0.6112021987254803,
+    "seconds": 66.9,
+    "ap50": 0.9582,
+    "precision": 0.9565,
+    "recall": 0.9495,
+    "exact_count": 0.75
+  },
+  {
+    "epoch": 27,
+    "loss": 0.6172315150499343,
+    "seconds": 75.7,
+    "ap50": 0.9592,
+    "precision": 0.9551,
+    "recall": 0.9494,
+    "exact_count": 0.7348
+  },
+  {
+    "epoch": 28,
+    "loss": 0.6168423109329664,
+    "seconds": 61.9,
+    "ap50": 0.9579,
+    "precision": 0.9522,
+    "recall": 0.9508,
+    "exact_count": 0.7559
+  },
+  {
+    "epoch": 29,
+    "loss": 0.6092889986359156,
+    "seconds": 63.5,
+    "ap50": 0.9586,
+    "precision": 0.9537,
+    "recall": 0.9504,
+    "exact_count": 0.7348
+  },
+  {
+    "epoch": 30,
+    "loss": 0.6103413991056956,
+    "seconds": 72.0,
+    "ap50": 0.9581,
+    "precision": 0.9537,
+    "recall": 0.9498,
+    "exact_count": 0.7424
+  },
+  {
+    "epoch": 31,
+    "loss": 0.608938667178154,
+    "seconds": 59.9,
+    "ap50": 0.9577,
+    "precision": 0.9529,
+    "recall": 0.9498,
+    "exact_count": 0.7433
+  },
+  {
+    "epoch": 32,
+    "loss": 0.6053127806920272,
+    "seconds": 68.1,
+    "ap50": 0.958,
+    "precision": 0.9527,
+    "recall": 0.9504,
+    "exact_count": 0.7475
+  },
+  {
+    "epoch": 33,
+    "loss": 0.6060371445921752,
+    "seconds": 62.7,
+    "ap50": 0.9579,
+    "precision": 0.953,
+    "recall": 0.95,
+    "exact_count": 0.7449
+  }
+]

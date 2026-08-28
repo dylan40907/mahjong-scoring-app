@@ -311,10 +311,31 @@ class CropDataset(Dataset):
     """Cached tile crops with photometric and geometric augmentation."""
 
     def __init__(self, store_dir: Path, train: bool = True):
-        self.crops = np.load(store_dir / "crops.npy", mmap_mode="r")
-        self.labels = np.load(store_dir / "labels.npy")
-        self.crops = self.crops[: len(self.labels)]
+        self.store_dir = Path(store_dir)
+        self.labels = np.load(self.store_dir / "labels.npy")
         self.train = train
+        self._crops: np.ndarray | None = None
+
+    @property
+    def crops(self) -> np.ndarray:
+        """The crop store, opened on first use rather than in `__init__`.
+
+        Windows spawns DataLoader workers by pickling the dataset, and a memmap
+        pickles as its whole contents rather than as a reference - gigabytes per
+        worker. Past about 2 GB the spawn fails outright with a truncated
+        pickle, which is what concatenating a real and a synthetic store used to
+        do. Opening lazily means each worker maps the file itself and nothing
+        large crosses the pipe.
+        """
+        if self._crops is None:
+            self._crops = np.load(self.store_dir / "crops.npy", mmap_mode="r")[: len(self.labels)]
+        return self._crops
+
+    def __getstate__(self) -> dict:
+        # Belt and braces: if the parent process has already touched the store
+        # before workers spawn, the open memmap would be pickled with it. Drop
+        # it so the worker always maps the file for itself.
+        return {**self.__dict__, "_crops": None}
 
     def __len__(self) -> int:
         return len(self.labels)

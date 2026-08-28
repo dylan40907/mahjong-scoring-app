@@ -3,6 +3,12 @@
 Generated rather than hand-written so the numbers in the documentation are the
 numbers the harness actually produced. A model card with stale figures is worse
 than none.
+
+Two evaluations go in, because the models are trained on two sources and a
+single number would hide the thing a reader most needs to know. The real
+photographs are the primary result - that is what the app is pointed at - and
+the synthetic split is reported beside it to show the rendered domain was not
+sacrificed to get there.
 """
 
 from __future__ import annotations
@@ -10,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import textwrap
 from pathlib import Path
 
 import numpy as np
@@ -20,8 +27,9 @@ from tileset import CODES, NUM_CLASSES  # noqa: E402
 
 TEMPLATE = """# Model card
 
-Two small convolutional networks, trained from scratch on synthetic data, that
-turn a photograph of a mahjong hand into an ordered list of tiles.
+Two small convolutional networks that turn a photograph of a mahjong hand into
+an ordered list of tiles. Both were first trained from scratch on synthetic
+renders, then fine-tuned on a mixture of those renders and real photographs.
 
 ## At a glance
 
@@ -33,66 +41,65 @@ turn a photograph of a mahjong hand into an ordered list of tiles.
 | Exported size | {detector_mb:.2f} MB ONNX | {classifier_mb:.2f} MB ONNX |
 | Architecture | Anchor-free centre-point head on a separable-conv backbone | Four separable-conv stages, global pool, linear |
 
-Both run on the CPU. Both were trained on two CPU cores.
+Both run on the CPU, on a phone, with no network.
 
-## Results on the held-out test split
+## Results on real photographs
 
-{scenes} scenes, {tiles} tile instances. Neither model saw this split during
-training or validation.
-
-### Detection
-
-| Metric | Value |
-|---|---|
-| AP@0.5 | {ap50:.4f} |
-| Precision @ 0.35 confidence | {precision:.4f} |
-| Recall @ 0.35 confidence | {recall:.4f} |
-
-### Classification, on detector-produced crops
-
-Measured only on the {matched_tiles:,} tiles the detector found, so this is the
-classifier's own accuracy rather than the pipeline's.
+This is the number that matters. {real_scenes} held-out photographs,
+{real_tiles:,} tile instances, from a public dataset of physical tile sets
+photographed on real tables. Neither model saw this split during training or
+validation, and the boxes are human-drawn rather than produced by this
+detector, so detection here is measured honestly.
 
 | Metric | Value |
 |---|---|
-| Top-1 | {top1:.4f} |
-| Top-3 | {top3:.4f} |
-
-That is one misread tile in {matched_tiles:,}. It is the clearest evidence that
-splitting the pipeline was the right call: recognising a tile from a
-full-resolution crop is nearly free, and all the remaining error is in finding
-the tiles at all. It also means the weakest-class table is uninformative —
-almost every class sits at 1.000 — so it is omitted.
-
-### End to end
-
-| Metric | Value |
-|---|---|
-| Per-tile accuracy | {tile_accuracy:.4f} |
-| Hand read perfectly | {hand_perfect:.4f} |
-| Tile count correct | {count_correct:.4f} |
-
-Per-tile accuracy counts every tile in the ground truth, including ones the
-detector never found — unlike the classifier figure above, which cannot count
-what it never saw.
+| Detection AP@0.5 | {real_ap50:.4f} |
+| Detection precision @ {threshold:.2f} | {real_precision:.4f} |
+| Detection recall @ {threshold:.2f} | {real_recall:.4f} |
+| Classifier top-1, on found tiles | {real_top1:.4f} |
+| Classifier top-3, on found tiles | {real_top3:.4f} |
+| **Per-tile accuracy, end to end** | **{real_tile_accuracy:.4f}** |
+| **Hand read perfectly** | **{real_hand_perfect:.4f}** |
+| Tile count correct | {real_count_correct:.4f} |
 
 "Hand read perfectly" means every tile in a scene was found *and* named
 correctly: no misses, no extras, no misreads. It is much harsher than the
 component figures and it is the number that describes what a user experiences.
-A {tiles_per_hand:.0f}-tile hand is {tiles_per_hand:.0f} independent chances to
-be wrong, so {tile_accuracy:.2%} per-tile accuracy does not mean
-{tile_accuracy:.2%} of hands come out clean — it means about
-{hand_perfect:.0%} do.
+{real_tiles_per_hand:.0f} tiles is {real_tiles_per_hand:.0f} independent
+chances to be wrong, so {real_tile_accuracy:.1%} per-tile accuracy yields about
+{real_hand_perfect:.0%} of hands clean.
 
-The gap is entirely detection. Both failure modes show up at the frame edge: a
-tile clipped by the crop is either missed or hallucinated. Framing the hand
-fully, which the capture screen asks for, avoids most of it.
+Top-3 at {real_top3:.3f} matters more than it looks. The review screen offers
+the three most likely tiles when a detection is tapped, so top-3 is the
+accuracy of the correction path: when the model is wrong, the right answer is
+almost always one tap away.
+
+{scene_caveat}
+
+## Results on the synthetic split
+
+Reported to show the rendered domain survived fine-tuning. {synth_scenes}
+scenes, {synth_tiles:,} tile instances, same generator and seed as the original
+training data.
+
+| Metric | Original models | Current models |
+|---|---|---|
+| Detection AP@0.5 | {orig_ap50:.4f} | {synth_ap50:.4f} |
+| Classifier top-1 | {orig_top1:.4f} | {synth_top1:.4f} |
+| Per-tile accuracy | {orig_tile_accuracy:.4f} | {synth_tile_accuracy:.4f} |
+| Hand read perfectly | {orig_hand_perfect:.4f} | {synth_hand_perfect:.4f} |
+
+Fine-tuning on real photographs *alone* was tried first and rejected: it
+reached {real_only_hand:.3f} on real hands but collapsed to
+{real_only_synth_hand:.3f} on synthetic ones, with all eight bonus classes at
+zero. Training on both sources together is what avoids trading one domain for
+the other.
 
 ### Choosing the operating threshold
 
 The detection confidence threshold trades misses against false positives, and
-AP hides the choice by integrating over all of them. Swept against the metric
-the app actually cares about:
+AP hides the choice by integrating over all of them. Swept on real photographs
+against the metric the app actually cares about:
 
 | Threshold | Hand read perfectly | Tile count correct |
 |---|---|---|
@@ -103,51 +110,64 @@ the app actually cares about:
 ### Latency
 
 {latency_median} ms median per photograph, {latency_p95} ms at the 95th
-percentile, measured single-threaded on two shared CPU cores in this
-environment. A phone is faster; treat these as an upper bound.
+percentile, measured single-threaded on CPU. A phone is comparable; the models
+are small enough that decoding the JPEG is a meaningful share of the total.
 
 ## Training data
 
-Entirely synthetic. No public annotated mahjong dataset was reachable from the
-build environment — Roboflow, Kaggle and HuggingFace are all blocked by the
-network proxy — and generation turned out to be the better option regardless:
-labels are exact by construction, rare tiles can be oversampled, and every
-nuisance factor becomes a parameter rather than a hope.
+Two sources, mixed in every fine-tuning batch.
 
-| Split | Scenes | Tile instances |
-|---|---|---|
-| Train | 5,999 | ~78,700 |
-| Validation | 700 | 9,370 |
-| Test | 500 | 6,526 |
+**Synthetic renders**, generated by `ml/src/synth.py`. Labels are exact by
+construction, rare tiles can be oversampled, and every nuisance factor is a
+parameter rather than a hope. Tile faces come from a CC0 SVG set; flowers,
+seasons and the framed white dragon are drawn procedurally, since a Riichi set
+contains none of them. Scenes vary in layout, table surface, camera angle,
+lighting, white balance, glare, blur, sensor noise and JPEG quality. A tenth of
+scenes are deliberately flower-and-season heavy, since bonus tiles are 8 of 144
+and would otherwise be starved.
 
-Tile faces are rendered from a CC0 SVG set; flowers, seasons and the framed
-white dragon are drawn procedurally, since a Riichi set contains none of them.
-Scenes vary in layout (single row, row with melds set apart, two rows, bonus
-spreads), table surface (felt, wood, cloth), camera angle (perspective to about
-35 degrees, roll, framing crop), lighting, white balance, glare, blur, sensor
-noise and JPEG quality. Hands, sleeves and cast shadows intrude from the frame
-edge in roughly a third of scenes.
+**Real photographs**, from Jon Chan's mahjong dataset on Roboflow Universe
+(CC BY 4.0), the one public set found whose 42 classes match this project's
+taxonomy including flowers and seasons. Physical tile sets on real tables:
+green mats, wooden desks, automatic mahjong tables, varied lighting and
+clutter, several different tile designs, and tiles both lying flat and standing
+in a wall.
 
-Hands are drawn without replacement from a real 144-tile wall, so duplicates are
-naturally limited to four of a kind. A tenth of scenes are deliberately
-flower-and-season heavy, since bonus tiles are 8 of 144 and would otherwise be
-starved: per-class support in the training crops ranges from {min_support} to
-{max_support}.
+| Source | Split | Scenes | Tile instances |
+|---|---|---|---|
+| Real | Train | {real_train_scenes:,} | {real_train_tiles:,} |
+| Real | Validation | {real_val_scenes:,} | {real_val_tiles:,} |
+| Real | Test | {real_scenes:,} | {real_tiles:,} |
+| Synthetic | Train | {synth_train_scenes:,} | {synth_train_tiles:,} |
+| Synthetic | Validation | {synth_val_scenes:,} | {synth_val_tiles:,} |
+| Synthetic | Test | {synth_scenes:,} | {synth_tiles:,} |
+
+Per-class support in the fine-tuning crops ranges from {min_support:,} to
+{max_support:,}.
+
+The real dataset's training split carries Roboflow augmentation, three outputs
+per source image including a vertical flip. That is harmless for the detector,
+which is class-blind, and is why the validation and test splits - which are
+*not* augmented - are the ones used to judge anything.
 
 ## Known limitations
 
-**Trained on rendered tiles, not photographed ones.** This is the single
-biggest caveat. The synthetic pipeline models the nuisance factors of real
-photography carefully, but it renders one tile design. A physical set with
-different engraving, a different bone colour, or heavier wear is out of
-distribution, and the numbers above do not predict performance on it. The
-honest next step is a few dozen photographs of a real set, used as a
-calibration and evaluation set rather than as training data.
+**Two tile designs are not all tile designs.** The models have now seen
+rendered tiles and the sets in one public dataset. A set with unusual engraving
+or heavy wear is still out of distribution. `ml/src/ingest_photos.py` and
+`docs/real-photos.md` exist to make adding your own set cheap.
 
-**Face-up tiles only.** The detector is trained on tiles lying flat and face up.
-Tiles standing in a rack, seen edge-on, or face down are not represented.
+**Bonus tiles are the weakest classes.** Flowers and seasons have the thinnest
+real support, and the two sources disagree about what they look like - the
+renders draw the CJK glyphs, the photographs show pictorial illustrations. They
+sit around {worst_bonus:.2f} where the suits sit near 1.00.
 
-**No occlusion recovery.** A tile more than about 45% hidden is dropped from the
+**Face-down and edge-on tiles are detected but not named.** The real data
+contains tiles standing in a wall, so the detector often finds them. The
+classifier has no "unknown" class and will name them as whichever face they
+most resemble.
+
+**No occlusion recovery.** A heavily hidden tile is dropped from the synthetic
 ground truth during generation and will simply not be detected. The review
 screen makes adding it a tap, which is the intended handling.
 
@@ -160,95 +180,200 @@ of the 42 will be confidently named as whichever it most resembles.
 cd ml
 pip install -r requirements.txt
 python src/render_tiles.py
-python src/synth.py --out data/train_a --count 3000 --seed 11
-python src/synth.py --out data/train_b --count 3000 --seed 12
-python src/synth.py --out data/val --count 700 --seed 21
+
+# Synthetic half
+python src/synth.py --out data/train_a --count 1500 --seed 11
+python src/synth.py --out data/train_b --count 1500 --seed 12
+python src/synth.py --out data/val --count 400 --seed 21
 python src/synth.py --out data/test --count 500 --seed 22
-python src/build_crops.py --roots data/train_a data/train_b --out crops/train --seed 1
-python src/build_crops.py --roots data/val --out crops/val --seed 5
-python src/train_detector.py --train-roots data/train_a data/train_b --val-root data/val --out runs
-python src/train_classifier.py --train-store crops/train --val-store crops/val --out runs
-python src/evaluate.py --roots data/test --runs runs
-python src/export_onnx.py --out ../mobile/assets/models
+
+# Real half (needs a Roboflow API key; see docs/real-photos.md)
+python src/fetch_public_dataset.py --no-eval
+python src/import_yolo.py --root downloads/mahjong-83 --out data/real/public_train \\
+  --merge --splits train
+
+# Crops for the classifier
+python src/build_crops.py --roots data/train_a data/train_b --out crops/synth_train --seed 1
+python src/build_crops.py --roots data/val --out crops/synth_val --seed 5
+python src/build_crops.py --roots data/real/public_train --out crops/real_train --seed 1
+python src/build_crops.py --roots data/real/public_valid --out crops/real_val --seed 5
+
+# Fine-tune both on the mixture
+python src/train_detector.py \\
+  --train-roots data/real/public_train data/train_a data/train_b \\
+  --val-root data/real/public_valid data/val \\
+  --out runs/mixed --init-from runs/detector_best.pt --device cuda
+python src/train_classifier.py \\
+  --train-store crops/real_train crops/synth_train \\
+  --val-store crops/real_val crops/synth_val \\
+  --out runs/mixed --init-from runs/classifier_best.pt --device cuda
+
+python src/evaluate.py --roots data/real/public_test --runs runs/mixed
+python src/export_onnx.py --runs runs/mixed --out ../mobile/assets/models
 ```
 
 Checkpoints selected: detector epoch {detector_epoch} (validation AP@0.5
-{detector_val:.4f}), classifier epoch {classifier_epoch} (validation top-1
-{classifier_val:.4f}).
+{detector_val_ap:.4f}), classifier epoch {classifier_epoch} (validation top-1
+{classifier_val_top1:.4f}), both against the mixed validation set.
 
 ## Export
 
 Both models export to ONNX at opset 17 and are verified numerically against
 PyTorch after export; the largest observed disagreement is at float32 rounding
-level. The detector's decoding — sigmoid, 3x3 max-pool peak-finding, top-k,
-box assembly — is fused into the exported graph, so the app receives boxes and
+level. The detector's decoding - sigmoid, 3x3 max-pool peak-finding, top-k, box
+assembly - is fused into the exported graph, so the app receives boxes and
 scores rather than raw feature maps. Post-processing implemented twice is
 post-processing implemented differently.
 """
 
 
+def load(path: Path) -> dict:
+    return json.loads(Path(path).read_text(encoding="utf-8"))
+
+
+def count(root: Path) -> tuple[int, int]:
+    """Scenes and tile instances in a dataset directory."""
+    try:
+        records = load(root / "annotations.json")
+    except FileNotFoundError:
+        return 0, 0
+    return len(records), sum(len(r["labels"]) for r in records)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--evaluation", type=Path, default=Path("ml/runs/evaluation.json"))
+    parser.add_argument("--evaluation", type=Path, required=True,
+                        help="Evaluation JSON on the real held-out test split")
+    parser.add_argument("--synthetic-evaluation", type=Path, required=True)
+    parser.add_argument("--original-evaluation", type=Path, required=True,
+                        help="Original synthetic-only models on the synthetic split")
+    parser.add_argument("--real-only-evaluation", type=Path, default=None,
+                        help="Real-only fine-tune on real, for the rejected-approach note")
+    parser.add_argument("--real-only-synthetic-evaluation", type=Path, default=None)
     parser.add_argument("--models", type=Path, default=Path("mobile/assets/models"))
-    parser.add_argument("--crops", type=Path, default=Path("ml/crops/train"))
+    parser.add_argument("--crops", type=Path, nargs="+", required=True)
+    parser.add_argument("--data-root", type=Path, default=Path("ml/data"))
     parser.add_argument("--out", type=Path, default=Path("docs/model-card.md"))
     parser.add_argument("--input-size", type=int, default=320)
     args = parser.parse_args()
 
-    results = json.loads(args.evaluation.read_text())
-    labels = np.load(args.crops / "labels.npy")
-    support = np.bincount(labels, minlength=NUM_CLASSES)
+    real = load(args.evaluation)
+    synth = load(args.synthetic_evaluation)
+    orig = load(args.original_evaluation)
 
-    sweep = results.get("threshold_sweep") or []
+    support = np.zeros(NUM_CLASSES, np.int64)
+    for store in args.crops:
+        support += np.bincount(np.load(store / "labels.npy"), minlength=NUM_CLASSES)
+
+    sweep = real.get("threshold_sweep") or []
     sweep_rows = "\n".join(
-        f"| {row['threshold']:.2f} | {row['hand_read_perfectly']:.3f} | {row['tile_count_correct']:.3f} |"
+        f"| {row['threshold']:.2f} | {row['hand_read_perfectly']:.3f} | "
+        f"{row['tile_count_correct']:.3f} |"
         for row in sweep
     )
     if sweep:
         best = max(sweep, key=lambda row: row["hand_read_perfectly"])
-        threshold_note = (
-            f"The app ships at {best['threshold']:.2f}. The curve is sharply peaked: "
-            "lower and partial tiles at the frame edge start being detected as whole "
-            "ones, higher and genuine tiles are dropped."
+        threshold = best["threshold"]
+        threshold_note = textwrap.fill(
+            f"The app ships at {threshold:.2f}. Below it, partial tiles at the frame edge "
+            "start being detected as whole ones; above it, genuine tiles are dropped.",
+            width=79,
         )
     else:
-        threshold_note = ""
+        threshold, threshold_note = 0.35, ""
 
+    # Scenes larger than the decode's top-k cannot be read perfectly however
+    # good the model is, so say so rather than let the number look like error.
+    test_records = load(args.data_root / "real" / "public_test" / "annotations.json")
+    oversized = sum(1 for r in test_records if len(r["labels"]) > 64)
+    scene_caveat = textwrap.fill(
+        f"Of the {len(test_records)} test photographs, {oversized} contain more than 64 "
+        "tiles - whole walls rather than hands - and the exported decode returns at most "
+        "64 boxes, so those can never score as perfectly read. The app's capture screen "
+        "asks for a hand, which is 13 to 18 tiles, so this bounds the reported figure "
+        "rather than the product.",
+        width=79,
+    ) if oversized else ""
 
-    text = TEMPLATE.format(
+    worst_bonus = min(
+        (entry["accuracy"] for entry in real["classification"]["worst_classes"]),
+        default=0.0,
+    )
+
+    real_only = load(args.real_only_evaluation) if args.real_only_evaluation else None
+    real_only_synth = (
+        load(args.real_only_synthetic_evaluation)
+        if args.real_only_synthetic_evaluation else None
+    )
+
+    detector_mb = (args.models / "detector.onnx").stat().st_size / 1e6
+    classifier_mb = (args.models / "classifier.onnx").stat().st_size / 1e6
+
+    real_train = count(args.data_root / "real" / "public_train")
+    real_val = count(args.data_root / "real" / "public_valid")
+    synth_train_a = count(args.data_root / "train_a")
+    synth_train_b = count(args.data_root / "train_b")
+    synth_val = count(args.data_root / "val")
+
+    card = TEMPLATE.format(
         detector_input=args.input_size,
         detector_params=count_parameters(TileDetector()),
         classifier_params=count_parameters(TileClassifier(NUM_CLASSES)),
-        detector_mb=(args.models / "detector.onnx").stat().st_size / 1e6,
-        classifier_mb=(args.models / "classifier.onnx").stat().st_size / 1e6,
-        scenes=results["scenes"],
-        tiles=results["tiles"],
-        ap50=results["detection"]["ap50"],
-        precision=results["detection"]["precision"],
-        recall=results["detection"]["recall"],
-        top1=results["classification"]["top1"],
-        top3=results["classification"]["top3"],
-        matched_tiles=results["classification"].get("matched_tiles", 0),
-        tile_accuracy=results["end_to_end"].get("tile_accuracy", 0.0),
+        detector_mb=detector_mb,
+        classifier_mb=classifier_mb,
+        threshold=threshold,
+        real_scenes=real["scenes"],
+        real_tiles=real["tiles"],
+        real_ap50=real["detection"]["ap50"],
+        real_precision=real["detection"]["precision"],
+        real_recall=real["detection"]["recall"],
+        real_top1=real["classification"]["top1"],
+        real_top3=real["classification"]["top3"],
+        real_tile_accuracy=real["end_to_end"]["tile_accuracy"],
+        real_hand_perfect=real["end_to_end"]["hand_read_perfectly"],
+        real_count_correct=real["end_to_end"]["tile_count_correct"],
+        real_tiles_per_hand=real["tiles"] / max(1, real["scenes"]),
+        scene_caveat=scene_caveat,
+        synth_scenes=synth["scenes"],
+        synth_tiles=synth["tiles"],
+        synth_ap50=synth["detection"]["ap50"],
+        synth_top1=synth["classification"]["top1"],
+        synth_tile_accuracy=synth["end_to_end"]["tile_accuracy"],
+        synth_hand_perfect=synth["end_to_end"]["hand_read_perfectly"],
+        orig_ap50=orig["detection"]["ap50"],
+        orig_top1=orig["classification"]["top1"],
+        orig_tile_accuracy=orig["end_to_end"]["tile_accuracy"],
+        orig_hand_perfect=orig["end_to_end"]["hand_read_perfectly"],
+        real_only_hand=(
+            real_only["end_to_end"]["hand_read_perfectly"] if real_only else float("nan")
+        ),
+        real_only_synth_hand=(
+            real_only_synth["end_to_end"]["hand_read_perfectly"]
+            if real_only_synth else float("nan")
+        ),
         sweep_rows=sweep_rows,
         threshold_note=threshold_note,
-        hand_perfect=results["end_to_end"]["hand_read_perfectly"],
-        count_correct=results["end_to_end"]["tile_count_correct"],
-        tiles_per_hand=results["tiles"] / max(1, results["scenes"]),
-        latency_median=results["latency_ms"]["median"],
-        latency_p95=results["latency_ms"]["p95"],
+        latency_median=real["latency_ms"]["median"],
+        latency_p95=real["latency_ms"]["p95"],
+        real_train_scenes=real_train[0], real_train_tiles=real_train[1],
+        real_val_scenes=real_val[0], real_val_tiles=real_val[1],
+        synth_train_scenes=synth_train_a[0] + synth_train_b[0],
+        synth_train_tiles=synth_train_a[1] + synth_train_b[1],
+        synth_val_scenes=synth_val[0], synth_val_tiles=synth_val[1],
         min_support=int(support.min()),
         max_support=int(support.max()),
-        detector_epoch=results["checkpoints"]["detector_epoch"],
-        detector_val=results["checkpoints"]["detector_val_ap50"] or 0.0,
-        classifier_epoch=results["checkpoints"]["classifier_epoch"],
-        classifier_val=results["checkpoints"]["classifier_val_top1"] or 0.0,
+        worst_bonus=worst_bonus,
+        detector_epoch=real["checkpoints"]["detector_epoch"],
+        detector_val_ap=real["checkpoints"]["detector_val_ap50"] or 0.0,
+        classifier_epoch=real["checkpoints"]["classifier_epoch"],
+        classifier_val_top1=real["checkpoints"]["classifier_val_top1"] or 0.0,
     )
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(text)
-    print(f"Wrote {args.out}")
+    args.out.write_text(card, encoding="utf-8")
+    print(f"Wrote {args.out} ({len(card.splitlines())} lines)")
+    print(f"  real hands read perfectly:      {real['end_to_end']['hand_read_perfectly']:.4f}")
+    print(f"  synthetic hands read perfectly: {synth['end_to_end']['hand_read_perfectly']:.4f}")
 
 
 if __name__ == "__main__":

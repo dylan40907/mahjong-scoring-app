@@ -15,13 +15,20 @@ android/
 ml/data/
 ml/crops/
 
+# Raw photographs of a physical set. Large, personal, and the derived dataset
+# under ml/data/real/ is what the pipeline actually reads.
+ml/photos/
+
+# Third-party dataset downloads. Re-fetchable with ml/src/fetch_public_dataset.py
+# and separately licensed, so they are not vendored here.
+ml/downloads/
+
 # Training artefacts. The exported ONNX models under mobile/assets/models are
 # committed because the app needs them at build time, and the *_best.pt
 # checkpoints are committed because they are the only way to fine-tune or
 # reproduce the reported metrics without a four-hour retrain. The *_last.pt
 # files carry optimiser state and exist only to resume an interrupted run.
-ml/runs/*_last.pt
-ml/data/
+ml/runs/**/*_last.pt
 
 # Python
 __pycache__/

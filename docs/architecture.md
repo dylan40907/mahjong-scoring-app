@@ -76,13 +76,27 @@ scenes, with position and scale jitter standing in for the detector's
 localisation error. Training the classifier on clean, perfectly-cropped tiles
 would teach it to expect something inference never provides.
 
-## Synthetic data
+## Training data: synthetic and real, mixed
 
 No public annotated mahjong dataset was reachable from the build environment —
-Roboflow, Kaggle and HuggingFace are all blocked by the network proxy. The
-training set is therefore generated, and that turns out to be the better option
-anyway: labels are exact by construction, rare tiles can be oversampled, and
-every nuisance factor becomes a parameter.
+Roboflow, Kaggle and HuggingFace are all blocked by the network proxy — so the
+models were first trained entirely on generated scenes. That has real
+advantages: labels are exact by construction, rare tiles can be oversampled,
+and every nuisance factor becomes a parameter.
+
+It also has one decisive disadvantage, which only a real photograph reveals.
+The synthetic-only models scored 0.995 AP on rendered tiles and **0.003 on real
+hands** — they had learned one tile design and one idea of what a table looks
+like. Both models are now fine-tuned on a mixture of those renders and a public
+dataset of photographed tile sets.
+
+The mixture is the point, not an implementation detail. Fine-tuning on real
+photographs alone recovered real-world accuracy and destroyed the rendered
+domain, taking synthetic whole-hand accuracy from 0.906 to 0.088 with all eight
+bonus classes at zero. Training on both together holds both, and the synthetic
+half carries its weight in a specific place: it oversamples flowers and seasons,
+which are 8 of 144 tiles and correspondingly thin in real data. `docs/model-card.md`
+reports both splits side by side.
 
 A scene is built in four stages, each carrying the tile corner points through
 the same transform so the ground truth stays exact:

@@ -1,7 +1,8 @@
 # Model card
 
-Two small convolutional networks, trained from scratch on synthetic data, that
-turn a photograph of a mahjong hand into an ordered list of tiles.
+Two small convolutional networks that turn a photograph of a mahjong hand into
+an ordered list of tiles. Both were first trained from scratch on synthetic
+renders, then fine-tuned on a mixture of those renders and real photographs.
 
 ## At a glance
 
@@ -13,126 +14,142 @@ turn a photograph of a mahjong hand into an ordered list of tiles.
 | Exported size | 1.17 MB ONNX | 0.64 MB ONNX |
 | Architecture | Anchor-free centre-point head on a separable-conv backbone | Four separable-conv stages, global pool, linear |
 
-Both run on the CPU. Both were trained on two CPU cores.
+Both run on the CPU, on a phone, with no network.
 
-## Results on the held-out test split
+## Results on real photographs
 
-500 scenes, 6526 tile instances. Neither model saw this split during
-training or validation.
-
-### Detection
-
-| Metric | Value |
-|---|---|
-| AP@0.5 | 0.9950 |
-| Precision @ 0.35 confidence | 0.9954 |
-| Recall @ 0.35 confidence | 0.9951 |
-
-### Classification, on detector-produced crops
-
-Measured only on the 6,494 tiles the detector found, so this is the
-classifier's own accuracy rather than the pipeline's.
+This is the number that matters. 568 held-out photographs,
+7,568 tile instances, from a public dataset of physical tile sets
+photographed on real tables. Neither model saw this split during training or
+validation, and the boxes are human-drawn rather than produced by this
+detector, so detection here is measured honestly.
 
 | Metric | Value |
 |---|---|
-| Top-1 | 0.9998 |
-| Top-3 | 0.9998 |
-
-That is one misread tile in 6,494. It is the clearest evidence that
-splitting the pipeline was the right call: recognising a tile from a
-full-resolution crop is nearly free, and all the remaining error is in finding
-the tiles at all. It also means the weakest-class table is uninformative —
-almost every class sits at 1.000 — so it is omitted.
-
-### End to end
-
-| Metric | Value |
-|---|---|
-| Per-tile accuracy | 0.9949 |
-| Hand read perfectly | 0.9080 |
-| Tile count correct | 0.9120 |
-
-Per-tile accuracy counts every tile in the ground truth, including ones the
-detector never found — unlike the classifier figure above, which cannot count
-what it never saw.
+| Detection AP@0.5 | 0.9106 |
+| Detection precision @ 0.40 | 0.9552 |
+| Detection recall @ 0.40 | 0.9185 |
+| Classifier top-1, on found tiles | 0.9824 |
+| Classifier top-3, on found tiles | 0.9944 |
+| **Per-tile accuracy, end to end** | **0.9024** |
+| **Hand read perfectly** | **0.5933** |
+| Tile count correct | 0.6972 |
 
 "Hand read perfectly" means every tile in a scene was found *and* named
 correctly: no misses, no extras, no misreads. It is much harsher than the
 component figures and it is the number that describes what a user experiences.
-A 13-tile hand is 13 independent chances to
-be wrong, so 99.49% per-tile accuracy does not mean
-99.49% of hands come out clean — it means about
-91% do.
+13 tiles is 13 independent
+chances to be wrong, so 90.2% per-tile accuracy yields about
+59% of hands clean.
 
-The gap is entirely detection. Both failure modes show up at the frame edge: a
-tile clipped by the crop is either missed or hallucinated. Framing the hand
-fully, which the capture screen asks for, avoids most of it.
+Top-3 at 0.994 matters more than it looks. The review screen offers
+the three most likely tiles when a detection is tapped, so top-3 is the
+accuracy of the correction path: when the model is wrong, the right answer is
+almost always one tap away.
+
+Of the 568 test photographs, 12 contain more than 64 tiles - whole walls rather
+than hands - and the exported decode returns at most 64 boxes, so those can
+never score as perfectly read. The app's capture screen asks for a hand, which
+is 13 to 18 tiles, so this bounds the reported figure rather than the product.
+
+## Results on the synthetic split
+
+Reported to show the rendered domain survived fine-tuning. 500
+scenes, 6,526 tile instances, same generator and seed as the original
+training data.
+
+| Metric | Original models | Current models |
+|---|---|---|
+| Detection AP@0.5 | 0.9910 | 0.9916 |
+| Classifier top-1 | 0.9998 | 0.9963 |
+| Per-tile accuracy | 0.9910 | 0.9884 |
+| Hand read perfectly | 0.8760 | 0.8340 |
+
+Fine-tuning on real photographs *alone* was tried first and rejected: it
+reached 0.521 on real hands but collapsed to
+0.088 on synthetic ones, with all eight bonus classes at
+zero. Training on both sources together is what avoids trading one domain for
+the other.
 
 ### Choosing the operating threshold
 
 The detection confidence threshold trades misses against false positives, and
-AP hides the choice by integrating over all of them. Swept against the metric
-the app actually cares about:
+AP hides the choice by integrating over all of them. Swept on real photographs
+against the metric the app actually cares about:
 
 | Threshold | Hand read perfectly | Tile count correct |
 |---|---|---|
-| 0.20 | 0.828 | 0.828 |
-| 0.30 | 0.906 | 0.914 |
-| 0.35 | 0.908 | 0.912 |
-| 0.40 | 0.874 | 0.880 |
-| 0.50 | 0.736 | 0.738 |
-| 0.60 | 0.326 | 0.328 |
+| 0.20 | 0.408 | 0.463 |
+| 0.30 | 0.539 | 0.646 |
+| 0.35 | 0.578 | 0.688 |
+| 0.40 | 0.593 | 0.697 |
+| 0.50 | 0.491 | 0.555 |
+| 0.60 | 0.167 | 0.176 |
 
-The app ships at 0.35. The curve is sharply peaked: lower and partial tiles at the frame edge start being detected as whole ones, higher and genuine tiles are dropped.
+The app ships at 0.40. Below it, partial tiles at the frame edge start being
+detected as whole ones; above it, genuine tiles are dropped.
 
 ### Latency
 
-43.4 ms median per photograph, 53.5 ms at the 95th
-percentile, measured single-threaded on two shared CPU cores in this
-environment. A phone is faster; treat these as an upper bound.
+24.3 ms median per photograph, 68.5 ms at the 95th
+percentile, measured single-threaded on CPU. A phone is comparable; the models
+are small enough that decoding the JPEG is a meaningful share of the total.
 
 ## Training data
 
-Entirely synthetic. No public annotated mahjong dataset was reachable from the
-build environment — Roboflow, Kaggle and HuggingFace are all blocked by the
-network proxy — and generation turned out to be the better option regardless:
-labels are exact by construction, rare tiles can be oversampled, and every
-nuisance factor becomes a parameter rather than a hope.
+Two sources, mixed in every fine-tuning batch.
 
-| Split | Scenes | Tile instances |
-|---|---|---|
-| Train | 5,999 | ~78,700 |
-| Validation | 700 | 9,370 |
-| Test | 500 | 6,526 |
+**Synthetic renders**, generated by `ml/src/synth.py`. Labels are exact by
+construction, rare tiles can be oversampled, and every nuisance factor is a
+parameter rather than a hope. Tile faces come from a CC0 SVG set; flowers,
+seasons and the framed white dragon are drawn procedurally, since a Riichi set
+contains none of them. Scenes vary in layout, table surface, camera angle,
+lighting, white balance, glare, blur, sensor noise and JPEG quality. A tenth of
+scenes are deliberately flower-and-season heavy, since bonus tiles are 8 of 144
+and would otherwise be starved.
 
-Tile faces are rendered from a CC0 SVG set; flowers, seasons and the framed
-white dragon are drawn procedurally, since a Riichi set contains none of them.
-Scenes vary in layout (single row, row with melds set apart, two rows, bonus
-spreads), table surface (felt, wood, cloth), camera angle (perspective to about
-35 degrees, roll, framing crop), lighting, white balance, glare, blur, sensor
-noise and JPEG quality. Hands, sleeves and cast shadows intrude from the frame
-edge in roughly a third of scenes.
+**Real photographs**, from Jon Chan's mahjong dataset on Roboflow Universe
+(CC BY 4.0), the one public set found whose 42 classes match this project's
+taxonomy including flowers and seasons. Physical tile sets on real tables:
+green mats, wooden desks, automatic mahjong tables, varied lighting and
+clutter, several different tile designs, and tiles both lying flat and standing
+in a wall.
 
-Hands are drawn without replacement from a real 144-tile wall, so duplicates are
-naturally limited to four of a kind. A tenth of scenes are deliberately
-flower-and-season heavy, since bonus tiles are 8 of 144 and would otherwise be
-starved: per-class support in the training crops ranges from 851 to
-2207.
+| Source | Split | Scenes | Tile instances |
+|---|---|---|---|
+| Real | Train | 6,294 | 98,567 |
+| Real | Validation | 788 | 9,960 |
+| Real | Test | 568 | 7,568 |
+| Synthetic | Train | 3,000 | 39,648 |
+| Synthetic | Validation | 400 | 5,354 |
+| Synthetic | Test | 500 | 6,526 |
+
+Per-class support in the fine-tuning crops ranges from 1,381 to
+4,208.
+
+The real dataset's training split carries Roboflow augmentation, three outputs
+per source image including a vertical flip. That is harmless for the detector,
+which is class-blind, and is why the validation and test splits - which are
+*not* augmented - are the ones used to judge anything.
 
 ## Known limitations
 
-**Trained on rendered tiles, not photographed ones.** This is the single
-biggest caveat. The synthetic pipeline models the nuisance factors of real
-photography carefully, but it renders one tile design. A physical set with
-different engraving, a different bone colour, or heavier wear is out of
-distribution, and the numbers above do not predict performance on it. The
-honest next step is a few dozen photographs of a real set, used as a
-calibration and evaluation set rather than as training data.
+**Two tile designs are not all tile designs.** The models have now seen
+rendered tiles and the sets in one public dataset. A set with unusual engraving
+or heavy wear is still out of distribution. `ml/src/ingest_photos.py` and
+`docs/real-photos.md` exist to make adding your own set cheap.
 
-**Face-up tiles only.** The detector is trained on tiles lying flat and face up.
-Tiles standing in a rack, seen edge-on, or face down are not represented.
+**Bonus tiles are the weakest classes.** Flowers and seasons have the thinnest
+real support, and the two sources disagree about what they look like - the
+renders draw the CJK glyphs, the photographs show pictorial illustrations. They
+sit around 0.86 where the suits sit near 1.00.
 
-**No occlusion recovery.** A tile more than about 45% hidden is dropped from the
+**Face-down and edge-on tiles are detected but not named.** The real data
+contains tiles standing in a wall, so the detector often finds them. The
+classifier has no "unknown" class and will name them as whichever face they
+most resemble.
+
+**No occlusion recovery.** A heavily hidden tile is dropped from the synthetic
 ground truth during generation and will simply not be detected. The review
 screen makes adding it a tap, which is the intended handling.
 
@@ -145,37 +162,47 @@ of the 42 will be confidently named as whichever it most resembles.
 cd ml
 pip install -r requirements.txt
 python src/render_tiles.py
-python src/synth.py --out data/train_a --count 3000 --seed 11
-python src/synth.py --out data/train_b --count 3000 --seed 12
-python src/synth.py --out data/val --count 700 --seed 21
+
+# Synthetic half
+python src/synth.py --out data/train_a --count 1500 --seed 11
+python src/synth.py --out data/train_b --count 1500 --seed 12
+python src/synth.py --out data/val --count 400 --seed 21
 python src/synth.py --out data/test --count 500 --seed 22
-python src/build_crops.py --roots data/train_a data/train_b --out crops/train --seed 1
-python src/build_crops.py --roots data/val --out crops/val --seed 5
-python src/train_detector.py --train-roots data/train_a data/train_b --val-root data/val --out runs
-python src/train_classifier.py --train-store crops/train --val-store crops/val --out runs
-python src/evaluate.py --roots data/test --runs runs
-python src/export_onnx.py --out ../mobile/assets/models
+
+# Real half (needs a Roboflow API key; see docs/real-photos.md)
+python src/fetch_public_dataset.py --no-eval
+python src/import_yolo.py --root downloads/mahjong-83 --out data/real/public_train \
+  --merge --splits train
+
+# Crops for the classifier
+python src/build_crops.py --roots data/train_a data/train_b --out crops/synth_train --seed 1
+python src/build_crops.py --roots data/val --out crops/synth_val --seed 5
+python src/build_crops.py --roots data/real/public_train --out crops/real_train --seed 1
+python src/build_crops.py --roots data/real/public_valid --out crops/real_val --seed 5
+
+# Fine-tune both on the mixture
+python src/train_detector.py \
+  --train-roots data/real/public_train data/train_a data/train_b \
+  --val-root data/real/public_valid data/val \
+  --out runs/mixed --init-from runs/detector_best.pt --device cuda
+python src/train_classifier.py \
+  --train-store crops/real_train crops/synth_train \
+  --val-store crops/real_val crops/synth_val \
+  --out runs/mixed --init-from runs/classifier_best.pt --device cuda
+
+python src/evaluate.py --roots data/real/public_test --runs runs/mixed
+python src/export_onnx.py --runs runs/mixed --out ../mobile/assets/models
 ```
 
-Checkpoints selected: detector epoch 20 (validation AP@0.5
-0.9998), classifier epoch 16 (validation top-1
-0.9990).
+Checkpoints selected: detector epoch 16 (validation AP@0.5
+0.9623), classifier epoch 13 (validation top-1
+0.9831), both against the mixed validation set.
 
 ## Export
 
 Both models export to ONNX at opset 17 and are verified numerically against
 PyTorch after export; the largest observed disagreement is at float32 rounding
-level. The detector's decoding — sigmoid, 3x3 max-pool peak-finding, top-k,
-box assembly — is fused into the exported graph, so the app receives boxes and
+level. The detector's decoding - sigmoid, 3x3 max-pool peak-finding, top-k, box
+assembly - is fused into the exported graph, so the app receives boxes and
 scores rather than raw feature maps. Post-processing implemented twice is
 post-processing implemented differently.
-
-## What the failures look like
-
-![Predictions on held-out test scenes](images/predictions.png)
-
-Grey boxes are ground truth, green are correct predictions, red are wrong. The
-two failures visible here are both at the frame edge: one tile clipped by the
-crop was missed, and one partial tile was detected as a whole one. That is the
-characteristic failure mode and the reason the capture screen asks for the hand
-to fill the frame.

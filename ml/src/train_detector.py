@@ -1,9 +1,15 @@
 """Train the tile detector.
 
-Runs on CPU by design - the whole point of the two-stage split is that the
-detector can be small enough to train without a GPU. Training is checkpointed
-every epoch and bounded by a wall-clock budget so an interrupted run resumes
-rather than restarting.
+Small enough to train on CPU - that is the whole point of splitting the
+pipeline in two, and it is how the original run happened. `--device` defaults
+to CUDA when one is present, which is minutes rather than hours. Training is
+checkpointed every epoch and bounded by a wall-clock budget so an interrupted
+run resumes rather than restarting.
+
+`--init-from` is the fine-tuning entry point: it loads weights and nothing
+else. Resuming continues one run - same data, same schedule, same best-AP to
+beat. Fine-tuning starts a new one against different data, so carrying the old
+optimiser momentum and the old best score would both be wrong.
 """
 
 from __future__ import annotations
@@ -57,7 +63,7 @@ def average_precision(
     rows: list[tuple[float, int]] = []
     total_truth = 0
     exact_count_hits = 0
-    operating_threshold = 0.35
+    operating_threshold = 0.40  # keep in step with evaluate.SCORE_THRESHOLD
 
     for (boxes, scores), truth in zip(predictions, truths):
         total_truth += len(truth)
@@ -120,16 +126,21 @@ def average_precision(
 
 
 @torch.no_grad()
-def evaluate(model: TileDetector, loader: DataLoader, max_batches: int | None = None) -> dict[str, float]:
+def evaluate(
+    model: TileDetector,
+    loader: DataLoader,
+    max_batches: int | None = None,
+    device: torch.device | str = "cpu",
+) -> dict[str, float]:
     model.eval()
     predictions, truths = [], []
     for i, batch in enumerate(loader):
         if max_batches is not None and i >= max_batches:
             break
-        heatmap, size, offset = model(batch["image"])
+        heatmap, size, offset = model(batch["image"].to(device))
         boxes, scores = decode(heatmap, size, offset)
         for b in range(len(boxes)):
-            predictions.append((boxes[b].numpy(), scores[b].numpy()))
+            predictions.append((boxes[b].cpu().numpy(), scores[b].cpu().numpy()))
             truths.append(batch["boxes"][b].numpy())
     model.train()
     return average_precision(predictions, truths)
@@ -152,7 +163,12 @@ def build_scheduler(optimiser, total_steps: int, warmup: int):
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--train-roots", type=Path, nargs="+", required=True)
-    parser.add_argument("--val-root", type=Path, required=True)
+    parser.add_argument(
+        "--val-root", type=Path, nargs="+", required=True,
+        help="One or more validation roots. Pass both a real and a synthetic root "
+             "when fine-tuning on mixed data: selecting the best epoch against only "
+             "one domain quietly optimises for it and hides forgetting in the other.",
+    )
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--input-size", type=int, default=320)
     parser.add_argument("--width", type=int, default=32)
@@ -168,7 +184,18 @@ def main() -> None:
     parser.add_argument("--max-hours", type=float, default=6.0)
     parser.add_argument("--eval-batches", type=int, default=16)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--init-from", type=Path, default=None,
+        help="Start from these weights with a fresh optimiser - the fine-tuning "
+             "entry point. Unlike resuming, epoch, schedule and best-AP all reset, "
+             "so the new run is judged against the new validation set.",
+    )
+    parser.add_argument("--device", type=str, default="auto", help="cuda, cpu, or auto")
     args = parser.parse_args()
+
+    device = torch.device(
+        ("cuda" if torch.cuda.is_available() else "cpu") if args.device == "auto" else args.device
+    )
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -176,7 +203,7 @@ def main() -> None:
     args.out.mkdir(parents=True, exist_ok=True)
 
     train_set = SceneDataset(list(args.train_roots), args.input_size, train=True)
-    val_set = SceneDataset([args.val_root], args.input_size, train=False)
+    val_set = SceneDataset(list(args.val_root), args.input_size, train=False)
 
     train_loader = DataLoader(
         train_set, batch_size=args.batch_size, shuffle=True, num_workers=args.workers,
@@ -187,7 +214,7 @@ def main() -> None:
         collate_fn=collate_scenes, persistent_workers=args.workers > 0,
     )
 
-    model = TileDetector(width=args.width)
+    model = TileDetector(width=args.width).to(device)
     optimiser = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     total_steps = args.epochs * args.steps_per_epoch
     scheduler = build_scheduler(optimiser, total_steps, warmup=min(300, total_steps // 12))
@@ -197,6 +224,11 @@ def main() -> None:
     history_path = args.out / "detector_history.json"
 
     start_epoch, best_ap, history = 0, 0.0, []
+    if args.init_from and not checkpoint_path.exists():
+        state = torch.load(args.init_from, map_location="cpu", weights_only=False)
+        model.load_state_dict(state["model"])
+        print(f"Initialised from {args.init_from} (weights only, fresh optimiser)")
+
     if checkpoint_path.exists():
         state = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         model.load_state_dict(state["model"])
@@ -207,7 +239,7 @@ def main() -> None:
         history = state.get("history", [])
         print(f"Resumed from epoch {start_epoch} (best AP50 {best_ap:.4f})")
 
-    print(f"detector: {count_parameters(model):,} params, input {args.input_size}")
+    print(f"detector: {count_parameters(model):,} params, input {args.input_size}, device {device}")
     print(f"train scenes: {len(train_set):,}  val scenes: {len(val_set):,}")
 
     deadline = time.time() + args.max_hours * 3600
@@ -226,10 +258,10 @@ def main() -> None:
                 iterator = iter(train_loader)
                 batch = next(iterator)
 
-            heatmap, size, offset = model(batch["image"])
-            hm_loss = focal_loss(heatmap, batch["heatmap"])
-            size_loss = regression_loss(size, batch["size"], batch["mask"])
-            off_loss = regression_loss(offset, batch["offset"], batch["mask"])
+            heatmap, size, offset = model(batch["image"].to(device))
+            hm_loss = focal_loss(heatmap, batch["heatmap"].to(device))
+            size_loss = regression_loss(size, batch["size"].to(device), batch["mask"].to(device))
+            off_loss = regression_loss(offset, batch["offset"].to(device), batch["mask"].to(device))
             loss = hm_loss + args.size_weight * size_loss + args.offset_weight * off_loss
 
             optimiser.zero_grad(set_to_none=True)
@@ -254,7 +286,7 @@ def main() -> None:
                     flush=True,
                 )
 
-        metrics = evaluate(model, val_loader, max_batches=args.eval_batches)
+        metrics = evaluate(model, val_loader, max_batches=args.eval_batches, device=device)
         elapsed = time.time() - epoch_start
         entry = {
             "epoch": epoch,

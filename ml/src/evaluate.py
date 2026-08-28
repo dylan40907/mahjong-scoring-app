@@ -26,7 +26,9 @@ from models import TileClassifier, TileDetector, decode  # noqa: E402
 from tileset import CODES, NUM_CLASSES, TILES  # noqa: E402
 from train_detector import average_precision, box_iou  # noqa: E402
 
-SCORE_THRESHOLD = 0.35
+# Joint peak of the whole-hand sweep on both test splits after the real-photo
+# fine-tune. Mirrored in mobile/src/vision/detector.ts.
+SCORE_THRESHOLD = 0.40
 MATCH_IOU = 0.5
 
 

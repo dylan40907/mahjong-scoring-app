@@ -1,0 +1,146 @@
+[
+  {
+    "epoch": 0,
+    "loss": 1.2561357681516814,
+    "top1": 0.92856,
+    "top3": 0.97773,
+    "worst_class": 0.5432,
+    "worst_class_name": "season_spring",
+    "seconds": 119.7
+  },
+  {
+    "epoch": 1,
+    "loss": 0.8116123270457662,
+    "top1": 0.95416,
+    "top3": 0.98831,
+    "worst_class": 0.6284,
+    "worst_class_name": "flower_plum",
+    "seconds": 31.2
+  },
+  {
+    "epoch": 2,
+    "loss": 0.7260563084942069,
+    "top1": 0.96578,
+    "top3": 0.99027,
+    "worst_class": 0.7778,
+    "worst_class_name": "season_spring",
+    "seconds": 33.1
+  },
+  {
+    "epoch": 3,
+    "loss": 0.68078993645139,
+    "top1": 0.9714,
+    "top3": 0.99177,
+    "worst_class": 0.8162,
+    "worst_class_name": "season_autumn",
+    "seconds": 38.2
+  },
+  {
+    "epoch": 4,
+    "loss": 0.6528228985798823,
+    "top1": 0.97551,
+    "top3": 0.99249,
+    "worst_class": 0.8765,
+    "worst_class_name": "season_spring",
+    "seconds": 44.5
+  },
+  {
+    "epoch": 5,
+    "loss": 0.6325900103475256,
+    "top1": 0.98002,
+    "top3": 0.99256,
+    "worst_class": 0.8929,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 40.3
+  },
+  {
+    "epoch": 6,
+    "loss": 0.6158030441165634,
+    "top1": 0.97982,
+    "top3": 0.99327,
+    "worst_class": 0.8643,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 42.5
+  },
+  {
+    "epoch": 7,
+    "loss": 0.6040411415148754,
+    "top1": 0.97995,
+    "top3": 0.99327,
+    "worst_class": 0.8897,
+    "worst_class_name": "season_autumn",
+    "seconds": 44.8
+  },
+  {
+    "epoch": 8,
+    "loss": 0.5924353937934634,
+    "top1": 0.98172,
+    "top3": 0.9934,
+    "worst_class": 0.8929,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 41.4
+  },
+  {
+    "epoch": 9,
+    "loss": 0.5834243759264088,
+    "top1": 0.98159,
+    "top3": 0.9936,
+    "worst_class": 0.9,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 41.4
+  },
+  {
+    "epoch": 10,
+    "loss": 0.5768179373197078,
+    "top1": 0.9823,
+    "top3": 0.99347,
+    "worst_class": 0.9012,
+    "worst_class_name": "season_spring",
+    "seconds": 43.4
+  },
+  {
+    "epoch": 11,
+    "loss": 0.5710525367277672,
+    "top1": 0.9823,
+    "top3": 0.99367,
+    "worst_class": 0.9,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 44.9
+  },
+  {
+    "epoch": 12,
+    "loss": 0.5659159758095397,
+    "top1": 0.98283,
+    "top3": 0.99373,
+    "worst_class": 0.8857,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 40.8
+  },
+  {
+    "epoch": 13,
+    "loss": 0.5625040544428498,
+    "top1": 0.98309,
+    "top3": 0.9936,
+    "worst_class": 0.8857,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 43.2
+  },
+  {
+    "epoch": 14,
+    "loss": 0.5611382571907787,
+    "top1": 0.98289,
+    "top3": 0.99354,
+    "worst_class": 0.8929,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 43.3
+  },
+  {
+    "epoch": 15,
+    "loss": 0.5608879672242449,
+    "top1": 0.98276,
+    "top3": 0.99354,
+    "worst_class": 0.8929,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 42.1
+  }
+]
