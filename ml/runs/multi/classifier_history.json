@@ -196,5 +196,23 @@
     "worst_class": 0.9081,
     "worst_class_name": "sou9",
     "seconds": 37.4
+  },
+  {
+    "epoch": 22,
+    "loss": 0.5080617352859261,
+    "top1": 0.97149,
+    "top3": 0.99178,
+    "worst_class": 0.915,
+    "worst_class_name": "man3",
+    "seconds": 40.7
+  },
+  {
+    "epoch": 23,
+    "loss": 0.5064870183615341,
+    "top1": 0.97113,
+    "top3": 0.99175,
+    "worst_class": 0.9089,
+    "worst_class_name": "man3",
+    "seconds": 35.4
   }
 ]

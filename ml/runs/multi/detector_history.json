@@ -70,5 +70,104 @@
     "precision": 0.9683,
     "recall": 0.944,
     "exact_count": 0.7256
+  },
+  {
+    "epoch": 8,
+    "loss": 0.6661061663428942,
+    "seconds": 141.2,
+    "ap50": 0.9615,
+    "precision": 0.9689,
+    "recall": 0.9506,
+    "exact_count": 0.7769
+  },
+  {
+    "epoch": 9,
+    "loss": 0.6641475738088289,
+    "seconds": 75.8,
+    "ap50": 0.9609,
+    "precision": 0.9682,
+    "recall": 0.9468,
+    "exact_count": 0.75
+  },
+  {
+    "epoch": 10,
+    "loss": 0.6524997397263845,
+    "seconds": 72.3,
+    "ap50": 0.9637,
+    "precision": 0.9707,
+    "recall": 0.9477,
+    "exact_count": 0.7365
+  },
+  {
+    "epoch": 11,
+    "loss": 0.6466556756695112,
+    "seconds": 72.2,
+    "ap50": 0.9622,
+    "precision": 0.9655,
+    "recall": 0.9536,
+    "exact_count": 0.7652
+  },
+  {
+    "epoch": 12,
+    "loss": 0.6407898559172949,
+    "seconds": 69.9,
+    "ap50": 0.9641,
+    "precision": 0.9597,
+    "recall": 0.9568,
+    "exact_count": 0.7567
+  },
+  {
+    "epoch": 13,
+    "loss": 0.6252299109101296,
+    "seconds": 66.3,
+    "ap50": 0.9636,
+    "precision": 0.972,
+    "recall": 0.9442,
+    "exact_count": 0.7281
+  },
+  {
+    "epoch": 14,
+    "loss": 0.624995509882768,
+    "seconds": 61.9,
+    "ap50": 0.9636,
+    "precision": 0.9693,
+    "recall": 0.9509,
+    "exact_count": 0.7525
+  },
+  {
+    "epoch": 15,
+    "loss": 0.6138447535037994,
+    "seconds": 62.0,
+    "ap50": 0.9622,
+    "precision": 0.9687,
+    "recall": 0.951,
+    "exact_count": 0.7786
+  },
+  {
+    "epoch": 16,
+    "loss": 0.6103378620743751,
+    "seconds": 62.0,
+    "ap50": 0.9639,
+    "precision": 0.9694,
+    "recall": 0.9491,
+    "exact_count": 0.7618
+  },
+  {
+    "epoch": 17,
+    "loss": 0.6032396219174068,
+    "seconds": 64.5,
+    "ap50": 0.9637,
+    "precision": 0.9675,
+    "recall": 0.9535,
+    "exact_count": 0.7677
+  },
+  {
+    "epoch": 18,
+    "loss": 0.5879891632994017,
+    "seconds": 61.3,
+    "ap50": 0.9628,
+    "precision": 0.9666,
+    "recall": 0.9517,
+    "exact_count": 0.7677
   }
 ]

@@ -88,9 +88,13 @@ CLASS_MAP: dict[str, str] = {
     **{f"s{rank}": f"sou{rank}" for rank in range(1, 10)},
     "z1": "east", "z2": "south", "z3": "west", "z4": "north",
     "z5": "white", "z6": "green", "z7": "red",
-    # f1-f8 is assumed to be the four flowers then the four seasons, each in
-    # conventional order. Two guesses stacked, so --contact-sheet matters more
-    # here than anywhere else in this table.
+    # f1-f8 has no settled meaning. Some sets number the four flowers first,
+    # some the four seasons - test-ag8z6/mahjong-tiles-merged does the latter,
+    # and its tiles read 春 夏 秋 冬 for f1-f4 against 梅 蘭 菊 竹 for f5-f8.
+    # Guessing wrong swaps all eight bonus classes and *looks fine* afterwards,
+    # because the confusion is perfectly consistent. So the default below is
+    # only a default: pass --remap to override it per dataset, and check the
+    # contact sheet every time.
     "f1": "flower_plum", "f2": "flower_orchid",
     "f3": "flower_chrysanthemum", "f4": "flower_bamboo",
     "f5": "season_spring", "f6": "season_summer",
@@ -170,6 +174,7 @@ def convert_split(
     max_width: int,
     samples: dict[int, list[np.ndarray]] | None,
     samples_per_class: int,
+    class_map: dict[str, str],
     max_box_fraction: float,
     min_aspect: float,
     max_aspect: float,
@@ -215,7 +220,7 @@ def convert_split(
             cx, cy, bw, bh = (float(value) for value in parts[1:5])
 
             their_name = names[class_index]
-            our_code = CLASS_MAP.get(their_name)
+            our_code = class_map.get(their_name)
             if our_code is None:
                 skipped[f"unmapped class {their_name}"] = (
                     skipped.get(f"unmapped class {their_name}", 0) + 1
@@ -327,6 +332,12 @@ def main() -> None:
                         help="Write a per-class verification sheet here")
     parser.add_argument("--samples-per-class", type=int, default=8)
     parser.add_argument(
+        "--remap", type=str, default=None,
+        help="Per-dataset class overrides, e.g. 'f1=season_spring,f2=season_summer'. "
+             "Names like f1-f8 mean different things in different datasets; this "
+             "is how you say which without editing the shared table.",
+    )
+    parser.add_argument(
         "--max-box-fraction", type=float, default=0.06,
         help="Reject boxes covering more than this fraction of the image. A tile is "
              "around 1%% of a photographed hand; anything much larger is a pile "
@@ -347,10 +358,19 @@ def main() -> None:
     args = parser.parse_args()
 
     random.seed(args.seed)
+    class_map = dict(CLASS_MAP)
+    if args.remap:
+        for pair in args.remap.split(","):
+            their, ours = (part.strip() for part in pair.split("=", 1))
+            if ours not in BY_CODE:
+                raise SystemExit(f"--remap target {ours!r} is not a tile code")
+            class_map[their] = ours
+        print(f"Applied {len(args.remap.split(','))} class overrides.")
+
     names = read_class_names(args.root)
     print(f"{len(names)} classes in data.yaml: {', '.join(names)}")
 
-    unmapped = [name for name in names if name not in CLASS_MAP]
+    unmapped = [name for name in names if name not in class_map]
     if unmapped:
         print(f"\nWARNING: no mapping for {unmapped} - those boxes will be dropped.")
 
@@ -361,7 +381,8 @@ def main() -> None:
         out_dir = args.out if args.merge else args.out / split
         records, skipped = convert_split(
             args.root, split, names, out_dir, args.max_width, samples,
-            args.samples_per_class, args.max_box_fraction, args.min_aspect, args.max_aspect,
+            args.samples_per_class, class_map,
+            args.max_box_fraction, args.min_aspect, args.max_aspect,
         )
         tiles = sum(len(record["labels"]) for record in records)
         print(f"\n{split}: {len(records)} images, {tiles} tiles -> {out_dir}")

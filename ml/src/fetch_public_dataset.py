@@ -72,9 +72,14 @@ DATASETS: dict[str, dict] = {
         "licence": "CC BY 4.0",
         "classes": 54,
         "bonus": True,
-        "note": "1,744 photographs including flowers and seasons. 54 classes "
-                "because two datasets were merged without deduplicating their "
-                "class lists - m2 and 2man both appear - but every name maps.",
+        "note": "1,744 photographs including flowers and seasons.",
+        # This set numbers the seasons f1-f4 and the flowers f5-f8, which is the
+        # reverse of the table's default. Verified by reading the glyphs: f1-f4
+        # carry 春 夏 秋 冬, f5-f8 carry 梅 蘭 菊 竹.
+        "remap": (
+            "f1=season_spring,f2=season_summer,f3=season_autumn,f4=season_winter,"
+            "f5=flower_plum,f6=flower_orchid,f7=flower_chrysanthemum,f8=flower_bamboo"
+        ),
     },
 }
 
@@ -207,6 +212,8 @@ def main() -> None:
             "--merge",
             "--splits", split,
         ]
+        if spec.get("remap"):
+            command += ["--remap", spec["remap"]]
         sheet = args.contact_sheet or (
             ML_ROOT.parent / "docs" / "images" / f"classes-{args.dataset}.png")
         if index == 0:
