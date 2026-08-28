@@ -1,0 +1,218 @@
+[
+  {
+    "epoch": 0,
+    "loss": 0.525693594820913,
+    "top1": 0.96735,
+    "top3": 0.99033,
+    "worst_class": 0.9079,
+    "worst_class_name": "man3",
+    "seconds": 145.8
+  },
+  {
+    "epoch": 1,
+    "loss": 0.5287307679905373,
+    "top1": 0.9646,
+    "top3": 0.99057,
+    "worst_class": 0.8532,
+    "worst_class_name": "sou9",
+    "seconds": 93.7
+  },
+  {
+    "epoch": 2,
+    "loss": 0.5246127442429197,
+    "top1": 0.96744,
+    "top3": 0.99024,
+    "worst_class": 0.8897,
+    "worst_class_name": "man3",
+    "seconds": 68.4
+  },
+  {
+    "epoch": 3,
+    "loss": 0.5236265865300371,
+    "top1": 0.96856,
+    "top3": 0.99099,
+    "worst_class": 0.9079,
+    "worst_class_name": "man3",
+    "seconds": 40.3
+  },
+  {
+    "epoch": 4,
+    "loss": 0.5227588854824706,
+    "top1": 0.96895,
+    "top3": 0.99178,
+    "worst_class": 0.8761,
+    "worst_class_name": "sou9",
+    "seconds": 40.1
+  },
+  {
+    "epoch": 5,
+    "loss": 0.519349297448173,
+    "top1": 0.97041,
+    "top3": 0.9919,
+    "worst_class": 0.8835,
+    "worst_class_name": "sou9",
+    "seconds": 38.1
+  },
+  {
+    "epoch": 6,
+    "loss": 0.518993636490764,
+    "top1": 0.97089,
+    "top3": 0.99232,
+    "worst_class": 0.8947,
+    "worst_class_name": "man3",
+    "seconds": 39.3
+  },
+  {
+    "epoch": 7,
+    "loss": 0.513574876553249,
+    "top1": 0.96974,
+    "top3": 0.99142,
+    "worst_class": 0.9221,
+    "worst_class_name": "sou9",
+    "seconds": 40.1
+  },
+  {
+    "epoch": 8,
+    "loss": 0.51305504616124,
+    "top1": 0.97207,
+    "top3": 0.99166,
+    "worst_class": 0.8988,
+    "worst_class_name": "man3",
+    "seconds": 37.8
+  },
+  {
+    "epoch": 9,
+    "loss": 0.5103165269402422,
+    "top1": 0.97258,
+    "top3": 0.99226,
+    "worst_class": 0.9251,
+    "worst_class_name": "man3",
+    "seconds": 40.1
+  },
+  {
+    "epoch": 10,
+    "loss": 0.5101338120542561,
+    "top1": 0.97237,
+    "top3": 0.99271,
+    "worst_class": 0.9079,
+    "worst_class_name": "man3",
+    "seconds": 41.0
+  },
+  {
+    "epoch": 11,
+    "loss": 0.507286532515363,
+    "top1": 0.97059,
+    "top3": 0.99205,
+    "worst_class": 0.913,
+    "worst_class_name": "sou9",
+    "seconds": 39.6
+  },
+  {
+    "epoch": 12,
+    "loss": 0.5033296746410671,
+    "top1": 0.9724,
+    "top3": 0.99262,
+    "worst_class": 0.8909,
+    "worst_class_name": "sou9",
+    "seconds": 40.8
+  },
+  {
+    "epoch": 13,
+    "loss": 0.5012159377378537,
+    "top1": 0.97252,
+    "top3": 0.99196,
+    "worst_class": 0.8968,
+    "worst_class_name": "man3",
+    "seconds": 43.1
+  },
+  {
+    "epoch": 14,
+    "loss": 0.49849033961006883,
+    "top1": 0.9705,
+    "top3": 0.99262,
+    "worst_class": 0.8597,
+    "worst_class_name": "sou9",
+    "seconds": 44.6
+  },
+  {
+    "epoch": 15,
+    "loss": 0.4991436425402067,
+    "top1": 0.974,
+    "top3": 0.99281,
+    "worst_class": 0.8998,
+    "worst_class_name": "man3",
+    "seconds": 60.5
+  },
+  {
+    "epoch": 16,
+    "loss": 0.49715270032667475,
+    "top1": 0.97346,
+    "top3": 0.99275,
+    "worst_class": 0.9188,
+    "worst_class_name": "sou9",
+    "seconds": 53.0
+  },
+  {
+    "epoch": 17,
+    "loss": 0.4951190284344306,
+    "top1": 0.97397,
+    "top3": 0.99262,
+    "worst_class": 0.9119,
+    "worst_class_name": "man3",
+    "seconds": 86.2
+  },
+  {
+    "epoch": 18,
+    "loss": 0.4955751524741626,
+    "top1": 0.97506,
+    "top3": 0.99238,
+    "worst_class": 0.919,
+    "worst_class_name": "man3",
+    "seconds": 75.5
+  },
+  {
+    "epoch": 19,
+    "loss": 0.49352589947380365,
+    "top1": 0.975,
+    "top3": 0.99305,
+    "worst_class": 0.9214,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 81.3
+  },
+  {
+    "epoch": 20,
+    "loss": 0.4912933056966542,
+    "top1": 0.97494,
+    "top3": 0.99265,
+    "worst_class": 0.9109,
+    "worst_class_name": "man3",
+    "seconds": 78.5
+  },
+  {
+    "epoch": 21,
+    "loss": 0.4895588894741155,
+    "top1": 0.97536,
+    "top3": 0.99281,
+    "worst_class": 0.9214,
+    "worst_class_name": "flower_chrysanthemum",
+    "seconds": 48.0
+  },
+  {
+    "epoch": 22,
+    "loss": 0.49346212145303636,
+    "top1": 0.97506,
+    "top3": 0.99278,
+    "worst_class": 0.92,
+    "worst_class_name": "man3",
+    "seconds": 49.8
+  },
+  {
+    "epoch": 23,
+    "loss": 0.49196948743673574,
+    "top1": 0.97518,
+    "top3": 0.99284,
+    "worst_class": 0.9211,
+    "worst_class_name": "man3",
+    "seconds": 50.4
+  }
+]

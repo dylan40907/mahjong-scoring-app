@@ -165,10 +165,19 @@ which is class-blind, and is why the validation and test splits - which are
 
 ## Known limitations
 
-**Two tile designs are not all tile designs.** The models have now seen
-rendered tiles and the sets in one public dataset. A set with unusual engraving
-or heavy wear is still out of distribution. `ml/src/ingest_photos.py` and
-`docs/real-photos.md` exist to make adding your own set cheap.
+**A handful of tile designs is not all tile designs.** The models have seen
+rendered tiles and the sets in three public datasets. That is enough to have
+measurably generalised - adding a source improved an untouched fourth dataset
+by 7.6 points - but a set with unusual engraving or heavy wear is still out of
+distribution, and no public number predicts accuracy on *your* tiles.
+`ml/src/ingest_photos.py` and `docs/real-photos.md` make adding your own set
+about fifteen minutes of work.
+
+**A 34-class Riichi source is not free.** Those sets contain no flowers or
+seasons, so adding one dilutes the bonus classes even under balanced sampling:
+jon-chan bonus accuracy went 0.957 to 0.939 when riichi-6810 was added, and
+recovered to 0.952 only once a second bonus-carrying source arrived. Weigh that
+before adding another Riichi set.
 
 **Bonus tiles are the weakest classes.** Flowers and seasons have the thinnest
 real support, and the two sources disagree about what they look like - the

@@ -26,23 +26,23 @@ detector, so detection here is measured honestly.
 
 | Metric | Value |
 |---|---|
-| Detection AP@0.5 | 0.9223 |
-| Detection precision @ 0.40 | 0.9536 |
-| Detection recall @ 0.40 | 0.9294 |
-| Classifier top-1, on found tiles | 0.9861 |
-| Classifier top-3, on found tiles | 0.9952 |
-| **Per-tile accuracy, end to end** | **0.9165** |
-| **Hand read perfectly** | **0.6479** |
-| Tile count correct | 0.7500 |
+| Detection AP@0.5 | 0.9154 |
+| Detection precision @ 0.35 | 0.9607 |
+| Detection recall @ 0.35 | 0.9216 |
+| Classifier top-1, on found tiles | 0.9882 |
+| Classifier top-3, on found tiles | 0.9958 |
+| **Per-tile accuracy, end to end** | **0.9108** |
+| **Hand read perfectly** | **0.6655** |
+| Tile count correct | 0.7606 |
 
 "Hand read perfectly" means every tile in a scene was found *and* named
 correctly: no misses, no extras, no misreads. It is much harsher than the
 component figures and it is the number that describes what a user experiences.
 13 tiles is 13 independent
-chances to be wrong, so 91.6% per-tile accuracy yields about
-65% of hands clean.
+chances to be wrong, so 91.1% per-tile accuracy yields about
+67% of hands clean.
 
-Top-3 at 0.995 matters more than it looks. The review screen offers
+Top-3 at 0.996 matters more than it looks. The review screen offers
 the three most likely tiles when a detection is tapped, so top-3 is the
 accuracy of the correction path: when the model is wrong, the right answer is
 almost always one tap away.
@@ -60,10 +60,10 @@ training data.
 
 | Metric | Original models | Current models |
 |---|---|---|
-| Detection AP@0.5 | 0.9910 | 0.9904 |
+| Detection AP@0.5 | 0.9910 | 0.9935 |
 | Classifier top-1 | 0.9998 | 0.9983 |
-| Per-tile accuracy | 0.9910 | 0.9891 |
-| Hand read perfectly | 0.8760 | 0.8520 |
+| Per-tile accuracy | 0.9910 | 0.9923 |
+| Hand read perfectly | 0.8760 | 0.8640 |
 
 Fine-tuning on real photographs *alone* was tried first and rejected: it
 reached 0.521 on real hands but collapsed to
@@ -79,18 +79,17 @@ against the metric the app actually cares about:
 
 | Threshold | Hand read perfectly | Tile count correct |
 |---|---|---|
-| 0.30 | 0.614 | 0.718 |
-| 0.35 | 0.648 | 0.750 |
-| 0.40 | 0.651 | 0.747 |
-| 0.45 | 0.599 | 0.676 |
-| 0.50 | 0.467 | 0.516 |
+| 0.30 | 0.662 | 0.759 |
+| 0.35 | 0.665 | 0.761 |
+| 0.40 | 0.650 | 0.720 |
+| 0.45 | 0.537 | 0.597 |
 
-The app ships at 0.40. Below it, partial tiles at the frame edge start being
+The app ships at 0.35. Below it, partial tiles at the frame edge start being
 detected as whole ones; above it, genuine tiles are dropped.
 
 ### Latency
 
-55.3 ms median per photograph, 76.3 ms at the 95th
+18.3 ms median per photograph, 25.8 ms at the 95th
 percentile, measured single-threaded on CPU. A phone is comparable; the models
 are small enough that decoding the JPEG is a meaningful share of the total.
 
@@ -136,8 +135,8 @@ project's evidence that more sources buy generality rather than memorisation.
 | Synthetic | Validation | 400 | 5,354 |
 | Synthetic | Test | 500 | 6,526 |
 
-Per-class support in the fine-tuning crops ranges from 1,381 to
-5,503.
+Per-class support in the fine-tuning crops ranges from 1,425 to
+5,701.
 
 The real dataset's training split carries Roboflow augmentation, three outputs
 per source image including a vertical flip. That is harmless for the detector,
@@ -146,15 +145,24 @@ which is class-blind, and is why the validation and test splits - which are
 
 ## Known limitations
 
-**Two tile designs are not all tile designs.** The models have now seen
-rendered tiles and the sets in one public dataset. A set with unusual engraving
-or heavy wear is still out of distribution. `ml/src/ingest_photos.py` and
-`docs/real-photos.md` exist to make adding your own set cheap.
+**A handful of tile designs is not all tile designs.** The models have seen
+rendered tiles and the sets in three public datasets. That is enough to have
+measurably generalised - adding a source improved an untouched fourth dataset
+by 7.6 points - but a set with unusual engraving or heavy wear is still out of
+distribution, and no public number predicts accuracy on *your* tiles.
+`ml/src/ingest_photos.py` and `docs/real-photos.md` make adding your own set
+about fifteen minutes of work.
+
+**A 34-class Riichi source is not free.** Those sets contain no flowers or
+seasons, so adding one dilutes the bonus classes even under balanced sampling:
+jon-chan bonus accuracy went 0.957 to 0.939 when riichi-6810 was added, and
+recovered to 0.952 only once a second bonus-carrying source arrived. Weigh that
+before adding another Riichi set.
 
 **Bonus tiles are the weakest classes.** Flowers and seasons have the thinnest
 real support, and the two sources disagree about what they look like - the
 renders draw the CJK glyphs, the photographs show pictorial illustrations. They
-sit around 0.90 where the suits sit near 1.00.
+sit around 0.91 where the suits sit near 1.00.
 
 **Face-down and edge-on tiles are detected but not named.** The real data
 contains tiles standing in a wall, so the detector often finds them. The
@@ -206,9 +214,9 @@ python src/evaluate.py --roots data/real/public_test --runs runs/mixed
 python src/export_onnx.py --runs runs/mixed --out ../mobile/assets/models
 ```
 
-Checkpoints selected: detector epoch 21 (validation AP@0.5
-0.9649), classifier epoch 18 (validation top-1
-0.9719), both against the mixed validation set.
+Checkpoints selected: detector epoch 11 (validation AP@0.5
+0.9644), classifier epoch 21 (validation top-1
+0.9754), both against the mixed validation set.
 
 ## Export
 
