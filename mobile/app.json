@@ -56,8 +56,10 @@
         }
       ],
       "expo-updates",
+      "onnxruntime-react-native",
       "./plugins/with-onnxruntime-gradle9-fix",
-      "./plugins/with-onnxruntime-bridgeless-fix"
+      "./plugins/with-onnxruntime-bridgeless-fix",
+      "./plugins/with-onnxruntime-register-package"
     ],
     "experiments": {
       "typedRoutes": true,
