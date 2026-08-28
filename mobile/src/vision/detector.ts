@@ -1,4 +1,4 @@
-import { NativeModules, Platform } from 'react-native';
+import { NativeModules, Platform, TurboModuleRegistry } from 'react-native';
 import { Asset } from 'expo-asset';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -62,26 +62,74 @@ export class VisionUnavailableError extends Error {
 }
 
 /**
+ * The ONNX native module, however this React Native version exposes it.
+ *
+ * onnxruntime-react-native 1.24.3 registers a *legacy* bridge module -
+ * `OnnxruntimePackage implements ReactPackage`, no `codegenConfig` - and its
+ * `binding.js` reaches it with `NativeModules.Onnxruntime` at import time.
+ * React Native 0.86 is bridgeless-only, where legacy modules arrive through
+ * the TurboModule interop and do not necessarily appear on `NativeModules`.
+ * That is why the module can be compiled into the APK (the build log shows it
+ * linked for all four ABIs) and still be invisible to JavaScript.
+ *
+ * Looking it up through both, then writing the result back onto
+ * `NativeModules`, is what lets the library's own lookup succeed - it runs
+ * when the package is required, which is too early for us to patch afterwards.
+ */
+function resolveOnnxModule(): unknown {
+  if (NativeModules.Onnxruntime != null) return NativeModules.Onnxruntime;
+
+  let viaTurbo: unknown = null;
+  try {
+    viaTurbo = TurboModuleRegistry.get('Onnxruntime');
+  } catch {
+    return null;
+  }
+  if (viaTurbo == null) return null;
+
+  try {
+    (NativeModules as Record<string, unknown>).Onnxruntime = viaTurbo;
+  } catch {
+    // Frozen in some runtimes; the library will fail its own lookup and the
+    // capture screen falls through to manual entry, which is the safe path.
+  }
+  return viaTurbo;
+}
+
+/**
  * Whether on-device inference can run here at all.
  *
- * Checked by looking for the native module directly rather than by importing
- * the package. `onnxruntime-react-native/binding` calls
- * `NativeModules.Onnxruntime.install()` at *import* time, so merely requiring
- * it where the native side is absent throws a TypeError rather than returning
- * something falsy. Probing `NativeModules` first is free and cannot throw.
+ * Probed by resolving the native module rather than by importing the package.
+ * `onnxruntime-react-native/binding` calls `NativeModules.Onnxruntime.install()`
+ * at *import* time, so merely requiring it where the native side is absent
+ * throws a TypeError rather than returning something falsy.
  *
- * Two environments legitimately lack it:
- *
- *   - the web build, which exists to develop and review the interface;
- *   - Expo Go, which ships a fixed set of native modules and cannot include
- *     an arbitrary one. A development build can.
- *
- * Both fall through to manual tile entry, which is a first-class path rather
- * than an error state.
+ * Environments that legitimately lack it - the web build, and Expo Go, which
+ * ships a fixed set of native modules - fall through to manual tile entry,
+ * which is a first-class path rather than an error state.
  */
 export function isVisionSupported(): boolean {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') return false;
-  return NativeModules.Onnxruntime != null;
+  return resolveOnnxModule() != null;
+}
+
+/**
+ * What the runtime can actually see, for when the module is missing.
+ *
+ * Without this a failure is indistinguishable from every other failure, and
+ * each guess costs a twenty-minute native build. Naming which lookup failed
+ * turns that into one build.
+ */
+export function visionDiagnostics(): string {
+  let turbo = 'absent';
+  try {
+    turbo = TurboModuleRegistry.get('Onnxruntime') != null ? 'present' : 'absent';
+  } catch (error) {
+    turbo = `threw ${(error as Error).message}`;
+  }
+  const bridge = NativeModules.Onnxruntime != null ? 'present' : 'absent';
+  const visible = Object.keys(NativeModules ?? {}).length;
+  return `NativeModules.Onnxruntime ${bridge}; TurboModuleRegistry ${turbo}; ${visible} bridge modules visible; RN bridgeless`;
 }
 
 /**
@@ -100,7 +148,7 @@ export function visionUnavailableReason(): string | null {
   if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
     return 'Expo Go cannot load the tile models. Everything else works — enter the hand by hand, or open this in the development build to read tiles from photos.';
   }
-  return 'This build is missing the tile-reading module. Rebuild it with "eas build --profile development --platform android" and install the new APK. Enter the hand by hand meanwhile.';
+  return `The tile-reading module did not load in this build. Enter the hand by hand meanwhile.\n\n${visionDiagnostics()}`;
 }
 
 // ---------------------------------------------------------------------------
