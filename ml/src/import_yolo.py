@@ -80,10 +80,26 @@ CLASS_MAP: dict[str, str] = {
     **{f"{rank}s": f"sou{rank}" for rank in range(1, 10)},
     "1z": "east", "2z": "south", "3z": "west", "4z": "north",
     "5z": "white", "6z": "green", "7z": "red",
+
+    # --- Prefix-first variant of the same scheme (m1/p1/s1/z1), plus f1-f8
+    # --- for the bonus tiles that Riichi sets do not have.
+    **{f"m{rank}": f"man{rank}" for rank in range(1, 10)},
+    **{f"p{rank}": f"pin{rank}" for rank in range(1, 10)},
+    **{f"s{rank}": f"sou{rank}" for rank in range(1, 10)},
+    "z1": "east", "z2": "south", "z3": "west", "z4": "north",
+    "z5": "white", "z6": "green", "z7": "red",
+    # f1-f8 is assumed to be the four flowers then the four seasons, each in
+    # conventional order. Two guesses stacked, so --contact-sheet matters more
+    # here than anywhere else in this table.
+    "f1": "flower_plum", "f2": "flower_orchid",
+    "f3": "flower_chrysanthemum", "f4": "flower_bamboo",
+    "f5": "season_spring", "f6": "season_summer",
+    "f7": "season_autumn", "f8": "season_winter",
 }
 
 UNVERIFIED = {"1F", "2F", "3F", "4F", "1S", "2S", "3S", "4S",
-              "5z", "6z", "7z"}
+              "5z", "6z", "7z", "z5", "z6", "z7",
+              "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8"}
 
 
 def read_class_names(root: Path) -> list[str]:

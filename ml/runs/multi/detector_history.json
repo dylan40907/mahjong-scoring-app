@@ -1,0 +1,47 @@
+[
+  {
+    "epoch": 0,
+    "loss": 0.7696263134479523,
+    "seconds": 82.8,
+    "ap50": 0.9577,
+    "precision": 0.9646,
+    "recall": 0.9386,
+    "exact_count": 0.6995
+  },
+  {
+    "epoch": 1,
+    "loss": 0.7682555387417476,
+    "seconds": 84.1,
+    "ap50": 0.9601,
+    "precision": 0.9657,
+    "recall": 0.9387,
+    "exact_count": 0.6978
+  },
+  {
+    "epoch": 2,
+    "loss": 0.7357421473662058,
+    "seconds": 99.0,
+    "ap50": 0.9626,
+    "precision": 0.9566,
+    "recall": 0.9497,
+    "exact_count": 0.7214
+  },
+  {
+    "epoch": 3,
+    "loss": 0.720731713672479,
+    "seconds": 156.6,
+    "ap50": 0.9589,
+    "precision": 0.9653,
+    "recall": 0.9352,
+    "exact_count": 0.6717
+  },
+  {
+    "epoch": 4,
+    "loss": 0.7112954679131508,
+    "seconds": 175.8,
+    "ap50": 0.9617,
+    "precision": 0.9766,
+    "recall": 0.9319,
+    "exact_count": 0.681
+  }
+]

@@ -65,6 +65,17 @@ DATASETS: dict[str, dict] = {
         "bonus": False,
         "note": "6,810 photographs, one tight box per tile, Riichi 1m/1z naming.",
     },
+    "non-riichi": {
+        "workspace": "test-ag8z6",
+        "project": "mahjong-tiles-non-riichi",
+        "version": None,          # discovered; this project exposes no version list
+        "licence": "CC BY 4.0",
+        "classes": 42,
+        "bonus": True,
+        "note": "905 photographs of a hand laid out in a row on a table, seen "
+                "from the player's seat - the app's own scenario - and one of "
+                "only two public sources with flowers and seasons.",
+    },
 }
 
 # Checked and rejected, recorded so nobody pays to rediscover it:
@@ -129,6 +140,8 @@ def download(destination: Path, spec: dict) -> Path:
     # actually has, and fall back to its newest rather than guessing.
     wanted = spec.get("version")
     try:
+        if wanted is None:
+            raise RuntimeError("no version pinned")
         version = project.version(wanted)
     except RuntimeError:
         available = sorted(
