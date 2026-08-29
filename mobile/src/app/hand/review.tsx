@@ -13,6 +13,7 @@ import {
 import { AlertIcon, PlusIcon } from '@/design/icons';
 import { colors, radius, space, tileSize } from '@/design/tokens';
 import { TilePicker } from '@/components/TilePicker';
+import { containFit, placeBox } from '@/vision/overlay';
 import type { TileCode } from '@/tiles/tileset';
 import { TILE_BY_CODE, isBonus } from '@/tiles/tileset';
 import { findRuleSet } from '@/store/store';
@@ -259,16 +260,22 @@ export default function ReviewScreen() {
 function PhotoWithBoxes({ uri, draft }: { uri: string; draft: ReturnType<typeof getDraft> }) {
   const [layout, setLayout] = useState({ width: 0, height: 0 });
 
+  /**
+   * The decoded image's own size, not the extent of the boxes.
+   *
+   * Deriving it from the detections assumes the tiles reach the edges of the
+   * photograph. A hand lying in a thin strip across a tall frame breaks that
+   * badly: the inferred height comes out a fraction of the real one, the
+   * `contain` fit computed here stops matching the one the Image applies, and
+   * every box lands low and too wide. The detector always knew the real size;
+   * it just was not carried this far.
+   */
   const source = useMemo(() => {
-    if (draft.detections.length === 0) return null;
-    let maxX = 0;
-    let maxY = 0;
-    for (const detection of draft.detections) {
-      maxX = Math.max(maxX, detection.box[2]);
-      maxY = Math.max(maxY, detection.box[3]);
+    if (draft.imageWidth > 0 && draft.imageHeight > 0) {
+      return { width: draft.imageWidth, height: draft.imageHeight };
     }
-    return { width: maxX, height: maxY };
-  }, [draft.detections]);
+    return null;
+  }, [draft.imageWidth, draft.imageHeight]);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -276,16 +283,8 @@ function PhotoWithBoxes({ uri, draft }: { uri: string; draft: ReturnType<typeof 
   };
 
   // Boxes are in decoded-image pixels; the preview is letterboxed by `contain`,
-  // so the same fit has to be reproduced to place them.
-  const fit = useMemo(() => {
-    if (!source || layout.width === 0) return null;
-    const scale = Math.min(layout.width / source.width, layout.height / source.height);
-    return {
-      scale,
-      offsetX: (layout.width - source.width * scale) / 2,
-      offsetY: (layout.height - source.height * scale) / 2,
-    };
-  }, [source, layout]);
+  // so the same fit has to be reproduced to place them. See vision/overlay.ts.
+  const fit = useMemo(() => containFit(source, layout), [source, layout]);
 
   return (
     <View style={styles.photo} onLayout={onLayout}>
@@ -298,10 +297,7 @@ function PhotoWithBoxes({ uri, draft }: { uri: string; draft: ReturnType<typeof 
               style={[
                 styles.box,
                 {
-                  left: detection.box[0] * fit.scale + fit.offsetX,
-                  top: detection.box[1] * fit.scale + fit.offsetY,
-                  width: (detection.box[2] - detection.box[0]) * fit.scale,
-                  height: (detection.box[3] - detection.box[1]) * fit.scale,
+                  ...placeBox(detection.box, fit),
                   borderColor: detection.confidence < 0.6 ? colors.loss : colors.brass,
                 },
               ]}

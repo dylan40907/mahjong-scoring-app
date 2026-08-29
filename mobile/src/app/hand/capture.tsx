@@ -87,6 +87,8 @@ export default function CaptureScreen() {
           groups: ordered.groups.map((group) => group.map((tile) => tile.code)),
           meldGroups: meldGroupIndices,
           detections: result.detections,
+          imageWidth: result.imageWidth,
+          imageHeight: result.imageHeight,
           flagged,
         });
       } catch (error) {
@@ -128,7 +130,10 @@ export default function CaptureScreen() {
   };
 
   const enterManually = () => {
-    updateDraft({ photoUri: null, groups: [[]], detections: [], flagged: [] });
+    updateDraft({
+      photoUri: null, groups: [[]], detections: [],
+      imageWidth: 0, imageHeight: 0, flagged: [],
+    });
     router.push('/hand/review');
   };
 

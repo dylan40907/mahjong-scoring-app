@@ -29,6 +29,16 @@ export interface HandDraft {
   context: Partial<HandContext>;
   /** Raw detections, kept so the review screen can show confidence. */
   detections: Detection[];
+  /**
+   * Size of the decoded image the detection boxes refer to.
+   *
+   * Carried explicitly because it cannot be recovered from the boxes. Inferring
+   * it from their extent - which the review overlay used to do - silently
+   * assumes the tiles reach the edges of the photograph, and a hand sitting in
+   * the middle of a tall frame then draws every box in the wrong place.
+   */
+  imageWidth: number;
+  imageHeight: number;
   /** Positions the model was unsure about: "group:index". */
   flagged: string[];
 }
@@ -45,6 +55,8 @@ const EMPTY: HandDraft = {
   discarderId: null,
   context: {},
   detections: [],
+  imageWidth: 0,
+  imageHeight: 0,
   flagged: [],
 };
 
