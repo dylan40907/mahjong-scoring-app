@@ -9,6 +9,7 @@ import { colors, radius, space } from '@/design/tokens';
 import { findRuleSet, useAppState } from '@/store/store';
 import { getDraft, updateDraft } from '@/store/draft';
 import { orderDetections, splitHandAndMelds } from '@/vision/ordering';
+import { handBoundary, withinBoundary } from '@/vision/boundary';
 import {
   detectTiles,
   isVisionSupported,
@@ -67,7 +68,11 @@ export default function CaptureScreen() {
       setMessage('Reading the tiles…');
       try {
         const result = await detectTiles(uri);
-        const ordered = orderDetections(result.detections);
+        // Everything outside the hand is dropped before it can become a tile
+        // the user has to notice and delete.
+        const boundary = handBoundary(result.detections, result.imageWidth, result.imageHeight);
+        const inside = withinBoundary(result.detections, boundary);
+        const ordered = orderDetections(inside);
         const { melds } = splitHandAndMelds(ordered);
         const meldGroupIndices = ordered.groups
           .map((group, index) => ({ group, index }))
@@ -86,7 +91,8 @@ export default function CaptureScreen() {
         updateDraft({
           groups: ordered.groups.map((group) => group.map((tile) => tile.code)),
           meldGroups: meldGroupIndices,
-          detections: result.detections,
+          detections: inside,
+          boundary,
           imageWidth: result.imageWidth,
           imageHeight: result.imageHeight,
           flagged,
@@ -131,7 +137,7 @@ export default function CaptureScreen() {
 
   const enterManually = () => {
     updateDraft({
-      photoUri: null, groups: [[]], detections: [],
+      photoUri: null, groups: [[]], detections: [], boundary: null,
       imageWidth: 0, imageHeight: 0, flagged: [],
     });
     router.push('/hand/review');

@@ -268,13 +268,71 @@ async function decodeImage(uri: string): Promise<RgbaImage> {
   return { data: decoded.data, width: decoded.width, height: decoded.height };
 }
 
+/**
+ * Decode just the hand, at the same working width as the whole photograph.
+ *
+ * This is where re-reading inside a confirmed boundary earns its keep. A hand
+ * occupying a fifth of the frame gets a fifth of the detector's 320 pixels on
+ * the first pass; cropped to it, the same hand fills them. The tiles arrive
+ * several times larger with no change to either model.
+ *
+ * `region` is in the coordinate space of the *full* decoded image, because
+ * that is what the boxes and the on-screen boundary are both expressed in.
+ * Returned alongside is the mapping that puts boxes found here back into that
+ * space: the crop is always resized to the same working width, so the factor
+ * collapses to `regionWidth / MAX_SOURCE_WIDTH`.
+ */
+async function decodeRegion(
+  uri: string,
+  region: readonly [number, number, number, number],
+): Promise<{ image: RgbaImage; factor: number; offsetX: number; offsetY: number }> {
+  // The crop has to be expressed in the original file's pixels, so ask what
+  // those are. No base64, so this does not decode anything.
+  const probe = await ImageManipulator.manipulateAsync(uri, [], {
+    compress: 1,
+    format: ImageManipulator.SaveFormat.JPEG,
+  });
+
+  const fullScale = MAX_SOURCE_WIDTH / probe.width;
+  const originX = Math.max(0, Math.round(region[0] / fullScale));
+  const originY = Math.max(0, Math.round(region[1] / fullScale));
+  const width = Math.max(1, Math.min(
+    probe.width - originX, Math.round((region[2] - region[0]) / fullScale),
+  ));
+  const height = Math.max(1, Math.min(
+    probe.height - originY, Math.round((region[3] - region[1]) / fullScale),
+  ));
+
+  const result = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ crop: { originX, originY, width, height } }, { resize: { width: MAX_SOURCE_WIDTH } }],
+    { compress: 0.95, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+  );
+
+  if (!result.base64) throw new Error('The photo could not be read.');
+  const decoded = decodeJpeg(base64ToBytes(result.base64), { useTArray: true });
+  return {
+    image: { data: decoded.data, width: decoded.width, height: decoded.height },
+    factor: (width * fullScale) / MAX_SOURCE_WIDTH,
+    offsetX: originX * fullScale,
+    offsetY: originY * fullScale,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Inference
 // ---------------------------------------------------------------------------
 
 export async function detectTiles(
   uri: string,
-  options: { scoreThreshold?: number } = {},
+  options: {
+    scoreThreshold?: number;
+    /**
+     * Read only this rectangle, in full-image pixels. Boxes still come back in
+     * full-image coordinates, so callers do not have to know a crop happened.
+     */
+    region?: readonly [number, number, number, number];
+  } = {},
 ): Promise<DetectionResult> {
   const started = Date.now();
   const threshold = options.scoreThreshold ?? SCORE_THRESHOLD;
@@ -282,7 +340,41 @@ export async function detectTiles(
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const ort = require('onnxruntime-react-native') as typeof import('onnxruntime-react-native');
 
-  const image = await decodeImage(uri);
+  // Full-image dimensions are reported whether or not a region was read, so a
+  // second pass inside a boundary stays interchangeable with the first.
+  let image: RgbaImage;
+  let factor = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+  let reportedWidth: number;
+  let reportedHeight: number;
+
+  if (options.region) {
+    const cropped = await decodeRegion(uri, options.region);
+    image = cropped.image;
+    factor = cropped.factor;
+    offsetX = cropped.offsetX;
+    offsetY = cropped.offsetY;
+    const full = await ImageManipulator.manipulateAsync(uri, [], {
+      compress: 1,
+      format: ImageManipulator.SaveFormat.JPEG,
+    });
+    const fullScale = MAX_SOURCE_WIDTH / full.width;
+    reportedWidth = MAX_SOURCE_WIDTH;
+    reportedHeight = Math.round(full.height * fullScale);
+  } else {
+    image = await decodeImage(uri);
+    reportedWidth = image.width;
+    reportedHeight = image.height;
+  }
+
+  const toFullImage = (box: [number, number, number, number]): [number, number, number, number] => [
+    box[0] * factor + offsetX,
+    box[1] * factor + offsetY,
+    box[2] * factor + offsetX,
+    box[3] * factor + offsetY,
+  ];
+
   const { tensor, info } = letterboxToTensor(image, DETECTOR_INPUT);
 
   const detectorOutput = await detector.run({
@@ -309,7 +401,12 @@ export async function detectTiles(
   }
 
   if (kept.length === 0) {
-    return { detections: [], imageWidth: image.width, imageHeight: image.height, durationMs: Date.now() - started };
+    return {
+      detections: [],
+      imageWidth: reportedWidth,
+      imageHeight: reportedHeight,
+      durationMs: Date.now() - started,
+    };
   }
 
   // One batched classifier call rather than one per tile: the per-call
@@ -330,7 +427,7 @@ export async function detectTiles(
     const probabilities = softmax(logits, index * classCount, classCount);
     const ranked = topK(probabilities, 3);
     return {
-      box: entry.box,
+      box: toFullImage(entry.box),
       code: CODES[ranked[0].index] as TileCode,
       // Confidence is the classifier's, tempered by the detector's: a
       // confidently-read tile in a doubtful box is not a confident detection.
@@ -344,8 +441,8 @@ export async function detectTiles(
 
   return {
     detections,
-    imageWidth: image.width,
-    imageHeight: image.height,
+    imageWidth: reportedWidth,
+    imageHeight: reportedHeight,
     durationMs: Date.now() - started,
   };
 }

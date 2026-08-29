@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Image, LayoutChangeEvent, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Body,
@@ -13,10 +13,13 @@ import {
 import { AlertIcon, PlusIcon } from '@/design/icons';
 import { colors, radius, space, tileSize } from '@/design/tokens';
 import { TilePicker } from '@/components/TilePicker';
-import { containFit, placeBox } from '@/vision/overlay';
+import { HandBoundary } from '@/components/HandBoundary';
+import { withinBoundary } from '@/vision/boundary';
+import { detectTiles } from '@/vision/detector';
+import { orderDetections } from '@/vision/ordering';
+import { findRuleSet, useAppState } from '@/store/store';
 import type { TileCode } from '@/tiles/tileset';
 import { TILE_BY_CODE, isBonus } from '@/tiles/tileset';
-import { findRuleSet } from '@/store/store';
 import {
   appendTile,
   classifyMeld,
@@ -50,7 +53,56 @@ export default function ReviewScreen() {
   const rules = findRuleSet(draft.ruleSetId);
   const handSize = rules?.handSize ?? 16;
 
+  const settings = useAppState(useCallback((state) => state.settings, []));
+  const [rereading, setRereading] = useState(false);
   const [mode, setMode] = useState<'edit' | 'winning'>('edit');
+
+  /** Detection indices the model was unsure about, for the faint boxes. */
+  const uncertainIndices = useMemo(() => {
+    const set = new Set<number>();
+    draft.detections.forEach((detection, index) => {
+      if (detection.confidence < settings.confidenceThreshold) set.add(index);
+    });
+    return set;
+  }, [draft.detections, settings.confidenceThreshold]);
+
+  /**
+   * Read the hand again, this time seeing only what the boundary holds.
+   *
+   * Two things change. Tiles outside the box stop existing, so the wall behind
+   * the hand cannot contribute. And the detector's 320-pixel input is spent
+   * entirely on the hand rather than on the whole table, which for a hand
+   * filling a fifth of the frame is several times more pixels per tile.
+   */
+  const reread = useCallback(async () => {
+    if (!draft.photoUri || !draft.boundary) return;
+    setRereading(true);
+    try {
+      const result = await detectTiles(draft.photoUri, { region: draft.boundary });
+      const inside = withinBoundary(result.detections, draft.boundary);
+      const ordered = orderDetections(inside);
+      const flagged: string[] = [];
+      ordered.groups.forEach((group, groupIndex) => {
+        group.forEach((tile, tileIndex) => {
+          if (tile.confidence < settings.confidenceThreshold) {
+            flagged.push(`${groupIndex}:${tileIndex}`);
+          }
+        });
+      });
+      updateDraft({
+        groups: ordered.groups.map((group) => group.map((tile) => tile.code)),
+        meldGroups: [],
+        detections: inside,
+        imageWidth: result.imageWidth,
+        imageHeight: result.imageHeight,
+        flagged,
+      });
+    } catch {
+      // Keep the read we already have; the tiles are still editable by hand.
+    } finally {
+      setRereading(false);
+    }
+  }, [draft.photoUri, draft.boundary, settings.confidenceThreshold]);
   const [picker, setPicker] = useState<
     { group: number; tile: number } | { group: -1; tile: -1 } | null
   >(null);
@@ -94,7 +146,30 @@ export default function ReviewScreen() {
   return (
     <Screen padded={false} footerSpace={0}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {draft.photoUri ? <PhotoWithBoxes uri={draft.photoUri} draft={draft} /> : null}
+        {draft.photoUri ? (
+          <>
+            <HandBoundary
+              uri={draft.photoUri}
+              imageWidth={draft.imageWidth}
+              imageHeight={draft.imageHeight}
+              boundary={draft.boundary}
+              detections={draft.detections}
+              uncertain={uncertainIndices}
+              onChange={(next) => updateDraft({ boundary: next })}
+            />
+            <View style={styles.rereadRow}>
+              <Caption tone="faint" style={styles.rereadHint}>
+                Drag a corner so the box holds only your hand.
+              </Caption>
+              <Button
+                label={rereading ? 'Reading…' : 'Read again'}
+                variant="ghost"
+                disabled={rereading || !draft.boundary}
+                onPress={reread}
+              />
+            </View>
+          </>
+        ) : null}
 
         <View style={styles.statusRow}>
           <CaptionStrong tone={validation.tileCount === validation.expected ? 'muted' : 'loss'} numeric>
@@ -250,64 +325,6 @@ export default function ReviewScreen() {
   );
 }
 
-/**
- * The photograph with the detector's boxes drawn over it.
- *
- * Worth the space: it is the only place the user can see *why* a tile was read
- * the way it was. A box drawn around the wrong thing explains a wrong tile
- * immediately, where a list of tile names would leave them guessing.
- */
-function PhotoWithBoxes({ uri, draft }: { uri: string; draft: ReturnType<typeof getDraft> }) {
-  const [layout, setLayout] = useState({ width: 0, height: 0 });
-
-  /**
-   * The decoded image's own size, not the extent of the boxes.
-   *
-   * Deriving it from the detections assumes the tiles reach the edges of the
-   * photograph. A hand lying in a thin strip across a tall frame breaks that
-   * badly: the inferred height comes out a fraction of the real one, the
-   * `contain` fit computed here stops matching the one the Image applies, and
-   * every box lands low and too wide. The detector always knew the real size;
-   * it just was not carried this far.
-   */
-  const source = useMemo(() => {
-    if (draft.imageWidth > 0 && draft.imageHeight > 0) {
-      return { width: draft.imageWidth, height: draft.imageHeight };
-    }
-    return null;
-  }, [draft.imageWidth, draft.imageHeight]);
-
-  const onLayout = (event: LayoutChangeEvent) => {
-    const { width, height } = event.nativeEvent.layout;
-    setLayout({ width, height });
-  };
-
-  // Boxes are in decoded-image pixels; the preview is letterboxed by `contain`,
-  // so the same fit has to be reproduced to place them. See vision/overlay.ts.
-  const fit = useMemo(() => containFit(source, layout), [source, layout]);
-
-  return (
-    <View style={styles.photo} onLayout={onLayout}>
-      <Image source={{ uri }} style={styles.photoImage} resizeMode="contain" />
-      {fit
-        ? draft.detections.map((detection, index) => (
-            <View
-              key={index}
-              pointerEvents="none"
-              style={[
-                styles.box,
-                {
-                  ...placeBox(detection.box, fit),
-                  borderColor: detection.confidence < 0.6 ? colors.loss : colors.brass,
-                },
-              ]}
-            />
-          ))
-        : null}
-    </View>
-  );
-}
-
 function isWinningPosition(
   draft: ReturnType<typeof getDraft>,
   groupIndex: number,
@@ -336,6 +353,14 @@ const REVIEW_TILE_WIDTH = 34;
 const FOOTER_CLEARANCE = 96;
 
 const styles = StyleSheet.create({
+  rereadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    marginTop: space.xs,
+  },
+  rereadHint: { flex: 1 },
   content: { paddingHorizontal: space.xl, paddingBottom: FOOTER_CLEARANCE },
   photo: {
     height: 180,

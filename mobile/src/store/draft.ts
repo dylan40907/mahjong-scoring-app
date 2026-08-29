@@ -39,6 +39,15 @@ export interface HandDraft {
    */
   imageWidth: number;
   imageHeight: number;
+  /**
+   * The area of the photograph holding the hand, in decoded-image pixels.
+   *
+   * Proposed by clustering the detections and adjustable by dragging. Tiles
+   * outside it are not part of the hand - the wall behind, a neighbour's
+   * discards - and re-reading inside it also gives the detector several times
+   * more pixels per tile than the whole frame did.
+   */
+  boundary: readonly [number, number, number, number] | null;
   /** Positions the model was unsure about: "group:index". */
   flagged: string[];
 }
@@ -57,6 +66,7 @@ const EMPTY: HandDraft = {
   detections: [],
   imageWidth: 0,
   imageHeight: 0,
+  boundary: null,
   flagged: [],
 };
 
