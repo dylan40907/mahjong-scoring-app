@@ -8,7 +8,7 @@ import { CameraIcon, ImageIcon, TileIcon } from '@/design/icons';
 import { colors, radius, space } from '@/design/tokens';
 import { findRuleSet, useAppState } from '@/store/store';
 import { getDraft, updateDraft } from '@/store/draft';
-import { orderDetections, splitHandAndMelds } from '@/vision/ordering';
+import { orderDetections } from '@/vision/ordering';
 import { handBoundary, withinBoundary } from '@/vision/boundary';
 import {
   detectTiles,
@@ -73,11 +73,6 @@ export default function CaptureScreen() {
         const boundary = handBoundary(result.detections, result.imageWidth, result.imageHeight);
         const inside = withinBoundary(result.detections, boundary);
         const ordered = orderDetections(inside);
-        const { melds } = splitHandAndMelds(ordered);
-        const meldGroupIndices = ordered.groups
-          .map((group, index) => ({ group, index }))
-          .filter(({ group }) => melds.some((meld) => meld[0] === group[0]))
-          .map(({ index }) => index);
 
         const flagged: string[] = [];
         ordered.groups.forEach((group, groupIndex) => {
@@ -90,7 +85,11 @@ export default function CaptureScreen() {
 
         updateDraft({
           groups: ordered.groups.map((group) => group.map((tile) => tile.code)),
-          meldGroups: meldGroupIndices,
+          // Nothing is assumed exposed. Which tiles were melded cannot be read
+          // from a photograph - a player who tidies their hand before you take
+          // it has erased the spacing the old guess relied on - and guessing
+          // wrong changes the score. The player marks them on the review screen.
+          meldGroups: [],
           detections: inside,
           boundary,
           imageWidth: result.imageWidth,

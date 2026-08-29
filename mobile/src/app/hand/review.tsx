@@ -14,6 +14,8 @@ import { AlertIcon, PlusIcon } from '@/design/icons';
 import { colors, radius, space, tileSize } from '@/design/tokens';
 import { TilePicker } from '@/components/TilePicker';
 import { HandBoundary } from '@/components/HandBoundary';
+import { HandRow, type HandRowMode } from '@/components/HandRow';
+import { exposedIndices } from '@/store/melds';
 import { withinBoundary } from '@/vision/boundary';
 import { detectTiles } from '@/vision/detector';
 import { orderDetections } from '@/vision/ordering';
@@ -22,12 +24,13 @@ import type { TileCode } from '@/tiles/tileset';
 import { TILE_BY_CODE, isBonus } from '@/tiles/tileset';
 import {
   appendTile,
-  classifyMeld,
-  getDraft,
+  exposedSpans,
+  handTiles,
+  reorderTile,
+  setExposedSpans,
   removeBonus,
   removeTile,
   setTile,
-  toggleMeldGroup,
   updateDraft,
   useDraft,
   validateDraft,
@@ -55,7 +58,7 @@ export default function ReviewScreen() {
 
   const settings = useAppState(useCallback((state) => state.settings, []));
   const [rereading, setRereading] = useState(false);
-  const [mode, setMode] = useState<'edit' | 'winning'>('edit');
+  const [mode, setMode] = useState<HandRowMode>('edit');
 
   /** Detection indices the model was unsure about, for the faint boxes. */
   const uncertainIndices = useMemo(() => {
@@ -108,21 +111,60 @@ export default function ReviewScreen() {
   >(null);
 
   const validation = useMemo(() => validateDraft(draft, handSize), [draft, handSize]);
-  const flagged = useMemo(() => new Set(draft.flagged), [draft.flagged]);
 
-  const detectionFor = (groupIndex: number, tileIndex: number) => {
-    let position = 0;
-    for (let g = 0; g < groupIndex; g += 1) position += draft.groups[g].length;
-    return draft.detections[position + tileIndex];
-  };
+  /** The hand as one row; groups exist for the scorer, not for the player. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- groups is the only input
+  const tiles = useMemo(() => handTiles(draft), [draft.groups]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- groups and meldGroups are the only inputs
+  const spans = useMemo(() => exposedSpans(draft), [draft.groups, draft.meldGroups]);
+  const exposedSet = useMemo(() => exposedIndices(spans), [spans]);
 
-  const handleTilePress = (groupIndex: number, tileIndex: number) => {
+  /** Flagged positions arrive as "group:index"; the row works in flat indices. */
+  const uncertainTiles = useMemo(() => {
+    const set = new Set<number>();
+    let offset = 0;
+    draft.groups.forEach((group, groupIndex) => {
+      group.forEach((_tile, tileIndex) => {
+        if (draft.flagged.includes(`${groupIndex}:${tileIndex}`)) set.add(offset + tileIndex);
+      });
+      offset += group.length;
+    });
+    return set;
+  }, [draft.groups, draft.flagged]);
+
+  const winningIndex = useMemo(
+    () => (draft.winningTile ? tiles.indexOf(draft.winningTile) : null),
+    [tiles, draft.winningTile],
+  );
+
+  const [spanStart, setSpanStart] = useState<number | null>(null);
+
+  const handleTilePress = (index: number) => {
     if (mode === 'winning') {
-      updateDraft({ winningTile: draft.groups[groupIndex][tileIndex] });
+      updateDraft({ winningTile: tiles[index] });
       setMode('edit');
       return;
     }
-    setPicker({ group: groupIndex, tile: tileIndex });
+
+    if (mode === 'exposed') {
+      // Tapping inside an existing meld removes it, which is the only way back
+      // from a mistake and needs no separate control.
+      const covering = spans.findIndex(([from, to]) => index >= from && index <= to);
+      if (covering >= 0) {
+        setExposedSpans(spans.filter((_span, i) => i !== covering));
+        setSpanStart(null);
+        return;
+      }
+      if (spanStart === null) {
+        setSpanStart(index);
+      } else {
+        setExposedSpans([...spans, [spanStart, index]]);
+        setSpanStart(null);
+      }
+      return;
+    }
+
+    setPicker({ group: index, tile: index });
   };
 
   const handleSelect = (code: TileCode) => {
@@ -141,7 +183,7 @@ export default function ReviewScreen() {
   };
 
   const activeDetection =
-    picker && picker.group >= 0 ? detectionFor(picker.group, picker.tile) : undefined;
+    picker && picker.group >= 0 ? draft.detections[picker.group] : undefined;
 
   return (
     <Screen padded={false} footerSpace={0}>
@@ -175,54 +217,34 @@ export default function ReviewScreen() {
           <CaptionStrong tone={validation.tileCount === validation.expected ? 'muted' : 'loss'} numeric>
             {validation.tileCount} of {validation.expected} tiles
           </CaptionStrong>
-          {flagged.size > 0 ? (
+          {uncertainTiles.size > 0 ? (
             <View style={styles.flagNote}>
               <AlertIcon size={14} color={colors.loss} />
-              <Caption tone="loss">{flagged.size} to check</Caption>
+              <Caption tone="loss">{uncertainTiles.size} to check</Caption>
             </View>
           ) : null}
         </View>
 
-        <Section title={mode === 'winning' ? 'Tap the winning tile' : 'The hand'} first>
-          <View style={styles.groups}>
-            {draft.groups.map((group, groupIndex) => {
-              const isMeld = draft.meldGroups.includes(groupIndex);
-              const meld = isMeld ? classifyMeld(group, false) : null;
-              return (
-                <View key={groupIndex} style={styles.group}>
-                  <View style={styles.groupTiles}>
-                    {group.map((code, tileIndex) => (
-                      <TileFace
-                        key={`${groupIndex}-${tileIndex}`}
-                        code={code}
-                        width={REVIEW_TILE_WIDTH}
-                        selected={
-                          mode === 'winning'
-                            ? false
-                            : draft.winningTile === code &&
-                              isWinningPosition(draft, groupIndex, tileIndex)
-                        }
-                        uncertain={flagged.has(`${groupIndex}:${tileIndex}`)}
-                        onPress={() => handleTilePress(groupIndex, tileIndex)}
-                        accessibilityLabel={TILE_BY_CODE[code].label}
-                      />
-                    ))}
-                  </View>
-                  {group.length > 0 ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => toggleMeldGroup(groupIndex)}
-                      style={({ pressed }) => [styles.groupLabel, pressed && styles.pressed]}
-                    >
-                      <Caption tone={isMeld ? 'accent' : 'faint'}>
-                        {isMeld ? (meld ? capitalise(meld.kind) : 'Not a valid meld') : 'Concealed'}
-                      </Caption>
-                    </Pressable>
-                  ) : null}
-                </View>
-              );
-            })}
+        <Section
+          title={
+            mode === 'winning' ? 'Tap the winning tile'
+            : mode === 'exposed' ? 'Mark what was exposed'
+            : mode === 'reorder' ? 'Drag tiles into order'
+            : 'The hand'
+          }
+          first
+        >
+          <HandRow
+            tiles={tiles}
+            exposed={exposedSet}
+            uncertain={uncertainTiles}
+            selectedTile={winningIndex}
+            mode={mode}
+            onTilePress={handleTilePress}
+            onReorder={reorderTile}
+          />
 
+          <View style={styles.handActions}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Add a tile"
@@ -231,9 +253,29 @@ export default function ReviewScreen() {
             >
               <PlusIcon size={20} color={colors.inkFaint} />
             </Pressable>
+            <Button
+              label={mode === 'exposed' ? 'Done' : 'Exposed melds'}
+              variant="ghost"
+              onPress={() => {
+                setSpanStart(null);
+                setMode(mode === 'exposed' ? 'edit' : 'exposed');
+              }}
+            />
+            <Button
+              label={mode === 'reorder' ? 'Done' : 'Reorder'}
+              variant="ghost"
+              onPress={() => setMode(mode === 'reorder' ? 'edit' : 'reorder')}
+            />
           </View>
+
           <Caption tone="faint" style={styles.hint}>
-            Tap a tile to correct it. Tap the label under a group to mark it as an exposed meld.
+            {mode === 'exposed'
+              ? spanStart === null
+                ? 'Tap the first tile of a meld you declared. Tap a marked tile to unmark it.'
+                : 'Now tap the last tile of that meld.'
+              : mode === 'reorder'
+                ? 'Drag a tile to move it. Useful when the hand was read from the far side.'
+                : 'Tap a tile to correct it. Everything is concealed unless you mark it exposed.'}
           </Caption>
         </Section>
 
@@ -325,24 +367,6 @@ export default function ReviewScreen() {
   );
 }
 
-function isWinningPosition(
-  draft: ReturnType<typeof getDraft>,
-  groupIndex: number,
-  tileIndex: number,
-): boolean {
-  if (!draft.winningTile) return false;
-  for (let g = 0; g < draft.groups.length; g += 1) {
-    for (let t = 0; t < draft.groups[g].length; t += 1) {
-      if (draft.groups[g][t] === draft.winningTile) return g === groupIndex && t === tileIndex;
-    }
-  }
-  return false;
-}
-
-function capitalise(value: string): string {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
 /**
  * Sized so nine tiles fit across a narrow phone: a seventeen-tile hand lands on
  * two tidy rows rather than three ragged ones.
@@ -361,6 +385,12 @@ const styles = StyleSheet.create({
     marginTop: space.xs,
   },
   rereadHint: { flex: 1 },
+  handActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    marginTop: space.sm,
+  },
   content: { paddingHorizontal: space.xl, paddingBottom: FOOTER_CLEARANCE },
   photo: {
     height: 180,

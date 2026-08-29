@@ -1,5 +1,12 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import type { TileCode } from '@/tiles/tileset';
+import {
+  applyExposedSpans,
+  exposedIndices,
+  moveTile,
+  spansFromGrouping,
+  type Span,
+} from './melds';
 import { TILE_BY_CODE, isBonus } from '@/tiles/tileset';
 import type { HandContext, HandInput, Meld } from '@/scoring';
 import type { Detection } from '@/vision/ordering';
@@ -202,6 +209,58 @@ export function validateDraft(draftState: HandDraft, handSize: number): DraftVal
   if (!draftState.winningTile) problems.push('Choose the tile that completed the hand.');
 
   return { ok: problems.length === 0, problems, tileCount: total, expected };
+}
+
+/**
+ * The hand as one flat row, which is how it is shown and edited.
+ *
+ * Groups exist for the scorer's benefit - they carry which runs were exposed -
+ * but a player editing their hand thinks in tiles, not groups.
+ */
+export function handTiles(draftState: HandDraft = draft): TileCode[] {
+  return draftState.groups.flat();
+}
+
+/** Which runs the player has marked as exposed melds, in flat tile indices. */
+export function exposedSpans(draftState: HandDraft = draft): Span[] {
+  return spansFromGrouping({
+    groups: draftState.groups,
+    meldGroups: draftState.meldGroups,
+  });
+}
+
+/** Replace the marked melds, keeping the tiles and their order. */
+export function setExposedSpans(spans: readonly Span[]): void {
+  const tiles = handTiles();
+  updateDraft(applyExposedSpans(tiles, spans));
+}
+
+/**
+ * Move a tile within the hand, carrying the meld marks with the tiles rather
+ * than with the positions - moving a tile out of a meld should shrink it, not
+ * silently swap which tile is melded.
+ */
+export function reorderTile(from: number, to: number): void {
+  const tiles = handTiles();
+  if (from < 0 || from >= tiles.length) return;
+
+  const marks = exposedIndices(exposedSpans());
+  const flags = tiles.map((_, index) => marks.has(index));
+  const nextTiles = moveTile(tiles, from, to);
+  const nextFlags = moveTile(flags, from, to);
+
+  const spans: Span[] = [];
+  let start = -1;
+  nextFlags.forEach((flag, index) => {
+    if (flag && start === -1) start = index;
+    if (!flag && start !== -1) {
+      spans.push([start, index - 1]);
+      start = -1;
+    }
+  });
+  if (start !== -1) spans.push([start, nextFlags.length - 1]);
+
+  updateDraft(applyExposedSpans(nextTiles, spans));
 }
 
 export function buildHandInput(
