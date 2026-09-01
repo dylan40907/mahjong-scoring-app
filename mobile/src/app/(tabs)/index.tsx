@@ -12,7 +12,7 @@ import {
 } from '@/design/components';
 import { PlusIcon, SessionsIcon } from '@/design/icons';
 import { colors, radius, space } from '@/design/tokens';
-import { findRuleSet, sessionTotals, useAppState } from '@/store/store';
+import { createQuickSession, findRuleSet, sessionTotals, useAppState } from '@/store/store';
 import type { Session } from '@/store/types';
 import { plural, relativeDate, signed } from '@/lib/format';
 
@@ -25,6 +25,20 @@ import { plural, relativeDate, signed } from '@/lib/format';
  */
 export default function SessionsScreen() {
   const router = useRouter();
+
+  /**
+   * Straight to the table, with nothing to fill in first.
+   *
+   * The old form asked for a session name, four player names and a ruleset
+   * before a single tile had been thrown. All four are visible on the table
+   * itself and each is one tap to change, so asking up front only delayed the
+   * game. The name is the time you sat down and the rules are whatever you
+   * played last.
+   */
+  const startSession = () => {
+    const session = createQuickSession();
+    router.push(`/session/${session.id}`);
+  };
   const sessions = useAppState(useCallback((state) => state.sessions, []));
   const ready = useAppState(useCallback((state) => state.ready, []));
 
@@ -40,7 +54,7 @@ export default function SessionsScreen() {
               label="New Session"
               variant="primary"
               icon={<PlusIcon size={18} color={colors.onBrass} />}
-              onPress={() => router.push('/session/new')}
+              onPress={startSession}
             />
           }
         />
@@ -62,7 +76,7 @@ export default function SessionsScreen() {
               variant="primary"
               block
               icon={<PlusIcon size={18} color={colors.onBrass} />}
-              onPress={() => router.push('/session/new')}
+              onPress={startSession}
             />
           </View>
         }

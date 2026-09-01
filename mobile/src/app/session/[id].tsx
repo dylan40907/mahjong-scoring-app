@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Body,
@@ -14,12 +14,23 @@ import {
   Section,
   Title,
 } from '@/design/components';
-import { CameraIcon, TrashIcon } from '@/design/icons';
+import { TrashIcon } from '@/design/icons';
 import { colors, radius, space } from '@/design/tokens';
-import { deleteHand, deleteSession, findRuleSet, sessionTotals, useAppState } from '@/store/store';
-import type { HandRecord, Session, SessionPlayer } from '@/store/types';
+import {
+  allRuleSets,
+  deleteHand,
+  deleteSession,
+  findRuleSet,
+  renamePlayer,
+  renameSession,
+  sessionTotals,
+  setSessionRuleSet,
+  useAppState,
+} from '@/store/store';
+import { MahjongTable } from '@/components/MahjongTable';
+import type { HandRecord, Session } from '@/store/types';
 import { resetDraft } from '@/store/draft';
-import { plural, relativeDate, scoreLabel, signed, WIND_GLYPH, WIND_LABEL } from '@/lib/format';
+import { plural, relativeDate, scoreLabel, WIND_LABEL } from '@/lib/format';
 
 /**
  * A session in progress.
@@ -36,6 +47,16 @@ export default function SessionScreen() {
     useCallback((state) => state.sessions.find((s) => s.id === id), [id]),
   );
 
+  /*
+   * Above the not-found branch on purpose. Hooks have to run in the same order
+   * on every render, and a session can disappear underneath this screen when it
+   * is deleted from the list behind it.
+   */
+  const [winnerId, setWinnerId] = useState<string | null>(null);
+  const [pickingRules, setPickingRules] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleText, setTitleText] = useState(session?.name ?? '');
+
   if (!session) {
     return (
       <Screen>
@@ -46,10 +67,26 @@ export default function SessionScreen() {
 
   const rules = findRuleSet(session.ruleSetId);
   const totals = sessionTotals(session);
-  const ranked = [...session.players].sort((a, b) => (totals[b.id] ?? 0) - (totals[a.id] ?? 0));
 
-  const startHand = () => {
-    resetDraft({ sessionId: session.id, ruleSetId: session.ruleSetId });
+  /**
+   * Scoring starts from the person, not from a button.
+   *
+   * Tapping who won, then who fed the tile, is the whole question a hand poses
+   * at the table, and it is answered in the order people actually say it out
+   * loud. Both answers are things the scorer needs and neither can be read from
+   * a photograph, so asking here means the review screen has nothing left to
+   * ask about.
+   */
+  const startHand = (discarderId: string | null, selfDrawn: boolean) => {
+    if (!winnerId) return;
+    resetDraft({
+      sessionId: session.id,
+      ruleSetId: session.ruleSetId,
+      winnerId,
+      discarderId,
+      context: { selfDrawn },
+    });
+    setWinnerId(null);
     router.push('/hand/capture');
   };
 
@@ -69,26 +106,118 @@ export default function SessionScreen() {
 
   return (
     <Screen padded={false}>
-      <Stack.Screen options={{ title: session.name }} />
+      {/*
+        * The name lives in the page, not the bar: it is editable there, and
+        * showing it in both places said the same thing twice.
+        */}
+      <Stack.Screen options={{ title: '' }} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Caption tone="faint" style={styles.subtitle}>
-          {rules?.name ?? 'Unknown rules'} · {WIND_LABEL[session.roundWind]} round
-        </Caption>
+        {editingTitle ? (
+          <TextInput
+            value={titleText}
+            onChangeText={setTitleText}
+            onBlur={() => {
+              renameSession(session.id, titleText.trim() || session.name);
+              setEditingTitle(false);
+            }}
+            onSubmitEditing={() => {
+              renameSession(session.id, titleText.trim() || session.name);
+              setEditingTitle(false);
+            }}
+            autoFocus
+            selectTextOnFocus
+            style={styles.titleInput}
+            maxLength={40}
+            accessibilityLabel="Session name"
+          />
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Rename ${session.name}`}
+            onPress={() => {
+              setTitleText(session.name);
+              setEditingTitle(true);
+            }}
+          >
+            <Title>{session.name}</Title>
+          </Pressable>
+        )}
 
-        <Section title="Standings" first>
-          <Panel flush>
-            {ranked.map((player, index) => (
-              <View key={player.id}>
-                {index > 0 ? <Divider inset={space.lg} /> : null}
-                <StandingRow
-                  player={player}
-                  total={totals[player.id] ?? 0}
-                  isDealer={player.id === session.dealerId}
-                />
-              </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Change the rules"
+          onPress={() => setPickingRules(!pickingRules)}
+        >
+          <Caption tone="faint" style={styles.subtitle}>
+            {rules?.name ?? 'Unknown rules'} · {WIND_LABEL[session.roundWind]} round · change
+          </Caption>
+        </Pressable>
+
+        {pickingRules ? (
+          <View style={styles.ruleChips}>
+            {allRuleSets().map((option) => (
+              <Pressable
+                key={option.id}
+                accessibilityRole="button"
+                onPress={() => {
+                  setSessionRuleSet(session.id, option.id);
+                  setPickingRules(false);
+                }}
+                style={({ pressed }) => [
+                  styles.ruleChip,
+                  option.id === session.ruleSetId && styles.ruleChipOn,
+                  pressed && styles.pressedChip,
+                ]}
+              >
+                <Caption tone={option.id === session.ruleSetId ? 'accent' : 'muted'}>
+                  {option.name}
+                </Caption>
+              </Pressable>
             ))}
+          </View>
+        ) : null}
+
+        <MahjongTable
+          players={session.players}
+          totals={totals}
+          dealerId={session.dealerId}
+          selectedId={winnerId}
+          onSelect={(id) => setWinnerId(id === winnerId ? null : id)}
+          onRename={(playerId, name) => renamePlayer(session.id, playerId, name)}
+        />
+
+        {winnerId ? (
+          <Panel style={styles.askPanel}>
+            <CaptionStrong>
+              {session.players.find((p) => p.id === winnerId)?.name} won. Who discarded?
+            </CaptionStrong>
+            <View style={styles.ruleChips}>
+              {session.players
+                .filter((player) => player.id !== winnerId)
+                .map((player) => (
+                  <Pressable
+                    key={player.id}
+                    accessibilityRole="button"
+                    onPress={() => startHand(player.id, false)}
+                    style={({ pressed }) => [styles.ruleChip, pressed && styles.pressedChip]}
+                  >
+                    <Caption tone="muted">{player.name}</Caption>
+                  </Pressable>
+                ))}
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => startHand(null, true)}
+                style={({ pressed }) => [
+                  styles.ruleChip,
+                  styles.ruleChipOn,
+                  pressed && styles.pressedChip,
+                ]}
+              >
+                <Caption tone="accent">Self-drawn</Caption>
+              </Pressable>
+            </View>
           </Panel>
-        </Section>
+        ) : null}
 
         <Section title={`Hands`} note={session.hands.length > 0 ? plural(session.hands.length, 'hand') : undefined}>
           {session.hands.length === 0 ? (
@@ -121,44 +250,9 @@ export default function SessionScreen() {
         </Section>
       </ScrollView>
 
-      <View style={styles.footer}>
-        <Button
-          label="Score a Hand"
-          variant="primary"
-          block
-          icon={<CameraIcon size={18} color={colors.onBrass} />}
-          onPress={startHand}
-        />
-      </View>
     </Screen>
   );
 }
-
-function StandingRow({
-  player,
-  total,
-  isDealer,
-}: {
-  player: SessionPlayer;
-  total: number;
-  isDealer: boolean;
-}) {
-  return (
-    <View style={styles.standing}>
-      <View style={styles.seat}>
-        <Caption tone={isDealer ? 'accent' : 'faint'}>{WIND_GLYPH[player.seat]}</Caption>
-      </View>
-      <View style={styles.standingBody}>
-        <Body numberOfLines={1}>{player.name}</Body>
-        {isDealer ? <Caption tone="accent">Dealing</Caption> : null}
-      </View>
-      <Title tone={total > 0 ? 'gain' : total < 0 ? 'loss' : 'faint'} numeric>
-        {signed(total)}
-      </Title>
-    </View>
-  );
-}
-
 function HandRow({
   hand,
   session,
@@ -208,6 +302,31 @@ function HandRow({
 }
 
 const styles = StyleSheet.create({
+  titleInput: {
+    color: colors.ink,
+    fontSize: 24,
+    fontWeight: '700',
+    paddingVertical: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.brass,
+  },
+  ruleChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.xs,
+    marginTop: space.xs,
+  },
+  ruleChip: {
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+  },
+  ruleChipOn: { borderColor: colors.brass, backgroundColor: colors.brassWash },
+  pressedChip: { backgroundColor: colors.surfaceHigh },
+  askPanel: { marginTop: space.sm, gap: space.xs, padding: space.md },
   // Clears the fixed action bar so the last row can be scrolled into view.
   content: { paddingHorizontal: space.xl, paddingBottom: 96 },
   subtitle: { marginTop: -space.xs },

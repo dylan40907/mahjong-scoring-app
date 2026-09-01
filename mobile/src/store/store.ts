@@ -188,6 +188,55 @@ export function renameSession(sessionId: string, name: string): void {
   replaceSession(sessionId, (session) => ({ ...session, name }));
 }
 
+export function renamePlayer(sessionId: string, playerId: string, name: string): void {
+  replaceSession(sessionId, (session) => ({
+    ...session,
+    players: session.players.map((player) =>
+      player.id === playerId ? { ...player, name } : player,
+    ),
+  }));
+}
+
+/**
+ * Change which rules a session is scored by, and remember the choice.
+ *
+ * Remembering it is the point: a group plays the same variant every week, and
+ * being asked to pick it again each time is the kind of small friction that
+ * makes an app feel like paperwork.
+ */
+export function setSessionRuleSet(sessionId: string, ruleSetId: string): void {
+  replaceSession(sessionId, (session) => ({ ...session, ruleSetId }));
+  updateSettings({ defaultRuleSetId: ruleSetId });
+}
+
+/**
+ * A session with nothing to fill in.
+ *
+ * Starting a game should not open a form. The name is the time you sat down,
+ * the players are numbered until somebody bothers to rename them, and the rules
+ * are whatever you played last - all of which are visible and one tap to change
+ * on the table itself. Nobody has ever wanted to name a mahjong session before
+ * playing it.
+ */
+export function createQuickSession(): Session {
+  return createSession({
+    name: defaultSessionName(),
+    ruleSetId: state.settings.defaultRuleSetId,
+    playerNames: ['Player 1', 'Player 2', 'Player 3', 'Player 4'],
+  });
+}
+
+/** "Thu 29 Aug, 3:25 pm" in the device's own locale and clock. */
+export function defaultSessionName(now: Date = new Date()): string {
+  const day = now.toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+  const time = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return `${day}, ${time}`;
+}
+
 export function deleteSession(id: string): void {
   const next = state.sessions.filter((session) => session.id !== id);
   set({ sessions: next });

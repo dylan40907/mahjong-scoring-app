@@ -16,6 +16,7 @@ import { chromium } from 'playwright';
 const DIST = resolve('dist');
 const OUT = resolve('screenshots');
 const PORT = 8099;
+const SHEET = '00-all-screens.png';
 const VIEWPORT = { width: 390, height: 844 };
 
 const MIME = {
@@ -231,13 +232,15 @@ async function main() {
   await goto(page, '/settings');
   await shoot(page, '08-settings');
 
-  await goto(page, '/session/new');
-  await shoot(page, '09-new-session');
-
   // The hand flow keeps its state in memory, so it has to be walked rather
-  // than deep-linked.
+  // than deep-linked. Scoring now starts from the table: tap who won, then who
+  // fed the tile.
   await goto(page, '/session/sess1');
-  await page.getByText('Score a Hand', { exact: true }).click();
+  await page.getByText('Mei', { exact: true }).first().click();
+  await page.waitForTimeout(400);
+  await shoot(page, '09-who-discarded');
+
+  await page.getByText('Self-drawn', { exact: true }).click();
   await page.waitForTimeout(700);
   await shoot(page, '10-capture');
 
@@ -272,9 +275,57 @@ async function main() {
   await scrollBy(page, 1400);
   await shoot(page, '16-result-settlement');
 
+  await contactSheet(page);
+
   await browser.close();
   server.close();
   console.log(`\nWrote to ${OUT}`);
+}
+
+/**
+ * One sheet showing every screen, built from the shots just taken.
+ *
+ * It used to be a committed file that nothing regenerated, so it went on
+ * advertising a layout the app no longer had. Composing it here means it is
+ * either current or absent, never quietly wrong.
+ */
+async function contactSheet(page) {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const shots = readdirSync(OUT)
+    .filter((name) => /^\d/.test(name) && name.endsWith('.png') && name !== SHEET)
+    .sort();
+  if (shots.length === 0) return;
+
+  // Inlined rather than linked: setContent has no base URL, so a relative src
+  // resolves against about:blank and every image comes out broken.
+  const cells = shots
+    .map((name) => {
+      const data = readFileSync(join(OUT, name)).toString('base64');
+      return `<figure><img src="data:image/png;base64,${data}"><figcaption>${caption(name)}</figcaption></figure>`;
+    })
+    .join('');
+
+  await page.setViewportSize({ width: 1740, height: 1200 });
+  await page.setContent(
+    `<style>
+       body { margin:0; padding:18px; background:#0F1412; font:12px/1.3 system-ui,sans-serif; }
+       .grid { display:grid; grid-template-columns:repeat(6,1fr); gap:14px; }
+       figure { margin:0; }
+       img { width:100%; display:block; border-radius:6px; }
+       figcaption { color:#97A09A; padding-top:6px; }
+     </style>
+     <div class="grid">${cells}</div>`,
+    { waitUntil: 'load' },
+  );
+  await page.waitForTimeout(600);
+  await page.locator('.grid').screenshot({ path: join(OUT, SHEET) });
+  console.log(`  ${SHEET}`);
+}
+
+/** "12-review-filled.png" -> "Review filled". */
+function caption(name) {
+  const stem = name.replace(/^\d+[a-z]?-/, '').replace(/\.png$/, '').replace(/-/g, ' ');
+  return stem.charAt(0).toUpperCase() + stem.slice(1);
 }
 
 main().catch((error) => {
