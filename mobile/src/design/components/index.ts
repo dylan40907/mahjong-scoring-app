@@ -4,3 +4,6 @@ export * from './Button';
 export * from './Surface';
 export * from './Tile';
 export * from './Controls';
+export * from './TileScanner';
+export * from './CountUp';
+export * from './Confetti';

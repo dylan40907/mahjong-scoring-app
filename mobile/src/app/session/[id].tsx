@@ -30,7 +30,7 @@ import {
 import { MahjongTable } from '@/components/MahjongTable';
 import type { HandRecord, Session } from '@/store/types';
 import { resetDraft } from '@/store/draft';
-import { plural, relativeDate, scoreLabel, WIND_LABEL } from '@/lib/format';
+import { plural, relativeDate, scoreLabel } from '@/lib/format';
 
 /**
  * A session in progress.
@@ -149,7 +149,7 @@ export default function SessionScreen() {
           onPress={() => setPickingRules(!pickingRules)}
         >
           <Caption tone="faint" style={styles.subtitle}>
-            {rules?.name ?? 'Unknown rules'} · {WIND_LABEL[session.roundWind]} round · change
+            {rules?.name ?? 'Unknown rules'} · change
           </Caption>
         </Pressable>
 
@@ -181,6 +181,8 @@ export default function SessionScreen() {
           players={session.players}
           totals={totals}
           dealerId={session.dealerId}
+          roundWind={session.roundWind}
+          handCount={session.hands.length}
           selectedId={winnerId}
           onSelect={(id) => setWinnerId(id === winnerId ? null : id)}
           onRename={(playerId, name) => renamePlayer(session.id, playerId, name)}

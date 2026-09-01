@@ -3,7 +3,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { Body, Button, Caption, Overline, Screen, Title } from '@/design/components';
+import { Body, Button, Caption, Overline, Screen, TileScanner, Title } from '@/design/components';
 import { CameraIcon, ImageIcon, TileIcon } from '@/design/icons';
 import { colors, radius, space } from '@/design/tokens';
 import { findRuleSet, useAppState } from '@/store/store';
@@ -174,11 +174,20 @@ export default function CaptureScreen() {
       </View>
 
       <View style={styles.status}>
-        <Caption tone={message ? 'loss' : unavailable ? 'muted' : 'faint'} center>
-          {message ??
-            unavailable ??
-            `${handSize + 1} tiles including the winning tile · ${rules?.name ?? ''}`}
-        </Caption>
+        {busy ? (
+          /*
+           * The scanner replaces the caption rather than sitting beside it: a
+           * line of text and a moving graphic saying the same thing is one of
+           * them too many, and the graphic says it better.
+           */
+          <TileScanner label="Reading the tiles…" />
+        ) : (
+          <Caption tone={message ? 'loss' : unavailable ? 'muted' : 'faint'} center>
+            {message ??
+              unavailable ??
+              `${handSize + 1} tiles including the winning tile · ${rules?.name ?? ''}`}
+          </Caption>
+        )}
       </View>
 
       <View style={styles.actions}>

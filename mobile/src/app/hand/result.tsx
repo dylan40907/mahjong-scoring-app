@@ -8,7 +8,8 @@ import {
   Button,
   Caption,
   CaptionStrong,
-  Display,
+  Confetti,
+  CountUp,
   Divider,
   EmptyState,
   Heading,
@@ -24,7 +25,7 @@ import { buildHandInput, resetDraft, useDraft } from '@/store/draft';
 import { addHand, findRuleSet, makeId, useAppState } from '@/store/store';
 import type { HandRecord } from '@/store/types';
 import { scoreHand, type HandContext } from '@/scoring';
-import { signed } from '@/lib/format';
+import {  } from '@/lib/format';
 import { computeDeltas } from '@/lib/settlement';
 
 /**
@@ -133,12 +134,18 @@ export default function ResultScreen() {
 
   return (
     <Screen padded={false}>
+      <Confetti active={result.total > 0} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headline}>
           <Overline>{rules.name.toUpperCase()}</Overline>
-          <Display tone="accent" numeric style={styles.total}>
-            {result.total} {result.unit}
-          </Display>
+          <View style={styles.total}>
+            <CountUp
+              value={result.total}
+              variant="display"
+              tone="accent"
+              suffix={result.unit}
+            />
+          </View>
           {result.limitName ? <Body tone="muted">{result.limitName}</Body> : null}
           {result.fu ? (
             <Caption tone="faint" numeric>
@@ -210,7 +217,7 @@ export default function ResultScreen() {
                 <View key={payment.label} style={styles.paymentRow}>
                   <Body tone="muted">{payment.label}</Body>
                   <BodyStrong tone="loss" numeric>
-                    {signed(-payment.amount)}
+                    <CountUp value={-payment.amount} signed variant="caption" tone="loss" />
                   </BodyStrong>
                 </View>
               ))}
@@ -218,7 +225,12 @@ export default function ResultScreen() {
               <View style={styles.paymentRow}>
                 <BodyStrong>{winner?.name ?? 'Winner'}</BodyStrong>
                 <Heading tone="gain" numeric>
-                  {signed(result.settlement?.winnerReceives ?? 0)}
+                  <CountUp
+                    value={result.settlement?.winnerReceives ?? 0}
+                    signed
+                    variant="caption"
+                    tone="gain"
+                  />
                 </Heading>
               </View>
             </View>

@@ -9,6 +9,7 @@ import {
   Screen,
   Section,
   TileFace,
+  TileScanner,
 } from '@/design/components';
 import { AlertIcon, PlusIcon } from '@/design/icons';
 import { colors, radius, space, tileSize } from '@/design/tokens';
@@ -199,6 +200,11 @@ export default function ReviewScreen() {
               uncertain={uncertainIndices}
               onChange={(next) => updateDraft({ boundary: next })}
             />
+            {rereading ? (
+              <View style={styles.rereadBusy}>
+                <TileScanner label="Reading that area again…" />
+              </View>
+            ) : null}
             <View style={styles.rereadRow}>
               <Caption tone="faint" style={styles.rereadHint}>
                 Drag a corner so the box holds only your hand.
@@ -385,6 +391,7 @@ const styles = StyleSheet.create({
     marginTop: space.xs,
   },
   rereadHint: { flex: 1 },
+  rereadBusy: { alignItems: 'center', marginTop: space.sm },
   handActions: {
     flexDirection: 'row',
     alignItems: 'center',
