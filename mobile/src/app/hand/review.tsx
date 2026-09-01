@@ -235,7 +235,6 @@ export default function ReviewScreen() {
           title={
             mode === 'winning' ? 'Tap the winning tile'
             : mode === 'exposed' ? 'Mark what was exposed'
-            : mode === 'reorder' ? 'Drag tiles into order'
             : 'The hand'
           }
           first
@@ -267,11 +266,6 @@ export default function ReviewScreen() {
                 setMode(mode === 'exposed' ? 'edit' : 'exposed');
               }}
             />
-            <Button
-              label={mode === 'reorder' ? 'Done' : 'Reorder'}
-              variant="ghost"
-              onPress={() => setMode(mode === 'reorder' ? 'edit' : 'reorder')}
-            />
           </View>
 
           <Caption tone="faint" style={styles.hint}>
@@ -279,9 +273,7 @@ export default function ReviewScreen() {
               ? spanStart === null
                 ? 'Tap the first tile of a meld you declared. Tap a marked tile to unmark it.'
                 : 'Now tap the last tile of that meld.'
-              : mode === 'reorder'
-                ? 'Drag a tile to move it. Useful when the hand was read from the far side.'
-                : 'Tap a tile to correct it. Everything is concealed unless you mark it exposed.'}
+              : 'Tap a tile to correct it, or hold and drag to move it. Everything is concealed unless you mark it exposed.'}
           </Caption>
         </Section>
 

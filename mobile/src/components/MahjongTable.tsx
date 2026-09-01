@@ -44,6 +44,8 @@ type Slot = (typeof SLOTS)[number];
 const SEAT_WIDTH = 92;
 const SEAT_HEIGHT = 76;
 const WIND_TILE = 20;
+/** The baize is square, because a mahjong table is. */
+const FELT_SIZE = 164;
 
 function Seat({
   player,
@@ -76,6 +78,11 @@ function Seat({
       accessibilityRole="button"
       accessibilityLabel={`${player.name}, seated ${WIND_LABEL[player.seat]}, ${total} points`}
       onPress={onSelect}
+      onLongPress={() => {
+        setText(player.name);
+        setEditing(true);
+      }}
+      accessibilityHint="Hold to rename"
       style={({ pressed }) => [
         styles.seat,
         styles[slot],
@@ -104,20 +111,11 @@ function Seat({
         />
       ) : (
         /*
-         * Long press, not tap. Choosing who won happens every hand and renaming
-         * happens once, so the name must not swallow the tap that selects the
-         * seat underneath it.
+         * Plain text, not a pressable. The whole seat is the button - a name
+         * that handled its own presses left the middle of the card dead to the
+         * tap that selects the player, which is the thing you do every hand.
          */
-        <BodyStrong
-          numberOfLines={1}
-          onLongPress={() => {
-            setText(player.name);
-            setEditing(true);
-          }}
-          accessibilityHint="Long press to rename"
-        >
-          {player.name}
-        </BodyStrong>
+        <BodyStrong numberOfLines={1}>{player.name}</BodyStrong>
       )}
 
       {/* Ticks from its old value when a hand lands, so you see who moved. */}
@@ -177,18 +175,24 @@ export function MahjongTable({
 
 const styles = StyleSheet.create({
   table: {
-    height: 320,
+    height: FELT_SIZE + 2 * (SEAT_HEIGHT + space.sm),
     marginTop: space.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  /** The wooden edge. Thin, warm, and the only wood in the app. */
+  /**
+   * The wooden edge. Thin, warm, and the only wood in the app.
+   *
+   * Sized rather than stretched between the seats: a table is square, and
+   * letting it take whatever space the seats left over made it a tall slot on a
+   * narrow phone and a wide one on a large screen.
+   */
   rim: {
     position: 'absolute',
-    left: SEAT_WIDTH + space.xs,
-    right: SEAT_WIDTH + space.xs,
-    top: SEAT_HEIGHT + space.xs,
-    bottom: SEAT_HEIGHT + space.xs,
+    width: FELT_SIZE,
+    height: FELT_SIZE,
+    top: SEAT_HEIGHT + space.sm,
+    alignSelf: 'center',
     borderRadius: radius.xl,
     padding: 3,
     backgroundColor: colors.rim,
@@ -217,7 +221,13 @@ const styles = StyleSheet.create({
   },
   /** The dealer's place is warmer, the way a dealer's seat is marked. */
   seatDealer: { borderColor: colors.brassDim, backgroundColor: colors.surfaceHigh },
-  seatSelected: { borderColor: colors.brass, backgroundColor: colors.brassWash },
+  /*
+   * Green fill, not a gold outline. The dealer's seat is already outlined in
+   * brass, and a second brass outline for "selected" made the two states
+   * indistinguishable at a glance - which is the one thing this screen has to
+   * get right, since you tap a seat every hand and the dealer never moves.
+   */
+  seatSelected: { borderColor: colors.feltLine, backgroundColor: colors.feltHigh },
   seatPressed: { backgroundColor: colors.surfaceHigh },
   seatHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   nameInput: {

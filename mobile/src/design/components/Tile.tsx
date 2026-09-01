@@ -21,22 +21,27 @@ export interface TileFaceProps {
   code: TileCode;
   width: number;
   onPress?: () => void;
+  /** Hold to pick a tile up; used by the hand row to start a drag. */
+  onLongPress?: () => void;
   /** Draws the brass selection ring. */
   selected?: boolean;
   /** Dims the face; used for tiles the model was unsure about. */
   uncertain?: boolean;
   style?: ViewStyle;
   accessibilityLabel?: string;
+  accessibilityHint?: string;
 }
 
 export function TileFace({
   code,
   width,
   onPress,
+  onLongPress,
   selected,
   uncertain,
   style,
   accessibilityLabel,
+  accessibilityHint,
 }: TileFaceProps) {
   const box: ViewStyle = {
     width,
@@ -58,12 +63,14 @@ export function TileFace({
     </View>
   );
 
-  if (!onPress) return face;
+  if (!onPress && !onLongPress) return face;
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
+      accessibilityHint={accessibilityHint}
       onPress={onPress}
+      onLongPress={onLongPress}
       style={({ pressed }) => (pressed ? styles.pressed : undefined)}
     >
       {face}

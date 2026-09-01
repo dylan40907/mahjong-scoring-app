@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Image, Platform, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { Body, Button, Caption, Overline, Screen, TileScanner, Title } from '@/design/components';
+import { Body, Button, Caption, Screen, TileScanner, Title } from '@/design/components';
 import { CameraIcon, ImageIcon, TileIcon } from '@/design/icons';
 import { colors, radius, space } from '@/design/tokens';
 import { findRuleSet, useAppState } from '@/store/store';
@@ -37,6 +37,8 @@ export default function CaptureScreen() {
   const camera = useRef<CameraView>(null);
 
   const [busy, setBusy] = useState(false);
+  /** The frame being read, shown frozen in place of the live feed. */
+  const [captured, setCaptured] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const draft = getDraft();
@@ -57,6 +59,7 @@ export default function CaptureScreen() {
   const process = useCallback(
     async (uri: string) => {
       updateDraft({ photoUri: uri });
+      setCaptured(uri);
 
       if (!settings.detectionEnabled || !isVisionSupported()) {
         setMessage(null);
@@ -139,6 +142,7 @@ export default function CaptureScreen() {
       photoUri: null, groups: [[]], detections: [], boundary: null,
       imageWidth: 0, imageHeight: 0, flagged: [],
     });
+    setCaptured(null);
     router.push('/hand/review');
   };
 
@@ -153,7 +157,18 @@ export default function CaptureScreen() {
       </View>
 
       <View style={styles.frame}>
-        {cameraReady ? (
+        {/*
+          * Once there is a photograph, that is what the frame shows.
+          *
+          * A live camera feed carrying on behind a scanning animation says the
+          * app is reading whatever the lens is pointed at now, which is not what
+          * is happening - it is reading the frame already taken. It was worse
+          * for a picture chosen from the library, where the feed showed a scene
+          * with no connection to the tiles being read at all.
+          */}
+        {captured ? (
+          <Image source={{ uri: captured }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : cameraReady ? (
           <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" />
         ) : (
           <View style={styles.placeholder}>
@@ -165,12 +180,6 @@ export default function CaptureScreen() {
             </Caption>
           </View>
         )}
-        {cameraReady ? (
-          <View pointerEvents="none" style={styles.guide}>
-            <View style={styles.guideLine} />
-            <Overline style={styles.guideLabel}>ALIGN THE ROW HERE</Overline>
-          </View>
-        ) : null}
       </View>
 
       <View style={styles.status}>
@@ -241,14 +250,6 @@ const styles = StyleSheet.create({
   },
   placeholder: { ...FILL, alignItems: 'center', justifyContent: 'center', gap: space.md },
   placeholderText: { maxWidth: 240 },
-  guide: { ...FILL, alignItems: 'center', justifyContent: 'center', gap: space.sm },
-  guideLine: {
-    width: '82%',
-    height: 1,
-    backgroundColor: colors.brass,
-    opacity: 0.5,
-  },
-  guideLabel: { opacity: 0.7 },
   status: { paddingVertical: space.lg, minHeight: 48, justifyContent: 'center' },
   actions: { gap: space.sm },
 });
