@@ -32,7 +32,6 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="session/new" options={{ title: 'New Session', presentation: 'modal' }} />
         <Stack.Screen name="session/[id]" options={{ title: '' }} />
         <Stack.Screen name="hand/capture" options={{ title: 'Photograph the Hand' }} />
         <Stack.Screen name="hand/review" options={{ title: 'Check the Tiles' }} />
