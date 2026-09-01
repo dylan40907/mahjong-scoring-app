@@ -22,11 +22,18 @@ import {
 import { AlertIcon } from '@/design/icons';
 import { colors, radius, space, tileSize } from '@/design/tokens';
 import { buildHandInput, resetDraft, useDraft } from '@/store/draft';
-import { addHand, findRuleSet, makeId, useAppState } from '@/store/store';
+import {
+  addHand,
+  findRuleSet,
+  makeId,
+  updateHand,
+  useAppState,
+} from '@/store/store';
 import type { HandRecord } from '@/store/types';
 import { scoreHand, type HandContext } from '@/scoring';
 import {  } from '@/lib/format';
 import { computeDeltas } from '@/lib/settlement';
+import { keepPhoto } from '@/lib/photos';
 
 /**
  * The score, and how it was arrived at.
@@ -70,14 +77,20 @@ export default function ResultScreen() {
     // useMemo output, so it is stable whenever its own inputs are.
   }, [session, result, draft.winnerId, draft.discarderId]);
 
-  const save = () => {
+  const save = async () => {
     if (!session || !draft.winnerId || !result?.settlement) return;
     const input = buildHandInput(draft, draft.context as HandContext);
     if (!input || !draft.winningTile) return;
 
+    // Editing an existing hand keeps its id, so it replaces rather than joins.
+    const handId = draft.handId ?? makeId('h');
+    // The camera and picker both return cache URIs, which the system may clear
+    // at any time. A saved hand keeps its own copy.
+    const photoUri = draft.photoUri ? await keepPhoto(draft.photoUri, handId) : undefined;
+
     const record: HandRecord = {
-      id: makeId('h'),
-      createdAt: new Date().toISOString(),
+      id: handId,
+      createdAt: draft.createdAt ?? new Date().toISOString(),
       winnerId: draft.winnerId,
       discarderId: draft.discarderId,
       hand: {
@@ -95,9 +108,10 @@ export default function ResultScreen() {
         limitName: result.limitName,
         topPatterns: result.patterns.slice(0, 3).map((p) => p.name),
       },
-      photoUri: draft.photoUri ?? undefined,
+      photoUri,
     };
-    addHand(session.id, record);
+    if (draft.handId) updateHand(session.id, record);
+    else addHand(session.id, record);
     if (settings.hapticsEnabled) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }

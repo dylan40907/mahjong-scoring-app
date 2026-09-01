@@ -10,6 +10,7 @@ import {
 import { TILE_BY_CODE, isBonus } from '@/tiles/tileset';
 import type { HandContext, HandInput, Meld } from '@/scoring';
 import type { Detection } from '@/vision/ordering';
+import type { HandRecord } from './types';
 
 /**
  * The hand currently being entered.
@@ -57,6 +58,16 @@ export interface HandDraft {
   boundary: readonly [number, number, number, number] | null;
   /** Positions the model was unsure about: "group:index". */
   flagged: string[];
+  /**
+   * Set when an already-scored hand is open for correction.
+   *
+   * Its presence is the whole difference between saving and re-saving: with an
+   * id the record replaces the one in the session, without one it joins as a
+   * new hand and the deal passes.
+   */
+  handId: string | null;
+  /** Kept so an edited hand stays where it was in the history. */
+  createdAt: string | null;
 }
 
 const EMPTY: HandDraft = {
@@ -71,6 +82,8 @@ const EMPTY: HandDraft = {
   discarderId: null,
   context: {},
   detections: [],
+  handId: null,
+  createdAt: null,
   imageWidth: 0,
   imageHeight: 0,
   boundary: null,
@@ -91,6 +104,44 @@ export function updateDraft(partial: Partial<HandDraft>): void {
 
 export function resetDraft(seed: Partial<HandDraft> = {}): void {
   draft = { ...EMPTY, ...seed };
+  emit();
+}
+
+/**
+ * Open an already-scored hand for correction.
+ *
+ * The stored form is what the scorer needed - concealed tiles and melds kept
+ * apart - and the review screen works in one row with the melded runs marked,
+ * so this rebuilds that view: melds become groups in the order they were
+ * played, everything concealed follows, and the meld indices come back with
+ * them. Nothing is re-detected; the tiles are whatever they were corrected to.
+ */
+export function editHand(record: HandRecord, sessionId: string, ruleSetId: string): void {
+  const groups: TileCode[][] = [];
+  const meldGroups: number[] = [];
+
+  for (const meld of record.hand.melds) {
+    groups.push([...meld.tiles]);
+    meldGroups.push(groups.length - 1);
+  }
+  if (record.hand.concealed.length > 0) groups.push([...record.hand.concealed]);
+  if (groups.length === 0) groups.push([]);
+
+  draft = {
+    ...EMPTY,
+    sessionId,
+    ruleSetId,
+    handId: record.id,
+    createdAt: record.createdAt,
+    photoUri: record.photoUri ?? null,
+    groups,
+    meldGroups,
+    bonus: [...record.hand.bonus],
+    winningTile: record.hand.winningTile,
+    winnerId: record.winnerId,
+    discarderId: record.discarderId,
+    context: record.hand.context,
+  };
   emit();
 }
 

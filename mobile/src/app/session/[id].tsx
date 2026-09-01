@@ -29,7 +29,8 @@ import {
 } from '@/store/store';
 import { MahjongTable } from '@/components/MahjongTable';
 import type { HandRecord, Session } from '@/store/types';
-import { resetDraft } from '@/store/draft';
+import { editHand, resetDraft } from '@/store/draft';
+import { discardPhoto } from '@/lib/photos';
 import { plural, relativeDate, scoreLabel } from '@/lib/format';
 
 /**
@@ -241,7 +242,17 @@ export default function SessionScreen() {
                   <HandRow
                     hand={hand}
                     session={session}
-                    onDelete={() => deleteHand(session.id, hand.id)}
+                    onDelete={() => {
+                      void discardPhoto(hand.photoUri);
+                      deleteHand(session.id, hand.id);
+                    }}
+                    onEdit={() => {
+                      // Straight to the tiles: the photograph and everything
+                      // read from it are already known, so there is nothing to
+                      // capture unless the user asks to retake it.
+                      editHand(hand, session.id, session.ruleSetId);
+                      router.push('/hand/review');
+                    }}
                   />
                 </View>
               ))}
@@ -261,10 +272,12 @@ function HandRow({
   hand,
   session,
   onDelete,
+  onEdit,
 }: {
   hand: HandRecord;
   session: Session;
   onDelete: () => void;
+  onEdit: () => void;
 }) {
   const winner = session.players.find((p) => p.id === hand.winnerId);
   const discarder = session.players.find((p) => p.id === hand.discarderId);
@@ -282,7 +295,17 @@ function HandRow({
 
   return (
     <View style={styles.hand}>
-      <View style={styles.handBody}>
+      {/*
+        * The body opens the hand; only the bin deletes it. A scored hand is the
+        * one thing in the app that could previously not be corrected, which
+        * made every misread tile permanent.
+        */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Edit the hand ${winner?.name ?? ''} won`}
+        onPress={onEdit}
+        style={({ pressed }) => [styles.handBody, pressed && styles.pressedChip]}
+      >
         <View style={styles.handHeader}>
           <BodyStrong numberOfLines={1} style={styles.handWinner}>
             {winner?.name ?? 'Unknown'}
@@ -299,7 +322,7 @@ function HandRow({
             {hand.summary.topPatterns.join(' · ')}
           </Caption>
         ) : null}
-      </View>
+      </Pressable>
       <Button label="" variant="ghost" onPress={confirm} icon={<TrashIcon size={18} color={colors.inkFaint} />} style={styles.handDelete} />
     </View>
   );

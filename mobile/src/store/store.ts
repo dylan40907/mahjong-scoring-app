@@ -177,6 +177,21 @@ function nextDealer(session: Session): string {
   return session.players[(index + 1) % session.players.length].id;
 }
 
+/**
+ * Replace an existing hand, leaving the deal where it is.
+ *
+ * Editing a hand that has already been scored is a correction, not a new hand,
+ * so the dealer must not pass again - `addHand` rotates it, and running that a
+ * second time for the same hand would quietly desynchronise the seat winds from
+ * the game being played.
+ */
+export function updateHand(sessionId: string, record: HandRecord): void {
+  replaceSession(sessionId, (session) => ({
+    ...session,
+    hands: session.hands.map((hand) => (hand.id === record.id ? record : hand)),
+  }));
+}
+
 export function deleteHand(sessionId: string, handId: string): void {
   replaceSession(sessionId, (session) => ({
     ...session,

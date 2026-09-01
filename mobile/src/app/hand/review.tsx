@@ -189,6 +189,15 @@ export default function ReviewScreen() {
   return (
     <Screen padded={false} footerSpace={0}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {!draft.photoUri ? (
+          <Button
+            label="Add a photo"
+            variant="ghost"
+            block
+            onPress={() => router.push('/hand/capture')}
+            style={styles.addPhoto}
+          />
+        ) : null}
         {draft.photoUri ? (
           <>
             <HandBoundary
@@ -216,6 +225,12 @@ export default function ReviewScreen() {
                 onPress={reread}
               />
             </View>
+            <Button
+              label="Retake picture"
+              variant="ghost"
+              block
+              onPress={() => router.push('/hand/capture')}
+            />
           </>
         ) : null}
 
@@ -383,6 +398,7 @@ const styles = StyleSheet.create({
     marginTop: space.xs,
   },
   rereadHint: { flex: 1 },
+  addPhoto: { marginTop: space.md },
   rereadBusy: { alignItems: 'center', marginTop: space.sm },
   handActions: {
     flexDirection: 'row',

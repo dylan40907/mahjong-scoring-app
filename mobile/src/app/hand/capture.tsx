@@ -63,7 +63,7 @@ export default function CaptureScreen() {
 
       if (!settings.detectionEnabled || !isVisionSupported()) {
         setMessage(null);
-        router.push('/hand/review');
+        router.replace('/hand/review');
         return;
       }
 
@@ -109,7 +109,7 @@ export default function CaptureScreen() {
         );
       } finally {
         setBusy(false);
-        router.push('/hand/review');
+        router.replace('/hand/review');
       }
     },
     [router, settings.confidenceThreshold, settings.detectionEnabled],
@@ -143,7 +143,7 @@ export default function CaptureScreen() {
       imageWidth: 0, imageHeight: 0, flagged: [],
     });
     setCaptured(null);
-    router.push('/hand/review');
+    router.replace('/hand/review');
   };
 
   return (
