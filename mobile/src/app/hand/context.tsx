@@ -2,9 +2,9 @@ import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
+  BodyStrong,
   Button,
   Caption,
-  Chip,
   Divider,
   Panel,
   Row,
@@ -38,13 +38,13 @@ export default function HandContextScreen() {
   const family = rules?.family ?? 'taiwanese';
 
   const players = session?.players ?? [];
-  const [winnerId, setWinnerId] = useState<string | null>(draft.winnerId ?? players[0]?.id ?? null);
-  const [discarderId, setDiscarderId] = useState<string | null>(draft.discarderId);
-  const [selfDrawn, setSelfDrawn] = useState(draft.context.selfDrawn ?? false);
+  const winnerId = draft.winnerId;
+  const discarderId = draft.discarderId;
+  const selfDrawn = draft.context.selfDrawn ?? false;
   const [flags, setFlags] = useState<Partial<HandContext>>(draft.context);
 
   const winner = players.find((p) => p.id === winnerId);
-  const opponents = players.filter((p) => p.id !== winnerId);
+  const discarder = players.find((p) => p.id === discarderId);
 
   const setFlag = <K extends keyof HandContext>(key: K, value: HandContext[K]) =>
     setFlags((current) => ({ ...current, [key]: value }));
@@ -65,63 +65,34 @@ export default function HandContextScreen() {
       discarderId: selfDrawn ? null : discarderId,
       context,
     });
-    router.push('/hand/result');
+    router.push('/hand/capture');
   };
 
   return (
     <Screen padded={false}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Section title="Who won" first>
-          <View style={styles.chips}>
-            {players.map((player) => (
-              <Chip
-                key={player.id}
-                label={player.name}
-                selected={player.id === winnerId}
-                onPress={() => {
-                  setWinnerId(player.id);
-                  if (discarderId === player.id) setDiscarderId(null);
-                }}
-              />
-            ))}
-          </View>
-          {winner ? (
-            <Caption tone="faint" style={styles.note}>
-              Seated {WIND_LABEL[winner.seat]}
-              {session?.dealerId === winner.id ? ' · dealing' : ''} · {WIND_LABEL[session?.roundWind ?? 'east']} round
+        {/*
+          * Who won and how the tile came are settled at the table, before the
+          * photograph, because that is the order people say them out loud. They
+          * are shown here as a statement rather than asked again - being asked
+          * twice reads as the app not having listened.
+          */}
+        <Section title="The hand" first>
+          <Panel style={styles.recap}>
+            <BodyStrong>
+              {winner?.name ?? 'Someone'} won
+              {selfDrawn
+                ? ', self-drawn'
+                : discarder
+                  ? `, on ${discarder.name}'s discard`
+                  : ''}
+            </BodyStrong>
+            <Caption tone="faint">
+              Seated {WIND_LABEL[winner?.seat ?? 'east']}
+              {session?.dealerId === winner?.id ? ' · dealing' : ''} ·{' '}
+              {WIND_LABEL[session?.roundWind ?? 'east']} round
             </Caption>
-          ) : null}
-        </Section>
-
-        <Section title="How the last tile came">
-          <Panel flush>
-            <Toggle
-              label="Self-drawn"
-              hint="Taken from the wall rather than claimed from a discard."
-              value={selfDrawn}
-              onChange={(value) => {
-                setSelfDrawn(value);
-                if (value) setDiscarderId(null);
-              }}
-            />
           </Panel>
-          {!selfDrawn ? (
-            <View style={styles.discarder}>
-              <Caption tone="faint" style={styles.discarderLabel}>
-                Discarded by
-              </Caption>
-              <View style={styles.chips}>
-                {opponents.map((player) => (
-                  <Chip
-                    key={player.id}
-                    label={player.name}
-                    selected={player.id === discarderId}
-                    onPress={() => setDiscarderId(player.id)}
-                  />
-                ))}
-              </View>
-            </View>
-          ) : null}
         </Section>
 
         {family === 'riichi' ? (
@@ -259,6 +230,7 @@ export default function HandContextScreen() {
 }
 
 const styles = StyleSheet.create({
+  recap: { gap: space.xxs },
   // Clears the fixed action bar so the last row can be scrolled into view.
   content: { paddingHorizontal: space.xl, paddingBottom: 96 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },

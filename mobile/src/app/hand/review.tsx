@@ -336,11 +336,11 @@ export default function ReviewScreen() {
 
       <View style={styles.footer}>
         <Button
-          label="Continue"
+          label="Score the Hand"
           variant="primary"
           block
           disabled={!validation.ok}
-          onPress={() => router.push('/hand/context')}
+          onPress={() => router.push('/hand/result')}
         />
       </View>
 

@@ -87,7 +87,9 @@ export default function SessionScreen() {
       context: { selfDrawn },
     });
     setWinnerId(null);
-    router.push('/hand/capture');
+    // Circumstances first, camera second. Everything the scorer needs that a
+    // photograph cannot show is settled while the hand is still on the table.
+    router.push('/hand/context');
   };
 
   const confirmDelete = () => {
