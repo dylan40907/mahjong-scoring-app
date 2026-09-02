@@ -128,12 +128,13 @@ function sevenPairsReading(concealed: readonly TileCode[], pairsNeeded: number):
   const counts = countTiles(concealed);
   const pairs: Meld[] = [];
   for (const [code, n] of counts) {
-    // Four identical tiles read as two pairs in most rules that allow the
-    // shape at all; rulesets that forbid it filter the reading out later.
-    if (n % 2 !== 0) return null;
-    for (let i = 0; i < n / 2; i += 1) {
-      pairs.push({ kind: 'pair', tiles: [code, code], concealed: true });
-    }
+    // Seven *different* pairs. Four identical tiles are one pair and two spare
+    // tiles, not two pairs - the rule is explicit in Riichi and is the ordinary
+    // reading everywhere else the shape is played. Allowing it here, which this
+    // used to on the promise that rulesets would filter it out later, paid out
+    // on a hand that is not a winning hand at all.
+    if (n !== 2) return null;
+    pairs.push({ kind: 'pair', tiles: [code, code], concealed: true });
   }
   return pairs.length === pairsNeeded ? pairs : null;
 }
@@ -224,19 +225,21 @@ export function decompose(hand: HandInput, options: DecomposeOptions): Decomposi
     }
   }
 
-  if (options.allowSevenPairs !== false) {
-    const pairsNeeded = options.handSize === 16 ? 8 : 7;
-    if (declaredSets === 0) {
-      const pairs = sevenPairsReading(concealed, pairsNeeded);
-      if (pairs) {
-        results.push(
-          ...withWinningMeld(pairs, null, hand.winningTile, options.handSize === 16 ? 'eight-pairs-triplet' : 'seven-pairs'),
-        );
-      }
-      if (options.handSize === 16) {
-        const mixed = eightPairsTripletReading(concealed);
-        if (mixed) results.push(...withWinningMeld(mixed, null, hand.winningTile, 'eight-pairs-triplet'));
-      }
+  // Special shapes are all-concealed by definition: you cannot claim a tile
+  // into seven pairs or thirteen orphans and still have the shape.
+  if (options.allowSevenPairs !== false && declaredSets === 0) {
+    if (options.handSize === 16) {
+      /*
+       * The Taiwanese analogue is seven pairs *plus a triplet*, not eight
+       * pairs. Eight pairs is sixteen tiles and a winning Taiwanese hand is
+       * seventeen, so the eight-pair reading could never match a real hand -
+       * it was asking for a tile count that does not occur.
+       */
+      const mixed = eightPairsTripletReading(concealed);
+      if (mixed) results.push(...withWinningMeld(mixed, null, hand.winningTile, 'eight-pairs-triplet'));
+    } else {
+      const pairs = sevenPairsReading(concealed, 7);
+      if (pairs) results.push(...withWinningMeld(pairs, null, hand.winningTile, 'seven-pairs'));
     }
   }
 
@@ -279,9 +282,15 @@ function withWinningMeld(
     });
   }
   if (out.length === 0) {
-    // The winning tile sits in an exposed meld, or the hand was claimed in a
-    // way that leaves no concealed home for it.
-    out.push({ melds, pair, special, winningMeldIndex: -1, waitType: 'single' });
+    /*
+     * The winning tile sits in a meld already on the table - robbing a kong,
+     * or a hand whose last tile completed something claimed.
+     *
+     * The wait is genuinely unclassifiable here, and calling it a single wait
+     * (which this used to) handed out a wait bonus nobody earned: one tai in
+     * Taiwanese, two fu in Riichi, on every such hand.
+     */
+    out.push({ melds, pair, special, winningMeldIndex: -1, waitType: 'none' });
   }
   return out;
 }

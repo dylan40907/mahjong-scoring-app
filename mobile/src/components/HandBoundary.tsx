@@ -10,20 +10,22 @@ import {
 import { colors, radius, space } from '@/design/tokens';
 import { clampBox, type Box } from '@/vision/boundary';
 import { containFit, placeBox, type ContainFit } from '@/vision/overlay';
-import type { Detection } from '@/vision/ordering';
+import { CAPTURE_ASPECT } from '@/vision/frame';
 
 /**
  * The photograph with one box around the hand.
  *
- * A per-tile overlay answers a question nobody asked: the review screen already
- * shows what each tile was read as, at a size you can actually see. What it
- * cannot show is that the model included three tiles from the wall behind, or
- * the neighbour's discards. One boundary makes that obvious at a glance and
- * makes it fixable by dragging a corner, rather than by deleting tiles from a
- * list one at a time.
+ * One box, and nothing else drawn on the photograph.
  *
- * Tiles the model was unsure about still get their own faint box, because that
- * is the one case where "which tile on the table is this?" is worth answering.
+ * A per-tile overlay answers a question nobody asked: the review screen already
+ * shows what each tile was read as, at a size you can actually see. Boxes
+ * scattered over the picture only made it look busy and unfinished, and they
+ * competed with the one thing the photograph is here for - deciding whether
+ * something outside the hand got into shot.
+ *
+ * The box starts as the whole picture, because the picture has already been
+ * cropped to the frame the user aimed. Dragging a corner in is a correction,
+ * not a confirmation, so there is nothing to do here in the ordinary case.
  */
 
 /** Touch target for a corner, comfortably past the 44pt minimum at the edges. */
@@ -37,9 +39,6 @@ interface Props {
   imageWidth: number;
   imageHeight: number;
   boundary: Box | null;
-  detections: readonly Detection[];
-  /** Indices of detections the model was unsure about. */
-  uncertain?: ReadonlySet<number>;
   onChange: (boundary: Box) => void;
 }
 
@@ -127,8 +126,6 @@ export function HandBoundary({
   imageWidth,
   imageHeight,
   boundary,
-  detections,
-  uncertain,
   onChange,
 }: Props) {
   const [layout, setLayout] = useState({ width: 0, height: 0 });
@@ -178,18 +175,6 @@ export function HandBoundary({
     <View style={styles.photo} onLayout={(event: LayoutChangeEvent) => setLayout(event.nativeEvent.layout)}>
       <Image source={{ uri }} style={styles.photoImage} resizeMode="contain" />
 
-      {fit
-        ? detections.map((detection, index) =>
-            uncertain?.has(index) ? (
-              <View
-                key={index}
-                pointerEvents="none"
-                style={[styles.uncertainBox, placeBox(detection.box, fit)]}
-              />
-            ) : null,
-          )
-        : null}
-
       {placed ? (
         <>
           <View pointerEvents="none" style={[styles.boundary, placed]} />
@@ -211,8 +196,11 @@ export function HandBoundary({
 }
 
 const styles = StyleSheet.create({
+  // The same shape the capture frame was, so a photograph taken in the app
+  // fills it exactly and one chosen from the library letterboxes honestly.
   photo: {
-    height: 220,
+    width: '100%',
+    aspectRatio: CAPTURE_ASPECT,
     marginTop: space.sm,
     borderRadius: radius.lg,
     borderWidth: 1,
@@ -226,12 +214,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.brass,
     borderRadius: radius.sm,
-  },
-  uncertainBox: {
-    position: 'absolute',
-    borderWidth: 1,
-    borderColor: colors.loss,
-    borderRadius: 2,
   },
   handle: {
     position: 'absolute',

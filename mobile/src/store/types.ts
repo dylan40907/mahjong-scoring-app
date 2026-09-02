@@ -65,7 +65,6 @@ export interface Settings {
   /** Run the detector on capture; off falls back to manual entry. */
   readonly detectionEnabled: boolean;
   /** Below this the review screen flags a tile for checking. */
-  readonly confidenceThreshold: number;
   readonly hapticsEnabled: boolean;
 }
 
@@ -79,6 +78,5 @@ export interface AppState {
 export const DEFAULT_SETTINGS: Settings = {
   defaultRuleSetId: 'taiwanese-common',
   detectionEnabled: true,
-  confidenceThreshold: 0.6,
   hapticsEnabled: true,
 };

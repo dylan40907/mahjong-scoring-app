@@ -1,4 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { CAPTURE_ASPECT, frameCrop } from '@/vision/frame';
 
 /**
  * Keeping the photograph a hand was read from.
@@ -56,5 +58,44 @@ export async function discardPhoto(uri: string | undefined): Promise<void> {
     if (file.exists) file.delete();
   } catch {
     // A photograph that will not delete is not worth failing a delete over.
+  }
+}
+
+export interface CroppedPhoto {
+  readonly uri: string;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * Crop a photograph to what the capture frame was showing.
+ *
+ * The camera preview fills the frame and centre-crops the overflow - `cover`
+ * in every renderer this app draws on - so reproducing it is the same
+ * arithmetic, and `frameCrop` holds it where it can be tested without an
+ * image. Doing this at capture time is what makes the viewfinder a promise
+ * rather than a suggestion: every stage after it, detection included, works on
+ * exactly the rectangle the user framed.
+ *
+ * Falls back to the original on any failure. A wider photograph than expected
+ * is a much smaller problem than a capture that dead-ends.
+ */
+export async function cropToFrame(
+  uri: string,
+  width: number,
+  height: number,
+  aspect: number = CAPTURE_ASPECT,
+): Promise<CroppedPhoto> {
+  const rect = frameCrop(width, height, aspect);
+  if (!rect) return { uri, width, height };
+
+  try {
+    const result = await ImageManipulator.manipulateAsync(uri, [{ crop: rect }], {
+      compress: 0.95,
+      format: ImageManipulator.SaveFormat.JPEG,
+    });
+    return { uri: result.uri, width: result.width, height: result.height };
+  } catch {
+    return { uri, width, height };
   }
 }

@@ -1,9 +1,11 @@
 import {
-  applyExposedSpans,
-  exposedIndices,
+  applyDeclaredMelds,
+  concealedIndices,
+  declaredMelds,
+  meldedIndices,
   moveTile,
-  normaliseSpans,
-  spansFromGrouping,
+  normaliseMelds,
+  type DeclaredMeld,
 } from '../melds';
 import type { TileCode } from '@/tiles/tileset';
 
@@ -12,58 +14,80 @@ const hand = [
   'east', 'east', 'east', 'red', 'red',
 ] as TileCode[];
 
-describe('normaliseSpans', () => {
+const open = (start: number, end: number): DeclaredMeld => ({ start, end, concealed: false });
+const hidden = (start: number, end: number): DeclaredMeld => ({ start, end, concealed: true });
+
+describe('normaliseMelds', () => {
   it('orders the endpoints and sorts', () => {
-    expect(normaliseSpans([[5, 3], [1, 0]], 14)).toEqual([[0, 1], [3, 5]]);
+    expect(normaliseMelds([open(5, 3), open(1, 0)], 14)).toEqual([open(0, 1), open(3, 5)]);
   });
 
-  it('merges overlapping and adjacent spans', () => {
-    expect(normaliseSpans([[0, 2], [2, 4]], 14)).toEqual([[0, 4]]);
-    expect(normaliseSpans([[0, 2], [3, 5]], 14)).toEqual([[0, 5]]);
+  it('merges overlapping and adjacent marks', () => {
+    expect(normaliseMelds([open(0, 2), open(2, 4)], 14)).toEqual([open(0, 4)]);
+    expect(normaliseMelds([open(0, 2), open(3, 5)], 14)).toEqual([open(0, 5)]);
+  });
+
+  it('only keeps a merged run concealed when everything in it was', () => {
+    expect(normaliseMelds([hidden(0, 3), hidden(4, 7)], 14)).toEqual([hidden(0, 7)]);
+    expect(normaliseMelds([hidden(0, 3), open(4, 7)], 14)).toEqual([open(0, 7)]);
   });
 
   it('clamps to the hand and drops what falls outside', () => {
-    expect(normaliseSpans([[12, 99]], 14)).toEqual([[12, 13]]);
-    expect(normaliseSpans([[20, 25]], 14)).toEqual([]);
+    expect(normaliseMelds([open(12, 99)], 14)).toEqual([open(12, 13)]);
+    expect(normaliseMelds([open(20, 25)], 14)).toEqual([]);
   });
 });
 
-describe('applyExposedSpans', () => {
+describe('applyDeclaredMelds', () => {
   it('leaves an unmarked hand as one concealed group', () => {
-    const { groups, meldGroups } = applyExposedSpans(hand, []);
+    const { groups, meldGroups } = applyDeclaredMelds(hand, []);
     expect(groups).toHaveLength(1);
     expect(groups[0]).toHaveLength(14);
     expect(meldGroups).toEqual([]);
   });
 
-  it('splits one exposed meld out of the middle', () => {
-    const { groups, meldGroups } = applyExposedSpans(hand, [[3, 5]]);
-    expect(groups.map((g) => g.length)).toEqual([3, 3, 8]);
+  it('splits one declared meld out of the middle', () => {
+    const { groups, meldGroups } = applyDeclaredMelds(hand, [open(3, 5)]);
+    expect(groups.map((group) => group.length)).toEqual([3, 3, 8]);
     expect(meldGroups).toEqual([1]);
     expect(groups[1]).toEqual(['pin4', 'pin4', 'pin4']);
   });
 
   it('handles a meld at the start and one at the end', () => {
-    const { groups, meldGroups } = applyExposedSpans(hand, [[0, 2], [12, 13]]);
-    expect(groups.map((g) => g.length)).toEqual([3, 9, 2]);
+    const { groups, meldGroups } = applyDeclaredMelds(hand, [open(0, 2), open(12, 13)]);
+    expect(groups.map((group) => group.length)).toEqual([3, 9, 2]);
     expect(meldGroups).toEqual([0, 2]);
   });
 
-  it('round-trips through spansFromGrouping', () => {
-    const spans = [[3, 5], [9, 11]] as const;
-    const grouping = applyExposedSpans(hand, spans);
-    expect(spansFromGrouping(grouping)).toEqual([[3, 5], [9, 11]]);
+  it('records which declarations were concealed', () => {
+    const { meldGroups, concealedMelds } = applyDeclaredMelds(hand, [
+      open(0, 2),
+      hidden(9, 11),
+    ]);
+    expect(meldGroups).toEqual([0, 2]);
+    expect(concealedMelds).toEqual([2]);
+  });
+
+  it('round-trips through declaredMelds', () => {
+    const melds = [open(3, 5), hidden(9, 11)];
+    expect(declaredMelds(applyDeclaredMelds(hand, melds))).toEqual(melds);
   });
 
   it('keeps every tile exactly once', () => {
-    const { groups } = applyExposedSpans(hand, [[3, 5], [9, 11]]);
+    const { groups } = applyDeclaredMelds(hand, [open(3, 5), open(9, 11)]);
     expect(groups.flat()).toEqual(hand);
   });
 });
 
-describe('exposedIndices', () => {
-  it('expands spans into the tiles they cover', () => {
-    expect([...exposedIndices([[1, 3]])].sort((a, b) => a - b)).toEqual([1, 2, 3]);
+describe('meldedIndices', () => {
+  it('expands marks into the tiles they cover', () => {
+    expect([...meldedIndices([open(1, 3)])].sort((a, b) => a - b)).toEqual([1, 2, 3]);
+  });
+
+  it('separates the concealed declarations from the rest', () => {
+    const melds = [open(0, 2), hidden(6, 9)];
+    expect(meldedIndices(melds).size).toBe(7);
+    expect([...concealedIndices(melds)].sort((a, b) => a - b)).toEqual([6, 7, 8, 9]);
   });
 });
 

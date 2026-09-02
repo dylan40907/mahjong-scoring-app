@@ -11,27 +11,27 @@ import {
   TileFace,
   TileScanner,
 } from '@/design/components';
-import { AlertIcon, PlusIcon } from '@/design/icons';
+import { PlusIcon } from '@/design/icons';
 import { colors, radius, space, tileSize } from '@/design/tokens';
 import { TilePicker } from '@/components/TilePicker';
 import { HandBoundary } from '@/components/HandBoundary';
 import { HandRow, type HandRowMode } from '@/components/HandRow';
-import { exposedIndices } from '@/store/melds';
+import { concealedIndices, meldedIndices, type DeclaredMeld } from '@/store/melds';
 import { withinBoundary } from '@/vision/boundary';
 import { detectTiles } from '@/vision/detector';
 import { orderDetections } from '@/vision/ordering';
-import { findRuleSet, useAppState } from '@/store/store';
+import { findRuleSet } from '@/store/store';
 import type { TileCode } from '@/tiles/tileset';
 import { TILE_BY_CODE, isBonus } from '@/tiles/tileset';
 import {
   appendTile,
-  exposedSpans,
+  declaredMeldsOf,
   handTiles,
   reorderTile,
-  setExposedSpans,
+  setDeclaredMelds,
   removeBonus,
-  removeTile,
-  setTile,
+  removeTileAt,
+  setTileAt,
   updateDraft,
   useDraft,
   validateDraft,
@@ -46,10 +46,9 @@ import {
  * detections are marked, and correcting one is a tap. Nothing has to be
  * confirmed tile by tile.
  *
- * Everything the detector inferred is presented as a proposal. Which groups
- * are exposed melds is a guess from spacing, and the winning tile cannot be
- * seen in a photograph at all, so both are stated plainly and are one tap to
- * change.
+ * Nothing the detector inferred is treated as fact. Which tiles were declared
+ * and which tile completed the hand are both invisible to a camera, so the
+ * player states them here rather than having them guessed at.
  */
 export default function ReviewScreen() {
   const router = useRouter();
@@ -57,18 +56,8 @@ export default function ReviewScreen() {
   const rules = findRuleSet(draft.ruleSetId);
   const handSize = rules?.handSize ?? 16;
 
-  const settings = useAppState(useCallback((state) => state.settings, []));
   const [rereading, setRereading] = useState(false);
   const [mode, setMode] = useState<HandRowMode>('edit');
-
-  /** Detection indices the model was unsure about, for the faint boxes. */
-  const uncertainIndices = useMemo(() => {
-    const set = new Set<number>();
-    draft.detections.forEach((detection, index) => {
-      if (detection.confidence < settings.confidenceThreshold) set.add(index);
-    });
-    return set;
-  }, [draft.detections, settings.confidenceThreshold]);
 
   /**
    * Read the hand again, this time seeing only what the boundary holds.
@@ -85,60 +74,49 @@ export default function ReviewScreen() {
       const result = await detectTiles(draft.photoUri, { region: draft.boundary });
       const inside = withinBoundary(result.detections, draft.boundary);
       const ordered = orderDetections(inside);
-      const flagged: string[] = [];
-      ordered.groups.forEach((group, groupIndex) => {
-        group.forEach((tile, tileIndex) => {
-          if (tile.confidence < settings.confidenceThreshold) {
-            flagged.push(`${groupIndex}:${tileIndex}`);
-          }
-        });
-      });
       updateDraft({
         groups: ordered.groups.map((group) => group.map((tile) => tile.code)),
         meldGroups: [],
+        concealedMelds: [],
         detections: inside,
         imageWidth: result.imageWidth,
         imageHeight: result.imageHeight,
-        flagged,
       });
     } catch {
       // Keep the read we already have; the tiles are still editable by hand.
     } finally {
       setRereading(false);
     }
-  }, [draft.photoUri, draft.boundary, settings.confidenceThreshold]);
-  const [picker, setPicker] = useState<
-    { group: number; tile: number } | { group: -1; tile: -1 } | null
-  >(null);
+  }, [draft.photoUri, draft.boundary]);
+
+  /** The tile the picker is editing. -1 means it is adding a new one. */
+  const [picker, setPicker] = useState<number | null>(null);
 
   const validation = useMemo(() => validateDraft(draft, handSize), [draft, handSize]);
 
   /** The hand as one row; groups exist for the scorer, not for the player. */
   // eslint-disable-next-line react-hooks/exhaustive-deps -- groups is the only input
   const tiles = useMemo(() => handTiles(draft), [draft.groups]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- groups and meldGroups are the only inputs
-  const spans = useMemo(() => exposedSpans(draft), [draft.groups, draft.meldGroups]);
-  const exposedSet = useMemo(() => exposedIndices(spans), [spans]);
-
-  /** Flagged positions arrive as "group:index"; the row works in flat indices. */
-  const uncertainTiles = useMemo(() => {
-    const set = new Set<number>();
-    let offset = 0;
-    draft.groups.forEach((group, groupIndex) => {
-      group.forEach((_tile, tileIndex) => {
-        if (draft.flagged.includes(`${groupIndex}:${tileIndex}`)) set.add(offset + tileIndex);
-      });
-      offset += group.length;
-    });
-    return set;
-  }, [draft.groups, draft.flagged]);
+  const melds = useMemo(
+    () => declaredMeldsOf(draft),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- these three are the only inputs
+    [draft.groups, draft.meldGroups, draft.concealedMelds],
+  );
+  const declaredSet = useMemo(() => meldedIndices(melds), [melds]);
+  const concealedSet = useMemo(() => concealedIndices(melds), [melds]);
 
   const winningIndex = useMemo(
     () => (draft.winningTile ? tiles.indexOf(draft.winningTile) : null),
     [tiles, draft.winningTile],
   );
 
-  const [spanStart, setSpanStart] = useState<number | null>(null);
+  const [meldStart, setMeldStart] = useState<number | null>(null);
+
+  /** Four identical tiles set down together: the one meld that can be concealed. */
+  const isKong = (meld: DeclaredMeld) => {
+    const run = tiles.slice(meld.start, meld.end + 1);
+    return run.length === 4 && run.every((code) => code === run[0]);
+  };
 
   const handleTilePress = (index: number) => {
     if (mode === 'winning') {
@@ -147,44 +125,58 @@ export default function ReviewScreen() {
       return;
     }
 
-    if (mode === 'exposed') {
-      // Tapping inside an existing meld removes it, which is the only way back
-      // from a mistake and needs no separate control.
-      const covering = spans.findIndex(([from, to]) => index >= from && index <= to);
+    if (mode === 'melds') {
+      const covering = melds.findIndex((meld) => index >= meld.start && index <= meld.end);
       if (covering >= 0) {
-        setExposedSpans(spans.filter((_span, i) => i !== covering));
-        setSpanStart(null);
+        /*
+         * Tapping a marked meld cycles it rather than only clearing it.
+         *
+         * A kong has a third state - set down, but never shown - and it is not
+         * a nicety: a concealed kong leaves a Riichi hand closed, so riichi,
+         * menzen tsumo and pinfu all survive it, and Taiwanese and MCR both
+         * pay it more than a melded one. A dedicated control for it would have
+         * been meaningless for every meld that is not four of a kind.
+         */
+        const meld = melds[covering];
+        setDeclaredMelds(
+          !meld.concealed && isKong(meld)
+            ? melds.map((m, i) => (i === covering ? { ...m, concealed: true } : m))
+            : melds.filter((_m, i) => i !== covering),
+        );
+        setMeldStart(null);
         return;
       }
-      if (spanStart === null) {
-        setSpanStart(index);
+      if (meldStart === null) {
+        setMeldStart(index);
       } else {
-        setExposedSpans([...spans, [spanStart, index]]);
-        setSpanStart(null);
+        setDeclaredMelds([
+          ...melds,
+          { start: Math.min(meldStart, index), end: Math.max(meldStart, index), concealed: false },
+        ]);
+        setMeldStart(null);
       }
       return;
     }
 
-    setPicker({ group: index, tile: index });
+    setPicker(index);
   };
 
   const handleSelect = (code: TileCode) => {
-    if (!picker) return;
-    if (picker.group === -1) {
+    if (picker === null) return;
+    if (picker < 0) {
       appendTile(code);
     } else if (isBonus(TILE_BY_CODE[code])) {
       // A flower can only have been read as a hand tile by mistake; move it to
       // where flowers belong rather than leaving it in the hand.
-      removeTile(picker.group, picker.tile);
+      removeTileAt(picker);
       appendTile(code);
     } else {
-      setTile(picker.group, picker.tile, code);
+      setTileAt(picker, code);
     }
     setPicker(null);
   };
 
-  const activeDetection =
-    picker && picker.group >= 0 ? draft.detections[picker.group] : undefined;
+  const activeDetection = picker !== null && picker >= 0 ? draft.detections[picker] : undefined;
 
   return (
     <Screen padded={false} footerSpace={0}>
@@ -205,8 +197,6 @@ export default function ReviewScreen() {
               imageWidth={draft.imageWidth}
               imageHeight={draft.imageHeight}
               boundary={draft.boundary}
-              detections={draft.detections}
-              uncertain={uncertainIndices}
               onChange={(next) => updateDraft({ boundary: next })}
             />
             {rereading ? (
@@ -214,23 +204,25 @@ export default function ReviewScreen() {
                 <TileScanner label="Reading that area again…" />
               </View>
             ) : null}
-            <View style={styles.rereadRow}>
-              <Caption tone="faint" style={styles.rereadHint}>
-                Drag a corner so the box holds only your hand.
-              </Caption>
+            <Caption tone="faint" style={styles.photoHint}>
+              Everything in the frame was read. Drag a corner in to leave something out, then read
+              it again.
+            </Caption>
+            <View style={styles.photoActions}>
               <Button
-                label={rereading ? 'Reading…' : 'Read again'}
+                label="Retake"
                 variant="ghost"
+                style={styles.photoAction}
+                onPress={() => router.push('/hand/capture')}
+              />
+              <Button
+                label={rereading ? 'Reading' : 'Read again'}
+                variant="ghost"
+                style={styles.photoAction}
                 disabled={rereading || !draft.boundary}
                 onPress={reread}
               />
             </View>
-            <Button
-              label="Retake picture"
-              variant="ghost"
-              block
-              onPress={() => router.push('/hand/capture')}
-            />
           </>
         ) : null}
 
@@ -238,26 +230,27 @@ export default function ReviewScreen() {
           <CaptionStrong tone={validation.tileCount === validation.expected ? 'muted' : 'loss'} numeric>
             {validation.tileCount} of {validation.expected} tiles
           </CaptionStrong>
-          {uncertainTiles.size > 0 ? (
-            <View style={styles.flagNote}>
-              <AlertIcon size={14} color={colors.loss} />
-              <Caption tone="loss">{uncertainTiles.size} to check</Caption>
-            </View>
+          {/* Says *why* the target moved, so an eighteen-tile hand does not
+              look like a counting error. */}
+          {validation.kongs > 0 ? (
+            <Caption tone="muted">
+              {validation.kongs === 1 ? 'one kong' : `${validation.kongs} kongs`} declared
+            </Caption>
           ) : null}
         </View>
 
         <Section
           title={
             mode === 'winning' ? 'Tap the winning tile'
-            : mode === 'exposed' ? 'Mark what was exposed'
+            : mode === 'melds' ? 'Mark what you declared'
             : 'The hand'
           }
           first
         >
           <HandRow
             tiles={tiles}
-            exposed={exposedSet}
-            uncertain={uncertainTiles}
+            declared={declaredSet}
+            concealed={concealedSet}
             selectedTile={winningIndex}
             mode={mode}
             onTilePress={handleTilePress}
@@ -268,27 +261,27 @@ export default function ReviewScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Add a tile"
-              onPress={() => setPicker({ group: -1, tile: -1 })}
+              onPress={() => setPicker(-1)}
               style={({ pressed }) => [styles.addTile, pressed && styles.pressed]}
             >
               <PlusIcon size={20} color={colors.inkFaint} />
             </Pressable>
             <Button
-              label={mode === 'exposed' ? 'Done' : 'Exposed melds'}
+              label={mode === 'melds' ? 'Done' : 'Declared melds'}
               variant="ghost"
               onPress={() => {
-                setSpanStart(null);
-                setMode(mode === 'exposed' ? 'edit' : 'exposed');
+                setMeldStart(null);
+                setMode(mode === 'melds' ? 'edit' : 'melds');
               }}
             />
           </View>
 
           <Caption tone="faint" style={styles.hint}>
-            {mode === 'exposed'
-              ? spanStart === null
-                ? 'Tap the first tile of a meld you declared. Tap a marked tile to unmark it.'
+            {mode === 'melds'
+              ? meldStart === null
+                ? 'Tap the first tile of a meld you set down. Tap a marked meld again to change it — a kong goes to concealed, anything else clears.'
                 : 'Now tap the last tile of that meld.'
-              : 'Tap a tile to correct it, or hold and drag to move it. Everything is concealed unless you mark it exposed.'}
+              : 'Tap a tile to correct it, or hold and drag to move it. Everything stays in hand unless you mark it declared.'}
           </Caption>
         </Section>
 
@@ -329,7 +322,7 @@ export default function ReviewScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Add a flower or season"
-                onPress={() => setPicker({ group: -1, tile: -1 })}
+                onPress={() => setPicker(-1)}
                 style={({ pressed }) => [styles.addBonus, pressed && styles.pressed]}
               >
                 <PlusIcon size={16} color={colors.inkFaint} />
@@ -364,16 +357,16 @@ export default function ReviewScreen() {
         onClose={() => setPicker(null)}
         onSelect={handleSelect}
         onRemove={
-          picker && picker.group >= 0
+          picker !== null && picker >= 0
             ? () => {
-                removeTile(picker.group, picker.tile);
+                removeTileAt(picker);
                 setPicker(null);
               }
             : undefined
         }
         alternatives={activeDetection?.alternatives}
-        current={picker && picker.group >= 0 ? draft.groups[picker.group]?.[picker.tile] : null}
-        title={picker?.group === -1 ? 'Add a tile' : 'Correct this tile'}
+        current={picker !== null && picker >= 0 ? (tiles[picker] ?? null) : null}
+        title={picker !== null && picker < 0 ? 'Add a tile' : 'Correct this tile'}
         includeBonus={rules?.usesBonusTiles ?? true}
       />
     </Screen>
@@ -390,14 +383,9 @@ const REVIEW_TILE_WIDTH = 34;
 const FOOTER_CLEARANCE = 96;
 
 const styles = StyleSheet.create({
-  rereadRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: space.sm,
-    marginTop: space.xs,
-  },
-  rereadHint: { flex: 1 },
+  photoHint: { marginTop: space.sm, paddingHorizontal: space.xs },
+  photoActions: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },
+  photoAction: { flex: 1 },
   addPhoto: { marginTop: space.md },
   rereadBusy: { alignItems: 'center', marginTop: space.sm },
   handActions: {
@@ -425,7 +413,6 @@ const styles = StyleSheet.create({
     marginTop: space.lg,
     paddingHorizontal: space.xs,
   },
-  flagNote: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   groups: { flexDirection: 'row', flexWrap: 'wrap', gap: space.lg, alignItems: 'flex-start' },
   // A concealed Taiwanese hand is seventeen tiles - far wider than a phone -
   // so a group has to be allowed to wrap. Tiles within a group stay two pixels

@@ -25,7 +25,7 @@ import { TILE_BY_CODE, type TileCode } from '@/tiles/tileset';
  * behind a mode switch advertised it as a step, which it is not.
  */
 
-export type HandRowMode = 'edit' | 'exposed' | 'winning';
+export type HandRowMode = 'edit' | 'melds' | 'winning';
 
 const TILE_WIDTH = 34;
 const GAP = 4;
@@ -35,10 +35,10 @@ const ROW_HEIGHT = Math.round(TILE_WIDTH * (4 / 3)) + GAP + 8;
 
 interface Props {
   tiles: readonly TileCode[];
-  /** Tiles belonging to an exposed meld. */
-  exposed: ReadonlySet<number>;
-  /** Tiles the model was unsure about. */
-  uncertain?: ReadonlySet<number>;
+  /** Tiles belonging to a declared meld. */
+  declared: ReadonlySet<number>;
+  /** Tiles belonging to a declaration that was concealed - a concealed kong. */
+  concealed: ReadonlySet<number>;
   selectedTile?: number | null;
   mode: HandRowMode;
   perRow?: number;
@@ -108,8 +108,8 @@ function makeResponder(context: { current: DragContext }): PanResponderInstance 
 
 export function HandRow({
   tiles,
-  exposed,
-  uncertain,
+  declared,
+  concealed,
   selectedTile,
   mode,
   perRow = 8,
@@ -182,14 +182,21 @@ export function HandRow({
           <TileFace
             code={code}
             width={TILE_WIDTH}
-            selected={mode === 'exposed' ? exposed.has(index) : selectedTile === index}
-            uncertain={uncertain?.has(index)}
+            selected={mode === 'melds' ? declared.has(index) : selectedTile === index}
             onPress={() => onTilePress(index)}
             onLongPress={() => lift(index)}
             accessibilityLabel={TILE_BY_CODE[code].label}
             accessibilityHint="Hold and drag to move this tile"
           />
-          {exposed.has(index) && mode !== 'exposed' ? <View style={styles.exposedBar} /> : null}
+          {/*
+            * Exposed and concealed declarations read differently: a solid rule
+            * for a meld everybody saw, a broken one for a kong that was set
+            * down face down. Same weight, same colour - the difference is what
+            * it says, not how loudly.
+            */}
+          {declared.has(index) && mode !== 'melds' ? (
+            <View style={concealed.has(index) ? styles.concealedBar : styles.declaredBar} />
+          ) : null}
         </View>
       ))}
     </View>
@@ -207,12 +214,21 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   /** A quiet rule under a tile that was declared, not a second colour. */
-  exposedBar: {
+  declaredBar: {
     marginTop: 3,
     width: TILE_WIDTH - 8,
     height: 2,
     borderRadius: radius.sm,
     backgroundColor: colors.brass,
+  },
+  concealedBar: {
+    marginTop: 3,
+    width: TILE_WIDTH - 8,
+    height: 2,
+    borderRadius: radius.sm,
+    borderTopWidth: 2,
+    borderTopColor: colors.brass,
+    borderStyle: 'dashed',
   },
 });
 

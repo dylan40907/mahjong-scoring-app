@@ -25,8 +25,6 @@ export interface TileFaceProps {
   onLongPress?: () => void;
   /** Draws the brass selection ring. */
   selected?: boolean;
-  /** Dims the face; used for tiles the model was unsure about. */
-  uncertain?: boolean;
   style?: ViewStyle;
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -38,7 +36,6 @@ export function TileFace({
   onPress,
   onLongPress,
   selected,
-  uncertain,
   style,
   accessibilityLabel,
   accessibilityHint,
@@ -55,7 +52,6 @@ export function TileFace({
         styles.face,
         box,
         selected && styles.selected,
-        uncertain && styles.uncertain,
         style,
       ]}
     >
@@ -90,7 +86,6 @@ export interface TileRowProps {
   width?: number;
   onPressTile?: (groupIndex: number, tileIndex: number) => void;
   selected?: { group: number; tile: number } | null;
-  uncertain?: readonly { group: number; tile: number }[];
   style?: ViewStyle;
 }
 
@@ -99,12 +94,8 @@ export function TileRow({
   width = 40,
   onPressTile,
   selected,
-  uncertain = [],
   style,
 }: TileRowProps) {
-  const isUncertain = (g: number, t: number) =>
-    uncertain.some((u) => u.group === g && u.tile === t);
-
   return (
     <View style={[styles.row, style]}>
       {groups.map((group, groupIndex) => (
@@ -115,7 +106,6 @@ export function TileRow({
               code={code}
               width={width}
               selected={selected?.group === groupIndex && selected?.tile === tileIndex}
-              uncertain={isUncertain(groupIndex, tileIndex)}
               onPress={onPressTile ? () => onPressTile(groupIndex, tileIndex) : undefined}
             />
           ))}
@@ -162,7 +152,6 @@ const styles = StyleSheet.create({
   },
   image: { width: '100%', height: '100%' },
   selected: { borderColor: colors.brass, borderWidth: 2 },
-  uncertain: { opacity: 0.55 },
   pressed: { opacity: 0.7, transform: [{ scale: 0.97 }] },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md, alignItems: 'center' },
   group: { flexDirection: 'row', gap: 2 },

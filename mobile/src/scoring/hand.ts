@@ -32,7 +32,8 @@ export type WaitType =
   | 'closed'  // kanchan: 4-_-6 waiting on 5
   | 'open'    // ryanmen: 4-5 waiting on 3 or 6
   | 'single'  // tanki: the pair was the wait
-  | 'pung';   // shanpon: two pairs, one became a triplet
+  | 'pung'    // shanpon: two pairs, one became a triplet
+  | 'none';   // the winning tile went into a meld already on the table
 
 export interface HandContext {
   /** Won on a tile drawn from the wall rather than claimed from a discard. */

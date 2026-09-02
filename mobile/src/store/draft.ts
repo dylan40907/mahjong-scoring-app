@@ -1,11 +1,12 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import type { TileCode } from '@/tiles/tileset';
 import {
-  applyExposedSpans,
-  exposedIndices,
+  applyDeclaredMelds,
+  concealedIndices,
+  declaredMelds,
+  meldedIndices,
   moveTile,
-  spansFromGrouping,
-  type Span,
+  type DeclaredMeld,
 } from './melds';
 import { TILE_BY_CODE, isBonus } from '@/tiles/tileset';
 import type { HandContext, HandInput, Meld } from '@/scoring';
@@ -28,8 +29,15 @@ export interface HandDraft {
   photoUri: string | null;
   /** Tile groups in reading order, as the ordering step recovered them. */
   groups: TileCode[][];
-  /** Indices into `groups` the user has marked as exposed melds. */
+  /** Indices into `groups` the user has marked as declared melds. */
   meldGroups: number[];
+  /**
+   * The subset of `meldGroups` declared *concealed* - in practice, concealed
+   * kongs. Kept apart from `meldGroups` rather than folded into it because a
+   * concealed declaration is still part of a concealed hand, and every ruleset
+   * here pays it differently from an exposed one.
+   */
+  concealedMelds: number[];
   bonus: TileCode[];
   winningTile: TileCode | null;
   winnerId: string | null;
@@ -50,14 +58,12 @@ export interface HandDraft {
   /**
    * The area of the photograph holding the hand, in decoded-image pixels.
    *
-   * Proposed by clustering the detections and adjustable by dragging. Tiles
-   * outside it are not part of the hand - the wall behind, a neighbour's
-   * discards - and re-reading inside it also gives the detector several times
-   * more pixels per tile than the whole frame did.
+   * Starts as the whole photograph, because the photograph has already been
+   * cropped to the frame the user pointed at the hand. Shrinking it is a
+   * deliberate correction for something that strayed into shot, and re-reading
+   * inside it also gives the detector several times more pixels per tile.
    */
   boundary: readonly [number, number, number, number] | null;
-  /** Positions the model was unsure about: "group:index". */
-  flagged: string[];
   /**
    * Set when an already-scored hand is open for correction.
    *
@@ -76,6 +82,7 @@ const EMPTY: HandDraft = {
   photoUri: null,
   groups: [],
   meldGroups: [],
+  concealedMelds: [],
   bonus: [],
   winningTile: null,
   winnerId: null,
@@ -87,7 +94,6 @@ const EMPTY: HandDraft = {
   imageWidth: 0,
   imageHeight: 0,
   boundary: null,
-  flagged: [],
 };
 
 let draft: HandDraft = { ...EMPTY };
@@ -119,10 +125,12 @@ export function resetDraft(seed: Partial<HandDraft> = {}): void {
 export function editHand(record: HandRecord, sessionId: string, ruleSetId: string): void {
   const groups: TileCode[][] = [];
   const meldGroups: number[] = [];
+  const concealedMelds: number[] = [];
 
   for (const meld of record.hand.melds) {
     groups.push([...meld.tiles]);
     meldGroups.push(groups.length - 1);
+    if (meld.concealed) concealedMelds.push(groups.length - 1);
   }
   if (record.hand.concealed.length > 0) groups.push([...record.hand.concealed]);
   if (groups.length === 0) groups.push([]);
@@ -136,6 +144,7 @@ export function editHand(record: HandRecord, sessionId: string, ruleSetId: strin
     photoUri: record.photoUri ?? null,
     groups,
     meldGroups,
+    concealedMelds,
     bonus: [...record.hand.bonus],
     winningTile: record.hand.winningTile,
     winnerId: record.winnerId,
@@ -165,19 +174,71 @@ export function useDraft<T>(selector: (draft: HandDraft) => T): T {
 // Editing
 // ---------------------------------------------------------------------------
 
-export function setTile(groupIndex: number, tileIndex: number, code: TileCode): void {
-  const groups = draft.groups.map((group, g) =>
-    g === groupIndex ? group.map((tile, t) => (t === tileIndex ? code : tile)) : group,
-  );
-  updateDraft({ groups, flagged: draft.flagged.filter((key) => key !== `${groupIndex}:${tileIndex}`) });
+/*
+ * The hand is edited in flat tile indices, because that is the only index the
+ * review screen has: it shows one row, not the groups.
+ *
+ * These used to take a group index and an offset within it, and the review
+ * screen passed the flat index for both - so correcting or deleting any tile
+ * past the first group silently did nothing at all. Removing a tile you had
+ * just added by hand was the visible half of that; the invisible half was
+ * corrections quietly failing on any hand the detector split into two groups.
+ */
+
+export function setTileAt(index: number, code: TileCode): void {
+  const tiles = handTiles();
+  if (index < 0 || index >= tiles.length) return;
+  const next = tiles.map((tile, i) => (i === index ? code : tile));
+  updateDraft(applyDeclaredMelds(next, declaredMeldsOf()));
 }
 
-export function removeTile(groupIndex: number, tileIndex: number): void {
-  const groups = draft.groups
-    .map((group, g) => (g === groupIndex ? group.filter((_, t) => t !== tileIndex) : group))
-    .filter((group) => group.length > 0);
-  updateDraft({ groups, winningTile: draft.winningTile });
+export function removeTileAt(index: number): void {
+  const tiles = handTiles();
+  if (index < 0 || index >= tiles.length) return;
+
+  // Marks move with the tiles, not with the positions: deleting a tile out of
+  // a declared meld shrinks that meld rather than swallowing its neighbour.
+  const melds = declaredMeldsOf();
+  const marked = meldedIndices(melds);
+  const hidden = concealedIndices(melds);
+  const kept = tiles
+    .map((tile, i) => ({ tile, exposed: marked.has(i), concealed: hidden.has(i) }))
+    .filter((_, i) => i !== index);
+
+  updateDraft({
+    ...applyDeclaredMelds(
+      kept.map((entry) => entry.tile),
+      runsFrom(kept),
+    ),
+    // The winning tile is a code, not a position, so it survives unless the
+    // last copy of it just left the hand.
+    winningTile: kept.some((entry) => entry.tile === draft.winningTile)
+      ? draft.winningTile
+      : null,
+    // Detections are positional and line up with the tiles the detector found.
+    // Dropping the matching one keeps "which box did this come from" honest for
+    // every tile after it.
+    detections: draft.detections.filter((_, i) => i !== index),
+  });
 }
+
+/** Contiguous runs of marked tiles, back into declarations. */
+function runsFrom(entries: readonly { exposed: boolean; concealed: boolean }[]): DeclaredMeld[] {
+  const melds: DeclaredMeld[] = [];
+  let start = -1;
+  entries.forEach((entry, index) => {
+    if (entry.exposed && start === -1) start = index;
+    if (!entry.exposed && start !== -1) {
+      melds.push({ start, end: index - 1, concealed: entries[start].concealed });
+      start = -1;
+    }
+  });
+  if (start !== -1) {
+    melds.push({ start, end: entries.length - 1, concealed: entries[start].concealed });
+  }
+  return melds;
+}
+
 
 export function appendTile(code: TileCode): void {
   if (isBonus(TILE_BY_CODE[code])) {
@@ -193,12 +254,7 @@ export function removeBonus(index: number): void {
   updateDraft({ bonus: draft.bonus.filter((_, i) => i !== index) });
 }
 
-export function toggleMeldGroup(groupIndex: number): void {
-  const meldGroups = draft.meldGroups.includes(groupIndex)
-    ? draft.meldGroups.filter((index) => index !== groupIndex)
-    : [...draft.meldGroups, groupIndex];
-  updateDraft({ meldGroups });
-}
+
 
 // ---------------------------------------------------------------------------
 // Building the scoring input
@@ -236,17 +292,22 @@ export interface DraftValidation {
   readonly problems: string[];
   readonly tileCount: number;
   readonly expected: number;
+  /** Declared kongs, each of which raises `expected` by one. */
+  readonly kongs: number;
 }
 
 export function validateDraft(draftState: HandDraft, handSize: number): DraftValidation {
   const problems: string[] = [];
   const total = draftState.groups.reduce((sum, group) => sum + group.length, 0);
-  const expected = handSize + 1;
+  const expected = expectedTileCount(draftState, handSize);
 
-  if (total !== expected) {
+  if (total < expected) {
+    const short = expected - total;
+    problems.push(`${short} more ${short === 1 ? 'tile' : 'tiles'} needed.`);
+  } else if (total > expected) {
     problems.push(
-      total < expected
-        ? `${expected - total} more ${expected - total === 1 ? 'tile' : 'tiles'} needed.`
+      undeclaredFourOfAKind(draftState)
+        ? 'Four of a kind only counts as a set once it is marked as a kong.'
         : `${total - expected} too many tiles.`,
     );
   }
@@ -257,9 +318,20 @@ export function validateDraft(draftState: HandDraft, handSize: number): DraftVal
       break;
     }
   }
+  if (draftState.concealedMelds.some((index) => !isKong(draftState.groups[index]))) {
+    // Only a kong is ever declared face down; a concealed run or triplet is
+    // just still in the hand, and the decomposer finds it there.
+    problems.push('Only a kong can be declared concealed.');
+  }
   if (!draftState.winningTile) problems.push('Choose the tile that completed the hand.');
 
-  return { ok: problems.length === 0, problems, tileCount: total, expected };
+  return {
+    ok: problems.length === 0,
+    problems,
+    tileCount: total,
+    expected,
+    kongs: countKongs(draftState),
+  };
 }
 
 /**
@@ -272,18 +344,18 @@ export function handTiles(draftState: HandDraft = draft): TileCode[] {
   return draftState.groups.flat();
 }
 
-/** Which runs the player has marked as exposed melds, in flat tile indices. */
-export function exposedSpans(draftState: HandDraft = draft): Span[] {
-  return spansFromGrouping({
+/** Which runs the player has declared, in flat tile indices. */
+export function declaredMeldsOf(draftState: HandDraft = draft): DeclaredMeld[] {
+  return declaredMelds({
     groups: draftState.groups,
     meldGroups: draftState.meldGroups,
+    concealedMelds: draftState.concealedMelds,
   });
 }
 
-/** Replace the marked melds, keeping the tiles and their order. */
-export function setExposedSpans(spans: readonly Span[]): void {
-  const tiles = handTiles();
-  updateDraft(applyExposedSpans(tiles, spans));
+/** Replace the declarations, keeping the tiles and their order. */
+export function setDeclaredMelds(melds: readonly DeclaredMeld[]): void {
+  updateDraft(applyDeclaredMelds(handTiles(), melds));
 }
 
 /**
@@ -295,23 +367,51 @@ export function reorderTile(from: number, to: number): void {
   const tiles = handTiles();
   if (from < 0 || from >= tiles.length) return;
 
-  const marks = exposedIndices(exposedSpans());
-  const flags = tiles.map((_, index) => marks.has(index));
-  const nextTiles = moveTile(tiles, from, to);
-  const nextFlags = moveTile(flags, from, to);
+  const melds = declaredMeldsOf();
+  const marked = meldedIndices(melds);
+  const hidden = concealedIndices(melds);
+  const entries = tiles.map((tile, index) => ({
+    tile,
+    exposed: marked.has(index),
+    concealed: hidden.has(index),
+  }));
+  const moved = moveTile(entries, from, to);
 
-  const spans: Span[] = [];
-  let start = -1;
-  nextFlags.forEach((flag, index) => {
-    if (flag && start === -1) start = index;
-    if (!flag && start !== -1) {
-      spans.push([start, index - 1]);
-      start = -1;
-    }
+  updateDraft(applyDeclaredMelds(moved.map((entry) => entry.tile), runsFrom(moved)));
+}
+
+/**
+ * Tiles a complete hand holds, given what has been declared.
+ *
+ * A kong is four tiles standing in for a set of three, so every declared kong
+ * puts the hand one tile over the nominal size - a Taiwanese hand with one
+ * kong is eighteen tiles, not seventeen, and with two it is nineteen. This is
+ * not an edge case; it is the ordinary consequence of a common declaration,
+ * and treating the nominal size as a hard count meant a hand with a kong in it
+ * could not be scored at all.
+ */
+export function expectedTileCount(draftState: HandDraft, handSize: number): number {
+  return handSize + 1 + countKongs(draftState);
+}
+
+function isKong(tiles: readonly TileCode[] | undefined): boolean {
+  return !!tiles && tiles.length === 4 && tiles.every((code) => code === tiles[0]);
+}
+
+function countKongs(draftState: HandDraft): number {
+  return draftState.meldGroups.filter((index) => isKong(draftState.groups[index])).length;
+}
+
+/** Four identical tiles sitting in the hand without having been declared. */
+function undeclaredFourOfAKind(draftState: HandDraft): boolean {
+  const declared = new Set(draftState.meldGroups);
+  const counts = new Map<TileCode, number>();
+  draftState.groups.forEach((group, index) => {
+    if (declared.has(index)) return;
+    for (const code of group) counts.set(code, (counts.get(code) ?? 0) + 1);
   });
-  if (start !== -1) spans.push([start, nextFlags.length - 1]);
-
-  updateDraft(applyExposedSpans(nextTiles, spans));
+  for (const n of counts.values()) if (n >= 4) return true;
+  return false;
 }
 
 export function buildHandInput(
@@ -324,9 +424,12 @@ export function buildHandInput(
   const concealed: TileCode[] = [];
 
   draftState.groups.forEach((group, index) => {
-    const exposed = draftState.meldGroups.includes(index);
-    if (exposed) {
-      const meld = classifyMeld(group, false);
+    if (draftState.meldGroups.includes(index)) {
+      // Concealed is only ever honoured for a kong: it is the one meld a player
+      // sets down without showing, and the one the rulesets pay differently.
+      const concealedDeclaration =
+        draftState.concealedMelds.includes(index) && isKong(group);
+      const meld = classifyMeld(group, concealedDeclaration);
       if (meld) {
         melds.push(meld);
         return;

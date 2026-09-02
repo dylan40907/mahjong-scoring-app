@@ -9,7 +9,6 @@ import {
   Row,
   Screen,
   Section,
-  Stepper,
   Toggle,
 } from '@/design/components';
 import { space } from '@/design/tokens';
@@ -47,20 +46,6 @@ export default function SettingsScreen() {
             hint="Run the detection model on capture. Turn off to enter every hand by hand."
             value={settings.detectionEnabled}
             onChange={(detectionEnabled) => updateSettings({ detectionEnabled })}
-          />
-          <Divider inset={space.lg} />
-          <Row
-            title="Flag tiles below"
-            subtitle="Detections under this confidence are marked for checking."
-            trailing={
-              <Stepper
-                value={Math.round(settings.confidenceThreshold * 100)}
-                min={30}
-                max={95}
-                step={5}
-                onChange={(value) => updateSettings({ confidenceThreshold: value / 100 })}
-              />
-            }
           />
         </Panel>
       </Section>

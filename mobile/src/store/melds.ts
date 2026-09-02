@@ -1,7 +1,7 @@
 import type { TileCode } from '@/tiles/tileset';
 
 /**
- * Turning "these tiles were exposed" into groups the scorer understands.
+ * Turning "these tiles were declared" into groups the scorer understands.
  *
  * Which tiles are melded cannot be recovered from a photograph. Spacing is the
  * only clue and it is often absent - a player who pushes their hand together
@@ -10,90 +10,129 @@ import type { TileCode } from '@/tiles/tileset';
  * not guessing: an exposed hand scores differently from a concealed one under
  * every ruleset here.
  *
- * So the player says. Everything starts concealed, they mark the runs they
- * melded, and this converts that into the group shape `buildHandInput` reads.
- * A span is contiguous in reading order because a declared meld is physically
- * set down together.
+ * So the player says. Everything starts concealed and unclaimed, they mark the
+ * runs they declared, and this converts that into the group shape
+ * `buildHandInput` reads. A mark is contiguous in reading order because a
+ * declared meld is physically set down together.
+ *
+ * A declaration carries whether it was concealed, which is not a detail. A
+ * concealed kong is set down like any other meld and is still part of a
+ * concealed hand: in Riichi it leaves riichi, menzen tsumo and pinfu intact
+ * and is worth double the fu of a melded one, and Taiwanese and MCR both pay
+ * it more. Treating every declaration as exposed - which this used to do -
+ * quietly deleted all of that.
  */
 
 /** Inclusive tile-index range, in the order the hand is displayed. */
-export type Span = readonly [number, number];
+export interface DeclaredMeld {
+  readonly start: number;
+  readonly end: number;
+  /**
+   * Declared from four tiles held in hand: set down, but never shown.
+   *
+   * Only a kong can be both declared and concealed. A concealed run or triplet
+   * is simply still in the hand, and the decomposer finds those on its own.
+   */
+  readonly concealed: boolean;
+}
 
 export interface Grouping {
   groups: TileCode[][];
-  /** Indices into `groups` that are exposed melds. */
+  /** Indices into `groups` that are declared melds. */
   meldGroups: number[];
+  /** The subset of `meldGroups` that were declared concealed. */
+  concealedMelds: number[];
 }
 
 /** Normalise, drop empties, sort, and merge anything overlapping or touching. */
-export function normaliseSpans(spans: readonly Span[], tileCount: number): Span[] {
-  const clamped = spans
-    .map(([a, b]): Span => [Math.max(0, Math.min(a, b)), Math.min(tileCount - 1, Math.max(a, b))])
-    .filter(([a, b]) => a <= b && a < tileCount && b >= 0)
-    .sort((left, right) => left[0] - right[0]);
+export function normaliseMelds(melds: readonly DeclaredMeld[], tileCount: number): DeclaredMeld[] {
+  const clamped = melds
+    .map((meld) => ({
+      start: Math.max(0, Math.min(meld.start, meld.end)),
+      end: Math.min(tileCount - 1, Math.max(meld.start, meld.end)),
+      concealed: meld.concealed,
+    }))
+    .filter((meld) => meld.start <= meld.end && meld.start < tileCount && meld.end >= 0)
+    .sort((left, right) => left.start - right.start);
 
-  const merged: Span[] = [];
-  for (const span of clamped) {
+  const merged: DeclaredMeld[] = [];
+  for (const meld of clamped) {
     const last = merged[merged.length - 1];
-    // Adjacent spans merge too: two melds declared side by side with no tile
+    // Adjacent marks merge too: two melds declared side by side with no tile
     // between them cannot be told apart later, so treating them as one run and
     // letting the size check reject it is more honest than silently splitting.
-    if (last && span[0] <= last[1] + 1) {
-      merged[merged.length - 1] = [last[0], Math.max(last[1], span[1])];
+    if (last && meld.start <= last.end + 1) {
+      merged[merged.length - 1] = {
+        start: last.start,
+        end: Math.max(last.end, meld.end),
+        // A merged run is only concealed if everything in it was.
+        concealed: last.concealed && meld.concealed,
+      };
     } else {
-      merged.push(span);
+      merged.push(meld);
     }
   }
   return merged;
 }
 
 /**
- * Split a flat hand into groups, with the marked spans as exposed melds and
- * everything between them concealed.
+ * Split a flat hand into groups, with the marked runs as declared melds and
+ * everything between them concealed and in hand.
  */
-export function applyExposedSpans(
+export function applyDeclaredMelds(
   tiles: readonly TileCode[],
-  spans: readonly Span[],
+  melds: readonly DeclaredMeld[],
 ): Grouping {
-  const ranges = normaliseSpans(spans, tiles.length);
+  const ranges = normaliseMelds(melds, tiles.length);
   const groups: TileCode[][] = [];
   const meldGroups: number[] = [];
+  const concealedMelds: number[] = [];
 
   let cursor = 0;
-  for (const [start, end] of ranges) {
-    if (start > cursor) groups.push(tiles.slice(cursor, start));
-    groups.push(tiles.slice(start, end + 1));
+  for (const meld of ranges) {
+    if (meld.start > cursor) groups.push(tiles.slice(cursor, meld.start));
+    groups.push(tiles.slice(meld.start, meld.end + 1));
     meldGroups.push(groups.length - 1);
-    cursor = end + 1;
+    if (meld.concealed) concealedMelds.push(groups.length - 1);
+    cursor = meld.end + 1;
   }
   if (cursor < tiles.length) groups.push(tiles.slice(cursor));
 
   // A hand with no melds is still one group, so the review screen always has
   // something to render.
   if (groups.length === 0) groups.push([]);
-  return { groups, meldGroups };
+  return { groups, meldGroups, concealedMelds };
 }
 
-/** The spans currently marked exposed, in flat tile indices. */
-export function spansFromGrouping(grouping: Grouping): Span[] {
-  const spans: Span[] = [];
+/** The declarations currently marked, in flat tile indices. */
+export function declaredMelds(grouping: Grouping): DeclaredMeld[] {
+  const melds: DeclaredMeld[] = [];
   let offset = 0;
   grouping.groups.forEach((group, index) => {
     if (grouping.meldGroups.includes(index) && group.length > 0) {
-      spans.push([offset, offset + group.length - 1]);
+      melds.push({
+        start: offset,
+        end: offset + group.length - 1,
+        concealed: grouping.concealedMelds.includes(index),
+      });
     }
     offset += group.length;
   });
-  return spans;
+  return melds;
 }
 
-/** Every tile index covered by an exposed span. */
-export function exposedIndices(spans: readonly Span[]): Set<number> {
+/** Every tile index covered by a declaration. */
+export function meldedIndices(melds: readonly DeclaredMeld[]): Set<number> {
   const set = new Set<number>();
-  for (const [start, end] of spans) {
-    for (let i = start; i <= end; i += 1) set.add(i);
+  for (const meld of melds) {
+    for (let i = meld.start; i <= meld.end; i += 1) set.add(i);
   }
   return set;
+}
+
+/** Tile indices belonging to a declaration that was concealed. */
+export function concealedIndices(melds: readonly DeclaredMeld[]): Set<number> {
+  return meldedIndices(melds.filter((meld) => meld.concealed));
 }
 
 /**

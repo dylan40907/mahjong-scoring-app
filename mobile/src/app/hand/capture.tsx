@@ -9,7 +9,9 @@ import { colors, radius, space } from '@/design/tokens';
 import { findRuleSet, useAppState } from '@/store/store';
 import { getDraft, updateDraft } from '@/store/draft';
 import { orderDetections } from '@/vision/ordering';
-import { handBoundary, withinBoundary } from '@/vision/boundary';
+import { fullFrame } from '@/vision/boundary';
+import { CAPTURE_ASPECT } from '@/vision/frame';
+import { cropToFrame } from '@/lib/photos';
 import {
   detectTiles,
   isVisionSupported,
@@ -20,11 +22,18 @@ import {
 /**
  * Capture.
  *
- * The preview is framed rather than full-bleed, with a guide rule across the
- * middle. A full-screen viewfinder looks more impressive and works worse here:
+ * The preview is framed rather than full-bleed, and the frame is the whole
+ * point. A full-screen viewfinder looks more impressive and works worse here:
  * the single biggest thing the user can do for accuracy is lay the hand out
  * straight and fill the frame with it, and a bare camera says nothing about
  * either.
+ *
+ * The frame is also a contract. The photograph is cropped to it before
+ * anything else happens, so what the user framed is what gets read, what gets
+ * saved with the hand, and what the review screen shows. It used to be a
+ * suggestion - the app photographed the whole sensor and then went looking for
+ * the hand inside it - which is why tiles nobody had pointed the camera at
+ * kept turning up in the results.
  *
  * Manual entry is offered from the start, not buried as an error path. Some
  * hands are quicker to type than to photograph, and the app should not insist
@@ -71,20 +80,18 @@ export default function CaptureScreen() {
       setMessage('Reading the tiles…');
       try {
         const result = await detectTiles(uri);
-        // Everything outside the hand is dropped before it can become a tile
-        // the user has to notice and delete.
-        const boundary = handBoundary(result.detections, result.imageWidth, result.imageHeight);
-        const inside = withinBoundary(result.detections, boundary);
-        const ordered = orderDetections(inside);
-
-        const flagged: string[] = [];
-        ordered.groups.forEach((group, groupIndex) => {
-          group.forEach((tile, tileIndex) => {
-            if (tile.confidence < settings.confidenceThreshold) {
-              flagged.push(`${groupIndex}:${tileIndex}`);
-            }
-          });
-        });
+        /*
+         * The boundary starts as the whole picture rather than as a guess.
+         *
+         * Clustering the detections to find the hand was wrong twice over: it
+         * failed quietly on the photographs it mattered for - two rows read as
+         * two clusters, a stacked wall outnumbering the hand - and it second-
+         * guessed a frame the user had already drawn with the camera. Now the
+         * frame is the boundary, and shrinking it is something the user does
+         * deliberately when something strayed into shot.
+         */
+        const boundary = fullFrame(result.imageWidth, result.imageHeight);
+        const ordered = orderDetections(result.detections);
 
         updateDraft({
           groups: ordered.groups.map((group) => group.map((tile) => tile.code)),
@@ -93,11 +100,11 @@ export default function CaptureScreen() {
           // it has erased the spacing the old guess relied on - and guessing
           // wrong changes the score. The player marks them on the review screen.
           meldGroups: [],
-          detections: inside,
+          concealedMelds: [],
+          detections: result.detections,
           boundary,
           imageWidth: result.imageWidth,
           imageHeight: result.imageHeight,
-          flagged,
         });
       } catch (error) {
         // Detection failing is not a dead end - it just means the hand gets
@@ -112,7 +119,7 @@ export default function CaptureScreen() {
         router.replace('/hand/review');
       }
     },
-    [router, settings.confidenceThreshold, settings.detectionEnabled],
+    [router, settings.detectionEnabled],
   );
 
   const takePhoto = async () => {
@@ -120,7 +127,11 @@ export default function CaptureScreen() {
     setBusy(true);
     try {
       const photo = await camera.current.takePictureAsync({ quality: 0.9, skipProcessing: false });
-      if (photo?.uri) await process(photo.uri);
+      if (!photo?.uri) return;
+      // Cropped here rather than anywhere later: this is the only moment the
+      // frame the user was looking at is still known.
+      const framed = await cropToFrame(photo.uri, photo.width, photo.height);
+      await process(framed.uri);
     } catch {
       setMessage('The camera could not take that photo.');
       setBusy(false);
@@ -139,8 +150,8 @@ export default function CaptureScreen() {
 
   const enterManually = () => {
     updateDraft({
-      photoUri: null, groups: [[]], detections: [], boundary: null,
-      imageWidth: 0, imageHeight: 0, flagged: [],
+      photoUri: null, groups: [[]], meldGroups: [], concealedMelds: [],
+      detections: [], boundary: null, imageWidth: 0, imageHeight: 0,
     });
     setCaptured(null);
     router.replace('/hand/review');
@@ -151,8 +162,8 @@ export default function CaptureScreen() {
       <View style={styles.intro}>
         <Title>Lay the hand out flat</Title>
         <Body tone="muted" style={styles.introBody}>
-          Fill the frame with the tiles and keep the row roughly level. Melds can stay separated —
-          the app will keep them apart.
+          Only what is inside the frame is read, so move any other tiles out of shot. Keep the rows
+          roughly level; melds can stay separated.
         </Body>
       </View>
 
@@ -167,7 +178,11 @@ export default function CaptureScreen() {
           * with no connection to the tiles being read at all.
           */}
         {captured ? (
-          <Image source={{ uri: captured }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          /* `contain`, not `cover`: a photograph from the library was never
+             cropped to this frame, and showing it filled would crop it on
+             screen only - claiming the tiles at the edges were not read when
+             they were. */
+          <Image source={{ uri: captured }} style={StyleSheet.absoluteFill} resizeMode="contain" />
         ) : cameraReady ? (
           <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" />
         ) : (
@@ -198,6 +213,8 @@ export default function CaptureScreen() {
           </Caption>
         )}
       </View>
+
+      <View style={styles.spacer} />
 
       <View style={styles.actions}>
         {cameraReady ? (
@@ -237,16 +254,26 @@ const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as c
 
 const styles = StyleSheet.create({
   intro: { paddingTop: space.sm, gap: space.sm },
+  spacer: { flex: 1 },
   introBody: { maxWidth: 420 },
+  /**
+   * Shaped, not stretched.
+   *
+   * The frame is the crop, so it has to be a shape rather than whatever space
+   * the screen had left over - otherwise the same hand photographed on a tall
+   * phone and a short one would be cropped differently. Two rows of 3:4 tiles
+   * is about 3:1, so a frame near that is filled by the hand instead of by the
+   * table around it.
+   */
   frame: {
-    flex: 1,
+    width: '100%',
+    aspectRatio: CAPTURE_ASPECT,
     marginTop: space.xl,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.well,
     overflow: 'hidden',
-    minHeight: 200,
   },
   placeholder: { ...FILL, alignItems: 'center', justifyContent: 'center', gap: space.md },
   placeholderText: { maxWidth: 240 },
