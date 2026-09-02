@@ -13,6 +13,8 @@
  * serialises to plain JSON.
  */
 
+import type { CustomHand } from '../patterns/custom';
+
 export type RuleFamily = 'taiwanese' | 'hongkong' | 'riichi' | 'mcr' | 'custom';
 
 export interface PatternValue {
@@ -113,6 +115,13 @@ export interface RuleSet {
   readonly requiresYaku: boolean;
   /** Pattern id to value. A missing id means the pattern does not score here. */
   readonly patterns: Readonly<Record<string, PatternValue>>;
+  /**
+   * Hands this table made up, described rather than coded.
+   *
+   * Their ids appear in `patterns` like any other, which is what lets them be
+   * turned off or revalued without being deleted.
+   */
+  readonly customHands?: readonly CustomHand[];
   readonly payout: PayoutConfig;
   /** False for user-authored rulesets. */
   readonly builtIn: boolean;

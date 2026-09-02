@@ -77,7 +77,9 @@ export default function RulesScreen() {
           onPress={() => router.push('/rules/edit')}
         />
         <Caption tone="faint" style={styles.note}>
-          Start from any preset, then change what each pattern is worth or turn it off entirely.
+          Start from any preset, then change the hand size, how it is counted, who pays on a
+          discard, and what every pattern is worth. Hands your table made up can be described from
+          scratch.
         </Caption>
       </Section>
     </Screen>

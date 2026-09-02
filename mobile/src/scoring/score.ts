@@ -2,6 +2,7 @@ import { decompose } from './decompose';
 import type { Decomposition, HandInput } from './hand';
 import { buildContext } from './patterns/context';
 import { PATTERNS, type PatternDefinition } from './patterns/library';
+import { toPatternDefinition } from './patterns/custom';
 import {
   faanToPoints,
   isFaan,
@@ -78,6 +79,20 @@ interface Match {
   readonly count: number;
 }
 
+/**
+ * The patterns this ruleset can match: the library, plus its own hands.
+ *
+ * Built per call rather than cached. A ruleset is edited far more often than a
+ * hand is scored, and a stale cache here would silently score the previous
+ * version of a hand somebody had just corrected.
+ */
+export function patternsFor(rules: RuleSet): ReadonlyMap<string, PatternDefinition> {
+  if (!rules.customHands?.length) return PATTERNS;
+  const map = new Map(PATTERNS);
+  for (const hand of rules.customHands) map.set(hand.id, toPatternDefinition(hand));
+  return map;
+}
+
 function collectMatches(
   reading: Decomposition,
   hand: HandInput,
@@ -85,9 +100,10 @@ function collectMatches(
 ): Match[] {
   const ctx = buildContext(hand, reading, rules.handSize);
   const matches: Match[] = [];
+  const library = patternsFor(rules);
 
   for (const [id, rule] of Object.entries(rules.patterns)) {
-    const definition = PATTERNS.get(id);
+    const definition = library.get(id);
     if (!definition) continue;
     if (rule.concealedOnly && !ctx.isConcealed) continue;
     const count = definition.detect(ctx);

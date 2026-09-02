@@ -16,7 +16,7 @@ import {
 } from '@/design/components';
 import { EditIcon, PlusIcon } from '@/design/icons';
 import { colors, space } from '@/design/tokens';
-import { PATTERNS, type PatternValue } from '@/scoring';
+import { PATTERNS, describeCustomHand, type PatternValue } from '@/scoring';
 import { deleteCustomRuleSet, findRuleSet, useAppState } from '@/store/store';
 
 /**
@@ -39,9 +39,10 @@ export default function RuleSetScreen() {
       .map(([patternId, value]) => ({ patternId, value, definition: PATTERNS.get(patternId) }))
       .filter((entry) => entry.definition !== undefined);
 
-    const limits = entries.filter((e) => e.value.limit !== undefined);
+    const own = new Set((rules.customHands ?? []).map((hand) => hand.id));
+    const limits = entries.filter((e) => e.value.limit !== undefined && !own.has(e.patternId));
     const scoring = entries
-      .filter((e) => e.value.limit === undefined)
+      .filter((e) => e.value.limit === undefined && !own.has(e.patternId))
       .sort((a, b) => b.value.value - a.value.value || a.definition!.name.localeCompare(b.definition!.name));
 
     return [
@@ -91,6 +92,11 @@ export default function RuleSetScreen() {
             <Row title="Flowers and seasons" value={rules.usesBonusTiles ? 'In play' : 'Not used'} />
             <Divider inset={space.lg} />
             <Row title="Seven pairs" value={rules.allowSevenPairs ? 'Allowed' : 'Not allowed'} />
+            <Divider inset={space.lg} />
+            <Row
+              title="Thirteen orphans"
+              value={rules.allowThirteenOrphans ? 'Allowed' : 'Not allowed'}
+            />
             {rules.requiresYaku ? (
               <>
                 <Divider inset={space.lg} />
@@ -125,6 +131,40 @@ export default function RuleSetScreen() {
             ) : null}
           </Panel>
         </Section>
+
+        {/*
+          * Hands this table made up, listed before the library's.
+          *
+          * They are the reason somebody built a custom ruleset at all, and
+          * burying them among ninety built-in patterns - where they sort by
+          * value like everything else - hid the one part that is theirs.
+          */}
+        {(rules.customHands ?? []).length > 0 ? (
+          <Section title="Hands this table plays" note={`${rules.customHands!.length}`}>
+            <Panel flush>
+              {rules.customHands!.map((hand, index) => (
+                <View key={hand.id}>
+                  {index > 0 ? <Divider inset={space.lg} /> : null}
+                  <View style={styles.pattern}>
+                    <View style={styles.patternBody}>
+                      <Body>{hand.name}</Body>
+                      <Caption tone="faint">{hand.description}</Caption>
+                      <Caption tone="muted">{describeCustomHand(hand)}</Caption>
+                    </View>
+                    {rules.patterns[hand.id] ? (
+                      <PatternValueLabel
+                        value={rules.patterns[hand.id]}
+                        unit={unitAbbrev(rules.payout.model)}
+                      />
+                    ) : (
+                      <Caption tone="faint">Off</Caption>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </Panel>
+          </Section>
+        ) : null}
 
         {grouped.map((group) => (
           <Section key={group.title} title={group.title} note={`${group.entries.length}`}>

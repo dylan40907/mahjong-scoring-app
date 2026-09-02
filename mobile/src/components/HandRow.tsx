@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { PanResponder, PanResponderInstance, StyleSheet, View } from 'react-native';
 import { TileFace } from '@/design/components';
 import { colors, radius, space } from '@/design/tokens';
@@ -62,6 +62,8 @@ interface GestureContext {
   onPaint: (indices: Set<number>) => void;
   setLifted: (index: number | null) => void;
   setOver: (index: number | null) => void;
+  /** Refresh the row's screen position, then run the callback. */
+  remeasure: (after?: () => void) => void;
 }
 
 /** Which slot a point inside the row lands in, accounting for wrapping. */
@@ -104,14 +106,26 @@ function makeResponder(context: { current: GestureContext }): PanResponderInstan
 
     onPanResponderGrant: (event) => {
       const state = context.current;
-      if (state.mode !== 'exposed') return;
-      const index = at(event.nativeEvent.pageX, event.nativeEvent.pageY);
-      // The first tile touched decides the whole stroke: starting on a marked
-      // tile erases, starting on an unmarked one marks. Toggling tile by tile
-      // would make a stroke that crosses its own path undo itself.
-      state.painting = !state.exposed.has(index);
-      state.painted = new Set();
-      paintFrom(index);
+      const { pageX, pageY } = event.nativeEvent;
+      /*
+       * Re-measure before deciding anything.
+       *
+       * Gesture coordinates are screen-relative, so the row's own position on
+       * screen is what turns them into a tile index - and that changes every
+       * time the page scrolls, which layout does not report. Measuring here
+       * costs a frame before the stroke starts and is the difference between
+       * painting the tile under the finger and painting one two rows away.
+       */
+      state.remeasure(() => {
+        if (state.mode !== 'exposed') return;
+        const index = at(pageX, pageY);
+        // The first tile touched decides the whole stroke: starting on a
+        // marked tile erases, starting on an unmarked one marks. Toggling tile
+        // by tile would make a stroke that crosses its own path undo itself.
+        state.painting = !state.exposed.has(index);
+        state.painted = new Set();
+        paintFrom(index);
+      });
     },
 
     onPanResponderMove: (event) => {
@@ -184,7 +198,23 @@ export function HandRow({
     onPaint,
     setLifted,
     setOver,
+    remeasure: () => undefined,
   });
+
+  // Only ever touches refs, so it is stable and safe to hand to the gesture
+  // context; the assignment itself happens in the effect below, after render.
+  const measure = useCallback((after?: () => void) => {
+    const node = row.current;
+    if (!node?.measureInWindow) {
+      after?.();
+      return;
+    }
+    node.measureInWindow((x, y) => {
+      context.current.originX = x ?? 0;
+      context.current.originY = y ?? 0;
+      after?.();
+    });
+  }, []);
 
   useEffect(() => {
     context.current.count = tiles.length;
@@ -193,7 +223,8 @@ export function HandRow({
     context.current.exposed = exposed;
     context.current.onReorder = onReorder;
     context.current.onPaint = onPaint;
-  }, [tiles.length, perRow, mode, exposed, onReorder, onPaint]);
+    context.current.remeasure = measure;
+  }, [tiles.length, perRow, mode, exposed, onReorder, onPaint, measure]);
 
   /*
    * See HandBoundary for the same pattern: a PanResponder has to outlive the
@@ -203,19 +234,14 @@ export function HandRow({
   // eslint-disable-next-line react-hooks/refs
   const [responder] = useState(() => makeResponder(context));
 
-  const measure = () => {
-    // Gesture coordinates are screen-relative, so the row's own screen
-    // position is what turns them into a tile index. `measureInWindow` on the
-    // ref rather than `currentTarget.measure`, which the web renderer does not
-    // always provide; a failure just leaves the last known origin in place.
-    row.current?.measureInWindow?.((x, y) => {
-      context.current.originX = x ?? 0;
-      context.current.originY = y ?? 0;
-    });
-  };
-
+  /*
+   * `measureInWindow` on the ref rather than `currentTarget.measure`, which the
+   * web renderer does not always provide. A failure leaves the last known
+   * origin in place and still runs the callback, so a gesture is never simply
+   * swallowed.
+   */
   return (
-    <View ref={row} style={styles.row} onLayout={measure} {...responder.panHandlers}>
+    <View ref={row} style={styles.row} onLayout={() => measure()} {...responder.panHandlers}>
       {tiles.map((code, index) => (
         <View
           key={`${code}-${index}`}

@@ -33,10 +33,28 @@ import {
  * silently drops that rule from a user's saved configuration.
  */
 
+/**
+ * Where a pattern belongs in the editor.
+ *
+ * Only the editor cares - the scorer treats every pattern the same - but it is
+ * the difference between a screen you can find something on and ninety rows in
+ * one list. `situational` and `bonus` are what most tables actually argue
+ * about; the hand shapes are a long tail behind an expander.
+ */
+export type PatternGroup =
+  | 'situational'
+  | 'bonus'
+  | 'structural'
+  | 'honours'
+  | 'suits'
+  | 'custom';
+
 export interface PatternDefinition {
   readonly id: string;
   readonly name: string;
   readonly description: string;
+  /** Filled in when the list is assembled; individual entries do not set it. */
+  readonly group?: PatternGroup;
   /**
    * Patterns whose meaning is entirely contained in this one. When both match,
    * only the superseding pattern scores. Big Three Dragons already implies two
@@ -1070,11 +1088,59 @@ const situational: PatternDefinition[] = [
   },
 ];
 
+/**
+ * Patterns that score bonus tiles rather than the hand.
+ *
+ * They sit among the situational ones in source order because that is where
+ * they were written, but they are the first thing a table changes - whether a
+ * flower pays regardless of seat is the single most common house rule - so the
+ * editor gives them their own section.
+ */
+const BONUS_IDS = new Set([
+  'flower-tiles',
+  'seat-flower',
+  'seat-season',
+  'all-flowers',
+  'all-seasons',
+  'all-eight-bonus',
+  'no-flowers',
+]);
+
+/**
+ * Patterns about the *circumstances* of a win rather than the shape of a hand.
+ *
+ * They are defined among the structural ones because that is where a hand's
+ * concealment naturally sits when you are writing detectors. In the editor it
+ * is the wrong place: "was anything claimed" is the same kind of question as
+ * "was it self-drawn", and a table arguing about what a concealed hand is
+ * worth should not have to go looking for it under hand shapes.
+ */
+const SITUATIONAL_IDS = new Set([
+  'concealed-hand',
+  'fully-concealed-hand',
+  'melded-hand',
+  'ready-on-deal',
+  'early-win-nine',
+  'early-win-five',
+  'winning-hand',
+  'chicken-hand',
+]);
+
+function groupOf(id: string, fallback: PatternGroup): PatternGroup {
+  if (BONUS_IDS.has(id)) return 'bonus';
+  if (SITUATIONAL_IDS.has(id)) return 'situational';
+  return fallback;
+}
+
+function grouped(list: PatternDefinition[], group: PatternGroup): PatternDefinition[] {
+  return list.map((pattern) => ({ ...pattern, group: groupOf(pattern.id, group) }));
+}
+
 export const PATTERN_LIST: readonly PatternDefinition[] = [
-  ...structural,
-  ...honours,
-  ...suits,
-  ...situational,
+  ...grouped(situational, 'situational'),
+  ...grouped(structural, 'structural'),
+  ...grouped(honours, 'honours'),
+  ...grouped(suits, 'suits'),
 ];
 
 export const PATTERNS: ReadonlyMap<string, PatternDefinition> = new Map(
