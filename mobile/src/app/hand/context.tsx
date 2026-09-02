@@ -223,7 +223,13 @@ export default function HandContextScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Button label="Score the Hand" variant="primary" block disabled={!ready} onPress={proceed} />
+        <Button
+          label="Photograph the Hand"
+          variant="primary"
+          block
+          disabled={!ready}
+          onPress={proceed}
+        />
       </View>
     </Screen>
   );

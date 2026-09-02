@@ -242,33 +242,31 @@ async function main() {
 
   await page.getByText('Self-drawn', { exact: true }).click();
   await page.waitForTimeout(700);
-  await shoot(page, '10-capture');
+  await shoot(page, '10-context');
+
+  // Circumstances are asked before the camera now, so this button leads to it.
+  await page.getByText('Photograph the Hand', { exact: true }).last().click();
+  await page.waitForTimeout(700);
+  await shoot(page, '11-capture');
 
   await page.getByText('Enter tiles by hand', { exact: true }).click();
   await page.waitForTimeout(700);
-  await shoot(page, '11-review-empty');
+  await shoot(page, '12-review-empty');
 
   for (const label of HAND) await addTile(page, label);
   await page.waitForTimeout(400);
-  await shoot(page, '12-review-filled');
+  await shoot(page, '13-review-filled');
 
   // Choose the winning tile.
   await page.getByText('Choose', { exact: true }).first().click();
   await page.waitForTimeout(300);
   await page.getByLabel('Red Dragon', { exact: true }).last().click();
   await page.waitForTimeout(400);
-  await shoot(page, '13-review-complete');
+  await shoot(page, '14-review-complete');
 
-  await page.getByText('Continue', { exact: true }).click();
-  await page.waitForTimeout(800);
-  await shoot(page, '14-context');
-
-  // Say who discarded, or the hand cannot be scored.
-  await page.getByText('Jo', { exact: true }).last().click();
-  await page.waitForTimeout(300);
-  await shoot(page, '14b-context-ready');
-
-  await page.getByText('Score the Hand', { exact: true }).click();
+  // The review screen scores directly: who won and how were settled before the
+  // photograph was ever taken.
+  await page.getByText('Score the Hand', { exact: true }).last().click();
   await page.waitForTimeout(900);
   await shoot(page, '15-result');
 

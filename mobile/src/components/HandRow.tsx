@@ -151,7 +151,10 @@ export function HandRow({
   const onLayout = (event: LayoutChangeEvent) => {
     // Gesture coordinates are screen-relative, so the row's own screen
     // position is what turns them into a tile index.
-    event.currentTarget.measure?.((_x, _y, _w, _h, pageX, pageY) =>
+    // `currentTarget` is not always a measurable node - the web renderer does
+    // not provide one - and a drag is a native gesture anyway, so failing to
+    // measure just means the row keeps its last known origin.
+    event.currentTarget?.measure?.((_x, _y, _w, _h, pageX, pageY) =>
       setOrigin({ x: pageX ?? 0, y: pageY ?? 0 }),
     );
   };

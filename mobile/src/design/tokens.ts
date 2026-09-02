@@ -19,43 +19,47 @@
  *   Dark only. A half-considered light theme reads worse than a committed
  *   dark one, and the subject is a table lit from above at night.
  *
- * The greens in the neutral ramp are barely there - a few points of hue in
- * near-black - but they keep the bone white of the tiles reading as warm.
+ * The ramp is green, and not subtly. The subject is a game played on baize, and
+ * a neutral near-black said nothing about it while making the whole app read as
+ * a utility. Deep jade costs no legibility - the bone white of a tile face and
+ * the brass of a score both gain contrast against it - and it means every
+ * screen belongs to the same object without any screen having to decorate
+ * itself to prove it.
  */
 
 export const colors = {
   /** Screen background. */
-  ground: '#0F1412',
+  ground: '#0B1714',
   /** Rows, panels, anything sitting on the ground. */
-  surface: '#161D1A',
+  surface: '#13251F',
   /** Raised or pressed state of a surface. */
-  surfaceHigh: '#1E2723',
+  surfaceHigh: '#1A3229',
   /** Input fields and wells, which sit *below* the surface. */
-  well: '#0B0F0E',
+  well: '#07110E',
 
-  line: '#28312D',
-  lineStrong: '#38433E',
+  line: '#22423A',
+  lineStrong: '#2F594C',
 
   /** Warm off-white, picked to sit next to the bone of a tile face. */
-  ink: '#ECEAE4',
-  inkMuted: '#97A09A',
-  inkFaint: '#646E68',
+  ink: '#F1EFE7',
+  inkMuted: '#9CB3AA',
+  inkFaint: '#6A8179',
 
   /** The single accent. */
-  brass: '#C9A227',
-  brassDim: '#9A7C1D',
-  brassWash: 'rgba(201, 162, 39, 0.12)',
+  brass: '#E3B63E',
+  brassDim: '#B28F24',
+  brassWash: 'rgba(227, 182, 62, 0.14)',
   onBrass: '#120E05',
 
   /** Score movement. Muted on purpose - these appear in lists, in quantity. */
-  gain: '#7FB68E',
-  loss: '#CE8168',
+  gain: '#5FCB8B',
+  loss: '#E28D66',
 
   /** Destructive actions only. */
-  danger: '#C4695A',
+  danger: '#E0685A',
 
   /** Tile face, for placeholders and the capture overlay. */
-  bone: '#F1EDE4',
+  bone: '#F6F2E9',
   overlay: 'rgba(9, 12, 11, 0.72)',
 
   /**
@@ -67,11 +71,11 @@ export const colors = {
    * as a panel until it is. The green is desaturated well below a real baize
    * so it sits in a dark room rather than glowing out of it.
    */
-  felt: '#123227',
-  feltHigh: '#17402F',
-  feltLine: '#1D4C39',
+  felt: '#17492F',
+  feltHigh: '#1D5738',
+  feltLine: '#2C6E4B',
   /** Warm rim around the baize, the wood of the table edge. */
-  rim: '#4A3A24',
+  rim: '#5A462A',
 } as const;
 
 export const space = {
