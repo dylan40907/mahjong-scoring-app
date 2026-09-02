@@ -16,7 +16,6 @@ import { colors, radius, space, tileSize } from '@/design/tokens';
 import { TilePicker } from '@/components/TilePicker';
 import { HandBoundary } from '@/components/HandBoundary';
 import { HandRow, type HandRowMode } from '@/components/HandRow';
-import { concealedIndices, meldedIndices, type DeclaredMeld } from '@/store/melds';
 import { withinBoundary } from '@/vision/boundary';
 import { detectTiles } from '@/vision/detector';
 import { orderDetections } from '@/vision/ordering';
@@ -25,12 +24,11 @@ import type { TileCode } from '@/tiles/tileset';
 import { TILE_BY_CODE, isBonus } from '@/tiles/tileset';
 import {
   appendTile,
-  declaredMeldsOf,
-  handTiles,
-  reorderTile,
-  setDeclaredMelds,
+  exposedSet,
   removeBonus,
   removeTileAt,
+  reorderTile,
+  setExposed,
   setTileAt,
   updateDraft,
   useDraft,
@@ -75,9 +73,8 @@ export default function ReviewScreen() {
       const inside = withinBoundary(result.detections, draft.boundary);
       const ordered = orderDetections(inside);
       updateDraft({
-        groups: ordered.groups.map((group) => group.map((tile) => tile.code)),
-        meldGroups: [],
-        concealedMelds: [],
+        tiles: ordered.groups.flat().map((tile) => tile.code),
+        exposed: [],
         detections: inside,
         imageWidth: result.imageWidth,
         imageHeight: result.imageHeight,
@@ -92,31 +89,23 @@ export default function ReviewScreen() {
   /** The tile the picker is editing. -1 means it is adding a new one. */
   const [picker, setPicker] = useState<number | null>(null);
 
-  const validation = useMemo(() => validateDraft(draft, handSize), [draft, handSize]);
-
-  /** The hand as one row; groups exist for the scorer, not for the player. */
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- groups is the only input
-  const tiles = useMemo(() => handTiles(draft), [draft.groups]);
-  const melds = useMemo(
-    () => declaredMeldsOf(draft),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- these three are the only inputs
-    [draft.groups, draft.meldGroups, draft.concealedMelds],
+  const validation = useMemo(
+    () =>
+      validateDraft(draft, handSize, {
+        allowSevenPairs: rules?.allowSevenPairs,
+        allowThirteenOrphans: rules?.allowThirteenOrphans,
+      }),
+    [draft, handSize, rules?.allowSevenPairs, rules?.allowThirteenOrphans],
   );
-  const declaredSet = useMemo(() => meldedIndices(melds), [melds]);
-  const concealedSet = useMemo(() => concealedIndices(melds), [melds]);
+
+  const tiles = draft.tiles;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- exposed is the only input
+  const melded = useMemo(() => exposedSet(draft), [draft.exposed]);
 
   const winningIndex = useMemo(
     () => (draft.winningTile ? tiles.indexOf(draft.winningTile) : null),
     [tiles, draft.winningTile],
   );
-
-  const [meldStart, setMeldStart] = useState<number | null>(null);
-
-  /** Four identical tiles set down together: the one meld that can be concealed. */
-  const isKong = (meld: DeclaredMeld) => {
-    const run = tiles.slice(meld.start, meld.end + 1);
-    return run.length === 4 && run.every((code) => code === run[0]);
-  };
 
   const handleTilePress = (index: number) => {
     if (mode === 'winning') {
@@ -124,40 +113,6 @@ export default function ReviewScreen() {
       setMode('edit');
       return;
     }
-
-    if (mode === 'melds') {
-      const covering = melds.findIndex((meld) => index >= meld.start && index <= meld.end);
-      if (covering >= 0) {
-        /*
-         * Tapping a marked meld cycles it rather than only clearing it.
-         *
-         * A kong has a third state - set down, but never shown - and it is not
-         * a nicety: a concealed kong leaves a Riichi hand closed, so riichi,
-         * menzen tsumo and pinfu all survive it, and Taiwanese and MCR both
-         * pay it more than a melded one. A dedicated control for it would have
-         * been meaningless for every meld that is not four of a kind.
-         */
-        const meld = melds[covering];
-        setDeclaredMelds(
-          !meld.concealed && isKong(meld)
-            ? melds.map((m, i) => (i === covering ? { ...m, concealed: true } : m))
-            : melds.filter((_m, i) => i !== covering),
-        );
-        setMeldStart(null);
-        return;
-      }
-      if (meldStart === null) {
-        setMeldStart(index);
-      } else {
-        setDeclaredMelds([
-          ...melds,
-          { start: Math.min(meldStart, index), end: Math.max(meldStart, index), concealed: false },
-        ]);
-        setMeldStart(null);
-      }
-      return;
-    }
-
     setPicker(index);
   };
 
@@ -230,14 +185,20 @@ export default function ReviewScreen() {
         ) : null}
 
         <View style={styles.statusRow}>
-          <CaptionStrong tone={validation.tileCount === validation.expected ? 'muted' : 'loss'} numeric>
-            {validation.tileCount} of {validation.expected} tiles
+          {/*
+            * A complete hand states its size; an incomplete one states its
+            * target. Kongs are counted rather than declared, so eighteen tiles
+            * is an answer here rather than a counting error - but only once
+            * the tiles actually make a kong, which is what `complete` knows.
+            */}
+          <CaptionStrong tone={validation.complete ? 'muted' : 'loss'} numeric>
+            {validation.complete
+              ? `${validation.tileCount} tiles`
+              : `${validation.tileCount} of ${validation.nominal} tiles`}
           </CaptionStrong>
-          {/* Says *why* the target moved, so an eighteen-tile hand does not
-              look like a counting error. */}
           {validation.kongs > 0 ? (
             <Caption tone="muted">
-              {validation.kongs === 1 ? 'one kong' : `${validation.kongs} kongs`} declared
+              including {validation.kongs === 1 ? 'a kong' : `${validation.kongs} kongs`}
             </Caption>
           ) : null}
         </View>
@@ -245,24 +206,24 @@ export default function ReviewScreen() {
         <Section
           title={
             mode === 'winning' ? 'Tap the winning tile'
-            : mode === 'melds' ? 'Mark what you declared'
+            : mode === 'exposed' ? 'Sweep across what you melded'
             : 'The hand'
           }
           icon={
             mode === 'winning' ? <TrophyIcon size={15} color={colors.brass} />
-            : mode === 'melds' ? <MeldIcon size={15} color={colors.brass} />
+            : mode === 'exposed' ? <MeldIcon size={15} color={colors.melded} />
             : <MeldIcon size={15} color={colors.inkFaint} />
           }
           first
         >
           <HandRow
             tiles={tiles}
-            declared={declaredSet}
-            concealed={concealedSet}
+            exposed={melded}
             selectedTile={winningIndex}
             mode={mode}
             onTilePress={handleTilePress}
             onReorder={reorderTile}
+            onPaint={setExposed}
           />
 
           <View style={styles.handActions}>
@@ -275,21 +236,16 @@ export default function ReviewScreen() {
               <PlusIcon size={20} color={colors.inkFaint} />
             </Pressable>
             <Button
-              label={mode === 'melds' ? 'Done' : 'Declared melds'}
+              label={mode === 'exposed' ? 'Done' : 'Melded tiles'}
               variant="ghost"
-              onPress={() => {
-                setMeldStart(null);
-                setMode(mode === 'melds' ? 'edit' : 'melds');
-              }}
+              onPress={() => setMode(mode === 'exposed' ? 'edit' : 'exposed')}
             />
           </View>
 
           <Caption tone="faint" style={styles.hint}>
-            {mode === 'melds'
-              ? meldStart === null
-                ? 'Tap the first tile of a meld you set down. Tap a marked meld again to change it — a kong goes to concealed, anything else clears.'
-                : 'Now tap the last tile of that meld.'
-              : 'Tap a tile to correct it, or hold and drag to move it. Everything stays in hand unless you mark it declared.'}
+            {mode === 'exposed'
+              ? 'Drag a finger across every tile you had already set down. Sweep them again to clear.'
+              : 'Tap a tile to correct it, or hold and drag to move it. Everything counts as still in hand unless you mark it melded.'}
           </Caption>
         </Section>
 

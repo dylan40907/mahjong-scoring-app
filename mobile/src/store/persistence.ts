@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { CustomRuleSet } from '@/scoring';
-import { DEFAULT_SETTINGS, type Session, type Settings } from './types';
+import { DEFAULT_SETTINGS, type Session, type Settings, type StoredHand } from './types';
 
 /**
  * Persistence.
@@ -21,7 +21,21 @@ const KEYS = {
   settings: 'mj.settings',
 } as const;
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
+
+/**
+ * Bring a hand written by an older build forward.
+ *
+ * Version 1 stored the melds the player had drawn by hand. The scorer works
+ * the grouping out for itself now and only wants to know which tiles were on
+ * the table, so the old groups flatten into one bag and nothing is lost - the
+ * boundaries between them were never information the engine could trust.
+ */
+function migrateHand(hand: StoredHand): StoredHand {
+  if (hand.exposed) return hand;
+  const exposed = (hand.melds ?? []).flatMap((meld) => [...meld.tiles]);
+  return { ...hand, exposed, melds: undefined };
+}
 
 async function readJson<T>(key: string, fallback: T): Promise<T> {
   try {
@@ -59,7 +73,12 @@ export async function loadAll(): Promise<{
   await writeJson(KEYS.version, SCHEMA_VERSION);
 
   return {
-    sessions: Array.isArray(sessions) ? sessions.filter(isPlausibleSession) : [],
+    sessions: Array.isArray(sessions)
+      ? sessions.filter(isPlausibleSession).map((session) => ({
+          ...session,
+          hands: session.hands.map((record) => ({ ...record, hand: migrateHand(record.hand) })),
+        }))
+      : [],
     customRuleSets: Array.isArray(customRuleSets) ? customRuleSets : [],
     settings: { ...DEFAULT_SETTINGS, ...settings },
   };

@@ -94,13 +94,12 @@ export default function CaptureScreen() {
         const ordered = orderDetections(result.detections);
 
         updateDraft({
-          groups: ordered.groups.map((group) => group.map((tile) => tile.code)),
-          // Nothing is assumed exposed. Which tiles were melded cannot be read
+          tiles: ordered.groups.flat().map((tile) => tile.code),
+          // Nothing is assumed melded. Which tiles were set down cannot be read
           // from a photograph - a player who tidies their hand before you take
           // it has erased the spacing the old guess relied on - and guessing
-          // wrong changes the score. The player marks them on the review screen.
-          meldGroups: [],
-          concealedMelds: [],
+          // wrong changes the score. The player paints them on the review screen.
+          exposed: [],
           detections: result.detections,
           boundary,
           imageWidth: result.imageWidth,
@@ -150,7 +149,7 @@ export default function CaptureScreen() {
 
   const enterManually = () => {
     updateDraft({
-      photoUri: null, groups: [[]], meldGroups: [], concealedMelds: [],
+      photoUri: null, tiles: [], exposed: [],
       detections: [], boundary: null, imageWidth: 0, imageHeight: 0,
     });
     setCaptured(null);

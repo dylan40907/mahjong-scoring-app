@@ -70,11 +70,24 @@ export interface HandContext {
   readonly readyOnDeal?: boolean;
 }
 
+/**
+ * A hand as the player can actually report it.
+ *
+ * Two bags of tiles and no grouping. Which tiles form which meld is something
+ * the scorer works out - see `decompose` - because it is a parsing problem and
+ * the player is a bad parser: melds get pushed together before a photograph,
+ * a concealed kong is set down without ever being shown, and being asked to
+ * draw the boundaries is being asked to do the engine's job badly.
+ *
+ * The one thing only the player knows is which tiles were *melded before the
+ * win*, because that is a fact about the game rather than about the tiles, and
+ * a great many patterns halve or vanish because of it.
+ */
 export interface HandInput {
-  /** Concealed tiles at the moment of winning, including the winning tile. */
+  /** Tiles still in hand at the moment of winning, including the winning tile. */
   readonly concealed: readonly TileCode[];
-  /** Exposed melds, plus any declared concealed kong. */
-  readonly melds: readonly Meld[];
+  /** Tiles melded before the win, ungrouped. */
+  readonly exposed: readonly TileCode[];
   /** Flowers and seasons, set aside from the hand proper. */
   readonly bonus: readonly TileCode[];
   readonly winningTile: TileCode;
@@ -124,7 +137,7 @@ export function meldTiles(melds: readonly Meld[]): TileCode[] {
 
 /** Every tile in the hand proper. Bonus tiles are excluded by definition. */
 export function allHandTiles(hand: HandInput): TileCode[] {
-  return [...hand.concealed, ...meldTiles(hand.melds)];
+  return [...hand.concealed, ...hand.exposed];
 }
 
 /**
@@ -175,9 +188,9 @@ export function hasBonus(tiles: readonly TileCode[]): boolean {
   return tiles.some((code) => isBonus(TILE_BY_CODE[code]));
 }
 
-/** True when no meld was formed by claiming a discard. */
+/** True when nothing was melded before the win. */
 export function isFullyConcealed(hand: HandInput): boolean {
-  return hand.melds.every((meld) => meld.concealed);
+  return hand.exposed.length === 0;
 }
 
 /** The number of sets (excluding the pair) a hand of this size needs. */

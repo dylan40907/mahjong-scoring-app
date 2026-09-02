@@ -13,12 +13,28 @@ import { countTiles, setsForHandSize } from './hand';
  * 2-3-4 needs a 4" and "1-2-3 run plus a pair of 1s", and which one is worth
  * more depends on the ruleset.
  *
- * Search cost is bounded and small. A 17-tile Taiwanese hand has at most a few
- * hundred readings, and the recursion always consumes the lowest remaining
- * tile, so it cannot revisit a state.
+ * The player supplies two bags of tiles - what was in hand, and what had been
+ * melded - and never a grouping. Grouping is what this file is for. Asking the
+ * user to draw the meld boundaries was asking them to do the parser's job, and
+ * it went wrong in the way that request always goes wrong: a concealed kong is
+ * set down but never shown, so "declare your melds" had no honest answer for
+ * it, and the four tiles either vanished from the count or lied about being
+ * exposed.
+ *
+ * Kongs fall out of the arithmetic instead. A kong is four tiles doing the
+ * work of three, so a hand carrying one is one tile over the nominal size and
+ * a hand carrying two is two over - and a kong is the only thing that can do
+ * that, since flowers are set aside before any of this. So the surplus *is*
+ * the number of kongs, and the search simply looks for readings that use that
+ * many. If none exists, the tiles do not form a hand, which is a far better
+ * answer than scoring a grouping the player was talked into.
+ *
+ * Search cost is bounded. Every branch consumes the lowest remaining tile, so
+ * no state is reachable twice, and both bags are capped.
  */
 
 const MAX_DECOMPOSITIONS = 512;
+const MAX_PARTITIONS = 256;
 
 // ---------------------------------------------------------------------------
 // Standard shape: N sets plus one pair
@@ -53,27 +69,45 @@ function lowestTile(counts: Counts): TileCode | null {
 }
 
 /**
- * Split `counts` into exactly `need` sets, returning every distinct way.
+ * Every way to consume `counts` entirely into sets, with none left over.
  *
  * Always works on the lowest remaining tile: any valid set containing it must
- * start with it (a chow cannot have it in the middle or at the top, or a lower
- * tile would still be present), so the two branches below are exhaustive.
+ * start with it - a chow cannot have it in the middle or at the top, or a
+ * lower tile would still be present - so the three branches below are
+ * exhaustive and no arrangement is reached twice.
  */
-function enumerateSets(counts: Counts, need: number, acc: Meld[], out: Meld[][]): void {
-  if (out.length >= MAX_DECOMPOSITIONS) return;
-  if (need === 0) {
-    if (counts.size === 0) out.push([...acc]);
+function partitionSets(
+  counts: Counts,
+  concealed: boolean,
+  acc: Meld[],
+  out: Meld[][],
+): void {
+  if (out.length >= MAX_PARTITIONS) return;
+  const head = lowestTile(counts);
+  if (head === null) {
+    out.push([...acc]);
     return;
   }
-  const head = lowestTile(counts);
-  if (head === null) return;
+
+  const available = counts.get(head) ?? 0;
+
+  // Kong. Tried before the triplet so that a reading using the kong is found
+  // first, but both survive: four identical tiles are sometimes a kong and
+  // sometimes a triplet with the fourth tile spent inside a run.
+  if (available >= 4) {
+    const next = cloneCounts(counts);
+    take(next, head, 4);
+    acc.push({ kind: 'kong', tiles: [head, head, head, head], concealed });
+    partitionSets(next, concealed, acc, out);
+    acc.pop();
+  }
 
   // Triplet.
-  if ((counts.get(head) ?? 0) >= 3) {
+  if (available >= 3) {
     const next = cloneCounts(counts);
     take(next, head, 3);
-    acc.push({ kind: 'pung', tiles: [head, head, head], concealed: true });
-    enumerateSets(next, need - 1, acc, out);
+    acc.push({ kind: 'pung', tiles: [head, head, head], concealed });
+    partitionSets(next, concealed, acc, out);
     acc.pop();
   }
 
@@ -87,28 +121,56 @@ function enumerateSets(counts: Counts, need: number, acc: Meld[], out: Meld[][])
       take(next, head, 1);
       take(next, second, 1);
       take(next, third, 1);
-      acc.push({ kind: 'chow', tiles: [head, second, third], concealed: true });
-      enumerateSets(next, need - 1, acc, out);
+      acc.push({ kind: 'chow', tiles: [head, second, third], concealed });
+      partitionSets(next, concealed, acc, out);
       acc.pop();
     }
   }
 }
 
-function standardReadings(concealed: readonly TileCode[], setsNeeded: number): { sets: Meld[]; pair: Meld }[] {
+interface StandardReading {
+  readonly sets: Meld[];
+  readonly pair: Meld;
+}
+
+/**
+ * Readings of the standard shape: `sets` sets and one pair.
+ *
+ * The two bags are partitioned independently and then paired up, which is what
+ * enforces the one rule the player cannot break: a meld is either on the table
+ * or in the hand, never half of each. It also means the pair can only come
+ * from the concealed bag, because a pair is never set down.
+ */
+function standardReadings(
+  concealed: readonly TileCode[],
+  exposed: readonly TileCode[],
+  sets: number,
+): StandardReading[] {
+  const exposedPartitions: Meld[][] = [];
+  partitionSets(countTiles(exposed), false, [], exposedPartitions);
+  if (exposedPartitions.length === 0) return [];
+
   const counts = countTiles(concealed);
-  const readings: { sets: Meld[]; pair: Meld }[] = [];
+  const readings: StandardReading[] = [];
 
   for (const [code, n] of counts) {
     if (n < 2) continue;
     const remaining = cloneCounts(counts);
     take(remaining, code, 2);
-    const found: Meld[][] = [];
-    enumerateSets(remaining, setsNeeded, [], found);
-    for (const sets of found) {
-      readings.push({
-        sets,
-        pair: { kind: 'pair', tiles: [code, code], concealed: true },
-      });
+
+    const concealedPartitions: Meld[][] = [];
+    partitionSets(remaining, true, [], concealedPartitions);
+    if (concealedPartitions.length === 0) continue;
+
+    for (const inHand of concealedPartitions) {
+      for (const onTable of exposedPartitions) {
+        if (onTable.length + inHand.length !== sets) continue;
+        readings.push({
+          sets: [...onTable, ...inHand],
+          pair: { kind: 'pair', tiles: [code, code], concealed: true },
+        });
+        if (readings.length >= MAX_DECOMPOSITIONS) return readings;
+      }
     }
   }
   return readings;
@@ -167,7 +229,7 @@ function thirteenOrphansReading(concealed: readonly TileCode[]): Meld[] | null {
     if (!isTerminalOrHonour(TILE_BY_CODE[code])) return null;
   }
   return [...counts.entries()].map(([code, n]) => ({
-    kind: n === 2 ? ('pair' as const) : ('pair' as const),
+    kind: 'pair' as const,
     tiles: n === 2 ? [code, code] : [code],
     concealed: true,
   }));
@@ -203,6 +265,28 @@ export interface DecomposeOptions {
   readonly allowThirteenOrphans?: boolean;
 }
 
+function handTiles(hand: HandInput): { concealed: TileCode[]; exposed: TileCode[] } {
+  return {
+    concealed: hand.concealed.filter((code) => !isBonus(TILE_BY_CODE[code])),
+    exposed: hand.exposed.filter((code) => !isBonus(TILE_BY_CODE[code])),
+  };
+}
+
+/**
+ * How many kongs a hand of this size must contain, or null if no number works.
+ *
+ * A kong is the only thing that can push a hand past its nominal size - every
+ * other tile is either part of a set, part of the pair, or a flower, and
+ * flowers were set aside long before this. So the surplus is the kong count,
+ * and a surplus larger than the number of sets in the hand is simply not a
+ * hand.
+ */
+export function kongsImpliedBy(tileCount: number, handSize: number): number | null {
+  const surplus = tileCount - (handSize + 1);
+  if (surplus < 0 || surplus > setsForHandSize(handSize)) return null;
+  return surplus;
+}
+
 /**
  * Every valid reading of a winning hand.
  *
@@ -210,24 +294,19 @@ export interface DecomposeOptions {
  * which is how callers detect an incomplete or mis-entered hand.
  */
 export function decompose(hand: HandInput, options: DecomposeOptions): Decomposition[] {
-  const concealed = hand.concealed.filter((code) => !isBonus(TILE_BY_CODE[code]));
-  const declaredSets = hand.melds.length;
-  const setsNeeded = setsForHandSize(options.handSize) - declaredSets;
+  const { concealed, exposed } = handTiles(hand);
+  const sets = setsForHandSize(options.handSize);
   const results: Decomposition[] = [];
 
-  if (setsNeeded >= 0) {
-    const expected = setsNeeded * 3 + 2;
-    if (concealed.length === expected) {
-      for (const { sets, pair } of standardReadings(concealed, setsNeeded)) {
-        const melds = [...hand.melds, ...sets, pair];
-        results.push(...withWinningMeld(melds, pair, hand.winningTile, undefined));
-      }
+  if (kongsImpliedBy(concealed.length + exposed.length, options.handSize) !== null) {
+    for (const { sets: found, pair } of standardReadings(concealed, exposed, sets)) {
+      results.push(...withWinningMeld([...found, pair], pair, hand.winningTile, undefined));
     }
   }
 
   // Special shapes are all-concealed by definition: you cannot claim a tile
   // into seven pairs or thirteen orphans and still have the shape.
-  if (options.allowSevenPairs !== false && declaredSets === 0) {
+  if (options.allowSevenPairs !== false && exposed.length === 0) {
     if (options.handSize === 16) {
       /*
        * The Taiwanese analogue is seven pairs *plus a triplet*, not eight
@@ -243,12 +322,54 @@ export function decompose(hand: HandInput, options: DecomposeOptions): Decomposi
     }
   }
 
-  if (options.allowThirteenOrphans !== false && declaredSets === 0 && options.handSize === 13) {
+  if (
+    options.allowThirteenOrphans !== false &&
+    exposed.length === 0 &&
+    options.handSize === 13
+  ) {
     const orphans = thirteenOrphansReading(concealed);
     if (orphans) results.push(...withWinningMeld(orphans, null, hand.winningTile, 'thirteen-orphans'));
   }
 
   return dedupe(results);
+}
+
+/**
+ * Whether these tiles form a complete hand at all, ignoring which tile won it.
+ *
+ * The review screen needs this before a winning tile has been chosen: it is
+ * what turns "18 of 17 tiles" into either "one kong" or "these tiles do not
+ * make a hand", and it is the only honest way to answer that, since whether
+ * the surplus tile is a kong depends on the rest of the hand.
+ */
+export function formsCompleteHand(
+  concealed: readonly TileCode[],
+  exposed: readonly TileCode[],
+  options: DecomposeOptions,
+): boolean {
+  const clean = {
+    concealed: concealed.filter((code) => !isBonus(TILE_BY_CODE[code])),
+    exposed: exposed.filter((code) => !isBonus(TILE_BY_CODE[code])),
+  };
+  const total = clean.concealed.length + clean.exposed.length;
+
+  if (kongsImpliedBy(total, options.handSize) !== null) {
+    const sets = setsForHandSize(options.handSize);
+    if (standardReadings(clean.concealed, clean.exposed, sets).length > 0) return true;
+  }
+  if (clean.exposed.length > 0) return false;
+
+  if (options.allowSevenPairs !== false) {
+    if (options.handSize === 16) {
+      if (eightPairsTripletReading(clean.concealed)) return true;
+    } else if (sevenPairsReading(clean.concealed, 7)) {
+      return true;
+    }
+  }
+  if (options.allowThirteenOrphans !== false && options.handSize === 13) {
+    if (thirteenOrphansReading(clean.concealed)) return true;
+  }
+  return false;
 }
 
 /**

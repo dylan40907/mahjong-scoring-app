@@ -111,7 +111,7 @@ const context: HandContext = {
 };
 
 function hand(concealed: TileCode[], winningTile: TileCode, extra: Partial<HandContext> = {}): HandInput {
-  return { concealed, melds: [], bonus: [], winningTile, context: { ...context, ...extra } };
+  return { concealed, exposed: [], bonus: [], winningTile, context: { ...context, ...extra } };
 }
 
 describe('scored hands settle to zero', () => {

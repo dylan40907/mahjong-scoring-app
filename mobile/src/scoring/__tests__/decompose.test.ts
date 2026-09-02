@@ -12,10 +12,10 @@ const baseContext: HandContext = {
 function hand(
   concealed: TileCode[],
   winningTile: TileCode,
-  melds: Meld[] = [],
+  exposed: TileCode[] = [],
   context: Partial<HandContext> = {},
 ): HandInput {
-  return { concealed, melds, bonus: [], winningTile, context: { ...baseContext, ...context } };
+  return { concealed, exposed, bonus: [], winningTile, context: { ...baseContext, ...context } };
 }
 
 /** Compact reading description, for asserting on structure without noise. */
@@ -87,13 +87,10 @@ describe('standard decomposition', () => {
     expect(decompose(hand(tiles, 'north'), { handSize: 13, allowSevenPairs: false })).toHaveLength(0);
   });
 
-  it('accounts for exposed melds when counting the sets still needed', () => {
-    const melds: Meld[] = [
-      { kind: 'pung', tiles: ['green', 'green', 'green'], concealed: false },
-      { kind: 'chow', tiles: ['pin1', 'pin2', 'pin3'], concealed: false },
-    ];
+  it('accounts for melded tiles when counting the sets still needed', () => {
+    const exposed: TileCode[] = ['green', 'green', 'green', 'pin1', 'pin2', 'pin3'];
     const tiles: TileCode[] = ['man1', 'man2', 'man3', 'sou7', 'sou8', 'sou9', 'west', 'west'];
-    const readings = decompose(hand(tiles, 'sou9', melds), { handSize: 13 });
+    const readings = decompose(hand(tiles, 'sou9', exposed), { handSize: 13 });
     expect(readings.length).toBeGreaterThan(0);
     expect(readings[0].melds).toHaveLength(5);
   });

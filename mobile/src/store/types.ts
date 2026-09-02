@@ -19,7 +19,16 @@ export interface SessionPlayer {
 /** The scoring inputs, in a form safe to serialise. */
 export interface StoredHand {
   readonly concealed: TileCode[];
-  readonly melds: Meld[];
+  /**
+   * Tiles melded before the win, ungrouped.
+   *
+   * Optional because records written before the scorer started working out
+   * the grouping for itself stored `melds` instead; `migrateHand` flattens
+   * those on load so an old session still opens.
+   */
+  readonly exposed?: TileCode[];
+  /** @deprecated Superseded by `exposed`. Read on load, never written. */
+  readonly melds?: Meld[];
   readonly bonus: TileCode[];
   readonly winningTile: TileCode;
   readonly context: HandContext;

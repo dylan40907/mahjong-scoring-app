@@ -26,10 +26,20 @@ import { CAPTURE_ASPECT } from '@/vision/frame';
  * The box starts as the whole picture, because the picture has already been
  * cropped to the frame the user aimed. Dragging a corner in is a correction,
  * not a confirmation, so there is nothing to do here in the ordinary case.
+ *
+ * Which is exactly why the corners have to be reachable when it *is* the
+ * ordinary case. The photograph used to be clipped to a rounded rectangle and
+ * the handles drawn inside it, so at the default full-frame box all four
+ * handles were half-eaten by the corner radius and the two on the right were
+ * effectively untouchable. The image is clipped; the overlay is not. It sits
+ * in a container inset by half a handle, which is space the handles need and
+ * nothing else uses.
  */
 
 /** Touch target for a corner, comfortably past the 44pt minimum at the edges. */
 const HANDLE_HIT = 44;
+/** Room around the photograph for the half of each handle that overhangs it. */
+const INSET = HANDLE_HIT / 2;
 
 type Corner = 'tl' | 'tr' | 'bl' | 'br';
 const CORNERS: Corner[] = ['tl', 'tr', 'bl', 'br'];
@@ -118,7 +128,9 @@ function handlePosition(
 ) {
   const x = corner === 'tl' || corner === 'bl' ? placed.left : placed.left + placed.width;
   const y = corner === 'tl' || corner === 'tr' ? placed.top : placed.top + placed.height;
-  return { left: x - HANDLE_HIT / 2, top: y - HANDLE_HIT / 2 };
+  // Handles live in the outer container, which is inset by half a handle, so
+  // the image-space position has to be shifted into it.
+  return { left: x + INSET - HANDLE_HIT / 2, top: y + INSET - HANDLE_HIT / 2 };
 }
 
 export function HandBoundary({
@@ -172,12 +184,20 @@ export function HandBoundary({
   const placed = fit && boundary ? placeBox(boundary, fit) : null;
 
   return (
-    <View style={styles.photo} onLayout={(event: LayoutChangeEvent) => setLayout(event.nativeEvent.layout)}>
-      <Image source={{ uri }} style={styles.photoImage} resizeMode="contain" />
+    <View style={styles.frame}>
+      <View
+        style={styles.photo}
+        onLayout={(event: LayoutChangeEvent) => setLayout(event.nativeEvent.layout)}
+      >
+        <Image source={{ uri }} style={styles.photoImage} resizeMode="contain" />
+      </View>
 
       {placed ? (
         <>
-          <View pointerEvents="none" style={[styles.boundary, placed]} />
+          <View
+            pointerEvents="none"
+            style={[styles.boundary, { left: placed.left + INSET, top: placed.top + INSET, width: placed.width, height: placed.height }]}
+          />
           {CORNERS.map((corner) => (
             <View
               key={corner}
@@ -196,12 +216,13 @@ export function HandBoundary({
 }
 
 const styles = StyleSheet.create({
+  /** Holds the overlay, and is the only thing that does not clip. */
+  frame: { marginTop: space.sm, padding: INSET },
   // The same shape the capture frame was, so a photograph taken in the app
   // fills it exactly and one chosen from the library letterboxes honestly.
   photo: {
     width: '100%',
     aspectRatio: CAPTURE_ASPECT,
-    marginTop: space.sm,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.line,

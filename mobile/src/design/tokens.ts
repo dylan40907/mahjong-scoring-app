@@ -56,6 +56,18 @@ export const colors = {
 
   /** The single accent. */
   brass: '#F5C63C',
+  /**
+   * Tiles that were melded before the win.
+   *
+   * The one marker that is deliberately not brass. Brass already means "the
+   * thing this screen is about" - the primary action, the score, the dealer's
+   * seat - and using it for a second, unrelated state made the two impossible
+   * to tell apart at a glance on the screen where both appear. Blue rather
+   * than an arbitrary fifth colour because the wind tiles are printed in it,
+   * so the marker belongs to the subject instead of to the palette.
+   */
+  melded: '#4FC9E8',
+  meldedWash: 'rgba(79, 201, 232, 0.18)',
   brassDim: '#C79E27',
   brassWash: 'rgba(245, 198, 60, 0.16)',
   onBrass: '#16120A',

@@ -25,6 +25,8 @@ export interface TileFaceProps {
   onLongPress?: () => void;
   /** Draws the brass selection ring. */
   selected?: boolean;
+  /** Draws the melded ring, in the blue that means "this was on the table". */
+  marked?: boolean;
   style?: ViewStyle;
   accessibilityLabel?: string;
   accessibilityHint?: string;
@@ -36,6 +38,7 @@ export function TileFace({
   onPress,
   onLongPress,
   selected,
+  marked,
   style,
   accessibilityLabel,
   accessibilityHint,
@@ -51,6 +54,7 @@ export function TileFace({
       style={[
         styles.face,
         box,
+        marked && styles.marked,
         selected && styles.selected,
         style,
       ]}
@@ -152,6 +156,7 @@ const styles = StyleSheet.create({
   },
   image: { width: '100%', height: '100%' },
   selected: { borderColor: colors.brass, borderWidth: 2 },
+  marked: { borderColor: colors.melded, borderWidth: 2 },
   pressed: { opacity: 0.7, transform: [{ scale: 0.97 }] },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md, alignItems: 'center' },
   group: { flexDirection: 'row', gap: 2 },

@@ -111,7 +111,7 @@ describe('every ruleset scores a plain hand', () => {
       const concealed = rules.handSize === 16 ? sixteen : thirteen;
       const hand: HandInput = {
         concealed,
-        melds: [],
+        exposed: [],
         bonus: [],
         winningTile: 'man4',
         context,

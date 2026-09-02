@@ -95,7 +95,7 @@ export default function ResultScreen() {
       discarderId: draft.discarderId,
       hand: {
         concealed: [...input.concealed],
-        melds: [...input.melds],
+        exposed: [...input.exposed],
         bonus: draft.bonus,
         winningTile: draft.winningTile,
         context: draft.context as HandContext,

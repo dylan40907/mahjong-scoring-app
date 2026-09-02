@@ -1,5 +1,5 @@
 import type { TileCode } from '@/tiles/tileset';
-import type { HandContext, HandInput, Meld } from '../hand';
+import type { HandContext, HandInput } from '../hand';
 import { scoreHand } from '../score';
 import {
   CHINESE_OFFICIAL,
@@ -19,11 +19,11 @@ const defaults: HandContext = {
 function hand(
   concealed: TileCode[],
   winningTile: TileCode,
-  options: { melds?: Meld[]; bonus?: TileCode[]; context?: Partial<HandContext> } = {},
+  options: { exposed?: TileCode[]; bonus?: TileCode[]; context?: Partial<HandContext> } = {},
 ): HandInput {
   return {
     concealed,
-    melds: options.melds ?? [],
+    exposed: options.exposed ?? [],
     bonus: options.bonus ?? [],
     winningTile,
     context: { ...defaults, ...options.context },
@@ -98,8 +98,7 @@ describe('Riichi scoring', () => {
       'west', 'west', 'west',
       'north', 'north',
     ];
-    const melds: Meld[] = [];
-    const result = scoreHand(hand(tiles, 'sou3', { melds }), RIICHI);
+    const result = scoreHand(hand(tiles, 'sou3'), RIICHI);
     expect(result.valid).toBe(false);
     expect(result.reason).toMatch(/no yaku/i);
   });
@@ -118,14 +117,14 @@ describe('Riichi scoring', () => {
   });
 
   it('halves an open half flush and still scores it', () => {
-    const melds: Meld[] = [{ kind: 'pung', tiles: ['green', 'green', 'green'], concealed: false }];
+    const exposed: TileCode[] = ['green', 'green', 'green'];
     const tiles: TileCode[] = [
       'sou1', 'sou2', 'sou3',
       'sou4', 'sou5', 'sou6',
       'sou7', 'sou8', 'sou9',
       'sou2', 'sou2',
     ];
-    const result = scoreHand(hand(tiles, 'sou9', { melds }), RIICHI);
+    const result = scoreHand(hand(tiles, 'sou9', { exposed }), RIICHI);
     const halfFlush = result.patterns.find((p) => p.id === 'half-flush');
     expect(halfFlush?.unitValue).toBe(2); // 3 closed, 2 open
   });

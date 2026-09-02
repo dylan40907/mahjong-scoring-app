@@ -1,11 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  LayoutChangeEvent,
-  PanResponder,
-  PanResponderInstance,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { PanResponder, PanResponderInstance, StyleSheet, View } from 'react-native';
 import { TileFace } from '@/design/components';
 import { colors, radius, space } from '@/design/tokens';
 import { TILE_BY_CODE, type TileCode } from '@/tiles/tileset';
@@ -15,45 +9,57 @@ import { TILE_BY_CODE, type TileCode } from '@/tiles/tileset';
  *
  * One row rather than the detector's groups. Which tiles sit together in a
  * photograph says nothing reliable about which were melded - a player who
- * pushes their hand tidy before you photograph it has erased the spacing - so
- * the grouping is something the player states here rather than something the
- * geometry claims.
+ * pushes their hand tidy before you photograph it has erased the spacing - and
+ * which tiles form which set is the scorer's job anyway.
  *
- * Reordering has no mode and no button. Hold a tile and it lifts; drag and the
- * others part around it; let go and it lands. Order does not affect the score
- * at all, so it should cost nothing to use and nothing to ignore - putting it
- * behind a mode switch advertised it as a step, which it is not.
+ * Two gestures share the row, and which one is live depends on the mode.
+ *
+ * In edit mode, holding a tile lifts it and dragging moves it; order does not
+ * affect the score at all, so it costs nothing to use and nothing to ignore.
+ *
+ * In exposed mode, a drag *paints*. The player sweeps a finger across the
+ * tiles they had already set down and they light up as it passes. This
+ * replaced tapping the first tile of a meld and then its last, which asked for
+ * two precise taps per meld, made the player think in meld boundaries, and had
+ * no answer at all for a concealed kong.
  */
 
-export type HandRowMode = 'edit' | 'melds' | 'winning';
+export type HandRowMode = 'edit' | 'exposed' | 'winning';
 
 const TILE_WIDTH = 34;
 const GAP = 4;
 const STRIDE = TILE_WIDTH + GAP;
-/** Rows wrap, so a drag has to know which line it is on. */
+/** Rows wrap, so a gesture has to know which line it is on. */
 const ROW_HEIGHT = Math.round(TILE_WIDTH * (4 / 3)) + GAP + 8;
 
 interface Props {
   tiles: readonly TileCode[];
-  /** Tiles belonging to a declared meld. */
-  declared: ReadonlySet<number>;
-  /** Tiles belonging to a declaration that was concealed - a concealed kong. */
-  concealed: ReadonlySet<number>;
+  /** Tiles melded before the win. */
+  exposed: ReadonlySet<number>;
   selectedTile?: number | null;
   mode: HandRowMode;
   perRow?: number;
   onTilePress: (index: number) => void;
   onReorder: (from: number, to: number) => void;
+  /** Exposed mode: the whole new set, as the finger moves. */
+  onPaint: (indices: Set<number>) => void;
 }
 
-interface DragContext {
+interface GestureContext {
   count: number;
   perRow: number;
   originX: number;
   originY: number;
+  mode: HandRowMode;
+  exposed: ReadonlySet<number>;
+  /** Edit mode: the tile a long press picked up, or -1. */
   from: number;
   over: number;
+  /** Exposed mode: whether this stroke is adding or erasing. */
+  painting: boolean;
+  painted: Set<number>;
   onReorder: (from: number, to: number) => void;
+  onPaint: (indices: Set<number>) => void;
   setLifted: (index: number | null) => void;
   setOver: (index: number | null) => void;
 }
@@ -66,68 +72,116 @@ function indexAt(x: number, y: number, count: number, perRow: number): number {
 }
 
 /**
- * Built once so a drag survives the re-renders it causes. Everything mutable is
- * read from the ref at gesture time rather than captured here.
+ * Built once so a gesture survives the re-renders it causes. Everything
+ * mutable is read from the ref at gesture time rather than captured here.
  */
-function makeResponder(context: { current: DragContext }): PanResponderInstance {
+function makeResponder(context: { current: GestureContext }): PanResponderInstance {
+  const at = (pageX: number, pageY: number) => {
+    const { count, perRow, originX, originY } = context.current;
+    return indexAt(pageX - originX, pageY - originY, count, perRow);
+  };
+
+  const paintFrom = (index: number) => {
+    const state = context.current;
+    if (state.painted.has(index)) return;
+    state.painted.add(index);
+    const next = new Set(state.exposed);
+    for (const i of state.painted) {
+      if (state.painting) next.add(i);
+      else next.delete(i);
+    }
+    state.onPaint(next);
+  };
+
   return PanResponder.create({
-    // Claims the gesture only after a long press has lifted a tile, so a plain
-    // tap still reaches the tile underneath and scrolling still scrolls.
-    onStartShouldSetPanResponder: () => context.current.from >= 0,
-    onMoveShouldSetPanResponder: () => context.current.from >= 0,
+    // Exposed mode claims the gesture immediately - the whole interaction is
+    // the drag. Edit mode claims it only after a long press has lifted a tile,
+    // so a plain tap still reaches the tile underneath and a scroll scrolls.
+    onStartShouldSetPanResponder: () =>
+      context.current.mode === 'exposed' || context.current.from >= 0,
+    onMoveShouldSetPanResponder: () =>
+      context.current.mode === 'exposed' || context.current.from >= 0,
+
+    onPanResponderGrant: (event) => {
+      const state = context.current;
+      if (state.mode !== 'exposed') return;
+      const index = at(event.nativeEvent.pageX, event.nativeEvent.pageY);
+      // The first tile touched decides the whole stroke: starting on a marked
+      // tile erases, starting on an unmarked one marks. Toggling tile by tile
+      // would make a stroke that crosses its own path undo itself.
+      state.painting = !state.exposed.has(index);
+      state.painted = new Set();
+      paintFrom(index);
+    },
+
     onPanResponderMove: (event) => {
-      const { count, perRow, originX, originY, from } = context.current;
-      if (from < 0) return;
-      const over = indexAt(
-        event.nativeEvent.pageX - originX,
-        event.nativeEvent.pageY - originY,
-        count,
-        perRow,
-      );
-      if (over !== context.current.over) {
-        context.current.over = over;
-        context.current.setOver(over);
+      const state = context.current;
+      const index = at(event.nativeEvent.pageX, event.nativeEvent.pageY);
+
+      if (state.mode === 'exposed') {
+        paintFrom(index);
+        return;
+      }
+
+      if (state.from < 0) return;
+      if (index !== state.over) {
+        state.over = index;
+        state.setOver(index);
       }
     },
+
     onPanResponderRelease: () => {
-      const { from, over, onReorder, setLifted, setOver } = context.current;
+      const state = context.current;
+      if (state.mode === 'exposed') {
+        state.painted = new Set();
+        return;
+      }
+      const { from, over, onReorder, setLifted, setOver } = state;
       if (from >= 0 && over >= 0 && over !== from) onReorder(from, over);
-      context.current.from = -1;
-      context.current.over = -1;
+      state.from = -1;
+      state.over = -1;
       setLifted(null);
       setOver(null);
     },
+
     onPanResponderTerminate: () => {
-      context.current.from = -1;
-      context.current.over = -1;
-      context.current.setLifted(null);
-      context.current.setOver(null);
+      const state = context.current;
+      state.painted = new Set();
+      state.from = -1;
+      state.over = -1;
+      state.setLifted(null);
+      state.setOver(null);
     },
   });
 }
 
 export function HandRow({
   tiles,
-  declared,
-  concealed,
+  exposed,
   selectedTile,
   mode,
   perRow = 8,
   onTilePress,
   onReorder,
+  onPaint,
 }: Props) {
-  const [origin, setOrigin] = useState({ x: 0, y: 0 });
+  const row = useRef<View>(null);
   const [lifted, setLifted] = useState<number | null>(null);
   const [over, setOver] = useState<number | null>(null);
 
-  const context = useRef<DragContext>({
+  const context = useRef<GestureContext>({
     count: tiles.length,
     perRow,
     originX: 0,
     originY: 0,
+    mode,
+    exposed,
     from: -1,
     over: -1,
+    painting: true,
+    painted: new Set(),
     onReorder,
+    onPaint,
     setLifted,
     setOver,
   });
@@ -135,39 +189,33 @@ export function HandRow({
   useEffect(() => {
     context.current.count = tiles.length;
     context.current.perRow = perRow;
-    context.current.originX = origin.x;
-    context.current.originY = origin.y;
+    context.current.mode = mode;
+    context.current.exposed = exposed;
     context.current.onReorder = onReorder;
-  }, [tiles.length, perRow, origin, onReorder]);
+    context.current.onPaint = onPaint;
+  }, [tiles.length, perRow, mode, exposed, onReorder, onPaint]);
 
   /*
    * See HandBoundary for the same pattern: a PanResponder has to outlive the
-   * renders a drag provokes, so it is created once and reads current values
+   * renders a gesture provokes, so it is created once and reads current values
    * from a ref inside its callbacks. Nothing reads the ref during render.
    */
   // eslint-disable-next-line react-hooks/refs
   const [responder] = useState(() => makeResponder(context));
 
-  const onLayout = (event: LayoutChangeEvent) => {
+  const measure = () => {
     // Gesture coordinates are screen-relative, so the row's own screen
-    // position is what turns them into a tile index.
-    // `currentTarget` is not always a measurable node - the web renderer does
-    // not provide one - and a drag is a native gesture anyway, so failing to
-    // measure just means the row keeps its last known origin.
-    event.currentTarget?.measure?.((_x, _y, _w, _h, pageX, pageY) =>
-      setOrigin({ x: pageX ?? 0, y: pageY ?? 0 }),
-    );
-  };
-
-  const lift = (index: number) => {
-    context.current.from = index;
-    context.current.over = index;
-    setLifted(index);
-    setOver(index);
+    // position is what turns them into a tile index. `measureInWindow` on the
+    // ref rather than `currentTarget.measure`, which the web renderer does not
+    // always provide; a failure just leaves the last known origin in place.
+    row.current?.measureInWindow?.((x, y) => {
+      context.current.originX = x ?? 0;
+      context.current.originY = y ?? 0;
+    });
   };
 
   return (
-    <View style={styles.row} onLayout={onLayout} {...responder.panHandlers}>
+    <View ref={row} style={styles.row} onLayout={measure} {...responder.panHandlers}>
       {tiles.map((code, index) => (
         <View
           key={`${code}-${index}`}
@@ -182,25 +230,34 @@ export function HandRow({
           <TileFace
             code={code}
             width={TILE_WIDTH}
-            selected={mode === 'melds' ? declared.has(index) : selectedTile === index}
-            onPress={() => onTilePress(index)}
-            onLongPress={() => lift(index)}
+            selected={mode === 'winning' && selectedTile === index}
+            marked={exposed.has(index)}
+            // Painting owns the whole gesture; a tap in that mode would fight
+            // the stroke it is part of.
+            onPress={mode === 'exposed' ? undefined : () => onTilePress(index)}
+            onLongPress={mode === 'edit' ? () => lift(context, index, setLifted, setOver) : undefined}
             accessibilityLabel={TILE_BY_CODE[code].label}
-            accessibilityHint="Hold and drag to move this tile"
+            accessibilityHint={
+              mode === 'exposed' ? 'Drag across the tiles you melded' : 'Hold and drag to move this tile'
+            }
           />
-          {/*
-            * Exposed and concealed declarations read differently: a solid rule
-            * for a meld everybody saw, a broken one for a kong that was set
-            * down face down. Same weight, same colour - the difference is what
-            * it says, not how loudly.
-            */}
-          {declared.has(index) && mode !== 'melds' ? (
-            <View style={concealed.has(index) ? styles.concealedBar : styles.declaredBar} />
-          ) : null}
+          {exposed.has(index) && mode !== 'exposed' ? <View style={styles.meldedBar} /> : null}
         </View>
       ))}
     </View>
   );
+}
+
+function lift(
+  context: { current: GestureContext },
+  index: number,
+  setLifted: (i: number | null) => void,
+  setOver: (i: number | null) => void,
+) {
+  context.current.from = index;
+  context.current.over = index;
+  setLifted(index);
+  setOver(index);
 }
 
 const styles = StyleSheet.create({
@@ -213,22 +270,13 @@ const styles = StyleSheet.create({
     marginLeft: -2,
     borderRadius: radius.sm,
   },
-  /** A quiet rule under a tile that was declared, not a second colour. */
-  declaredBar: {
+  /** A quiet rule under a tile that was set down, in the melded colour. */
+  meldedBar: {
     marginTop: 3,
     width: TILE_WIDTH - 8,
     height: 2,
     borderRadius: radius.sm,
-    backgroundColor: colors.brass,
-  },
-  concealedBar: {
-    marginTop: 3,
-    width: TILE_WIDTH - 8,
-    height: 2,
-    borderRadius: radius.sm,
-    borderTopWidth: 2,
-    borderTopColor: colors.brass,
-    borderStyle: 'dashed',
+    backgroundColor: colors.melded,
   },
 });
 
