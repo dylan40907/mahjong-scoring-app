@@ -100,7 +100,7 @@ function SessionCard({ session, onPress }: { session: Session; onPress: () => vo
       style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
     >
       <View style={styles.cardHeader}>
-        <Heading numberOfLines={1} style={styles.cardTitle}>
+        <Heading numberOfLines={2} style={styles.cardTitle}>
           {session.name}
         </Heading>
         <Caption tone="faint">{relativeDate(session.updatedAt)}</Caption>

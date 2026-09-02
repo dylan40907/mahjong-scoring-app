@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { BodyStrong, Caption, CountUp, TileFace } from '@/design/components';
-import { colors, radius, space } from '@/design/tokens';
+import { colors, radius, shadow, space } from '@/design/tokens';
 import type { SessionPlayer } from '@/store/types';
 import type { Wind } from '@/tiles/tileset';
 import { WIND_LABEL } from '@/lib/format';
@@ -115,7 +115,7 @@ function Seat({
          * that handled its own presses left the middle of the card dead to the
          * tap that selects the player, which is the thing you do every hand.
          */
-        <BodyStrong numberOfLines={1}>{player.name}</BodyStrong>
+        <BodyStrong numberOfLines={2}>{player.name}</BodyStrong>
       )}
 
       {/* Ticks from its old value when a hand lands, so you see who moved. */}
@@ -189,6 +189,7 @@ const styles = StyleSheet.create({
    */
   rim: {
     position: 'absolute',
+    ...shadow.raised,
     width: FELT_SIZE,
     height: FELT_SIZE,
     top: SEAT_HEIGHT + space.sm,
@@ -218,6 +219,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     backgroundColor: colors.surface,
     gap: space.xxs,
+    ...shadow.sunken,
   },
   /** The dealer's place is warmer, the way a dealer's seat is marked. */
   seatDealer: { borderColor: colors.brassDim, backgroundColor: colors.surfaceHigh },

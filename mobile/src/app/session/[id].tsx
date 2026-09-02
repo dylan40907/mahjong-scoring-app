@@ -14,7 +14,7 @@ import {
   Section,
   Title,
 } from '@/design/components';
-import { TrashIcon } from '@/design/icons';
+import { HistoryIcon, PlayersIcon, TrashIcon } from '@/design/icons';
 import { colors, radius, space } from '@/design/tokens';
 import {
   allRuleSets,
@@ -224,7 +224,11 @@ export default function SessionScreen() {
           </Panel>
         ) : null}
 
-        <Section title={`Hands`} note={session.hands.length > 0 ? plural(session.hands.length, 'hand') : undefined}>
+        <Section
+          title="Hands"
+          icon={<HistoryIcon size={15} color={colors.inkFaint} />}
+          note={session.hands.length > 0 ? plural(session.hands.length, 'hand') : undefined}
+        >
           {session.hands.length === 0 ? (
             <Panel style={styles.emptyPanel}>
               <Body tone="muted" center>
@@ -260,7 +264,7 @@ export default function SessionScreen() {
           )}
         </Section>
 
-        <Section title="Session">
+        <Section title="Session" icon={<PlayersIcon size={15} color={colors.inkFaint} />}>
           <Button label="Delete session" variant="danger" block onPress={confirmDelete} />
         </Section>
       </ScrollView>
@@ -318,7 +322,9 @@ function HandRow({
           {how} · {relativeDate(hand.createdAt)}
         </Caption>
         {hand.summary.topPatterns.length > 0 ? (
-          <Caption tone="muted" numberOfLines={1} style={styles.patterns}>
+          /* Wraps. This is the one line that says *why* the hand was worth
+             what it was worth, and it was reliably the line that got cut. */
+          <Caption tone="muted" style={styles.patterns}>
             {hand.summary.topPatterns.join(' · ')}
           </Caption>
         ) : null}

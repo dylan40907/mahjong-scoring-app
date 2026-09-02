@@ -11,7 +11,7 @@ import {
   TileFace,
   TileScanner,
 } from '@/design/components';
-import { PlusIcon } from '@/design/icons';
+import { CropIcon, FlowerIcon, MeldIcon, PlusIcon, TrophyIcon } from '@/design/icons';
 import { colors, radius, space, tileSize } from '@/design/tokens';
 import { TilePicker } from '@/components/TilePicker';
 import { HandBoundary } from '@/components/HandBoundary';
@@ -204,10 +204,13 @@ export default function ReviewScreen() {
                 <TileScanner label="Reading that area again…" />
               </View>
             ) : null}
-            <Caption tone="faint" style={styles.photoHint}>
-              Everything in the frame was read. Drag a corner in to leave something out, then read
-              it again.
-            </Caption>
+            <View style={styles.photoHintRow}>
+              <CropIcon size={15} color={colors.inkFaint} />
+              <Caption tone="faint" style={styles.photoHint}>
+                Everything in the frame was read. Drag a corner in to leave something out, then
+                read it again.
+              </Caption>
+            </View>
             <View style={styles.photoActions}>
               <Button
                 label="Retake"
@@ -244,6 +247,11 @@ export default function ReviewScreen() {
             mode === 'winning' ? 'Tap the winning tile'
             : mode === 'melds' ? 'Mark what you declared'
             : 'The hand'
+          }
+          icon={
+            mode === 'winning' ? <TrophyIcon size={15} color={colors.brass} />
+            : mode === 'melds' ? <MeldIcon size={15} color={colors.brass} />
+            : <MeldIcon size={15} color={colors.inkFaint} />
           }
           first
         >
@@ -285,7 +293,7 @@ export default function ReviewScreen() {
           </Caption>
         </Section>
 
-        <Section title="Winning tile">
+        <Section title="Winning tile" icon={<TrophyIcon size={15} color={colors.inkFaint} />}>
           <View style={styles.winning}>
             {draft.winningTile ? (
               <>
@@ -308,7 +316,11 @@ export default function ReviewScreen() {
         </Section>
 
         {rules?.usesBonusTiles ? (
-          <Section title="Flowers & seasons" note={draft.bonus.length === 0 ? 'None' : undefined}>
+          <Section
+            title="Flowers &amp; seasons"
+            icon={<FlowerIcon size={15} color={colors.inkFaint} />}
+            note={draft.bonus.length === 0 ? 'None' : undefined}
+          >
             <View style={styles.bonus}>
               {draft.bonus.map((code, index) => (
                 <TileFace
@@ -383,7 +395,14 @@ const REVIEW_TILE_WIDTH = 34;
 const FOOTER_CLEARANCE = 96;
 
 const styles = StyleSheet.create({
-  photoHint: { marginTop: space.sm, paddingHorizontal: space.xs },
+  photoHintRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: space.sm,
+    marginTop: space.md,
+    paddingHorizontal: space.xs,
+  },
+  photoHint: { flex: 1 },
   photoActions: { flexDirection: 'row', gap: space.sm, marginTop: space.sm },
   photoAction: { flex: 1 },
   addPhoto: { marginTop: space.md },

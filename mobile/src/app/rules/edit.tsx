@@ -137,7 +137,7 @@ export default function RuleEditorScreen() {
                       style={styles.patternBody}
                     >
                       <Body tone={enabled ? 'default' : 'faint'}>{row.definition.name}</Body>
-                      <Caption tone="faint" numberOfLines={2}>
+                      <Caption tone="faint">
                         {row.definition.description}
                       </Caption>
                     </Pressable>

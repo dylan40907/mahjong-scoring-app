@@ -19,7 +19,7 @@ import {
   Section,
   TileRow,
 } from '@/design/components';
-import { AlertIcon } from '@/design/icons';
+import { AlertIcon, CoinsIcon, MeldIcon, SparkIcon } from '@/design/icons';
 import { colors, radius, space, tileSize } from '@/design/tokens';
 import { buildHandInput, resetDraft, useDraft } from '@/store/draft';
 import {
@@ -177,7 +177,7 @@ export default function ResultScreen() {
           </View>
         ) : null}
 
-        <Section title="How it scores" first>
+        <Section title="How it scores" icon={<SparkIcon size={15} color={colors.brass} />} first>
           <Panel flush>
             {result.patterns.map((pattern, index) => (
               <View key={pattern.id}>
@@ -185,9 +185,9 @@ export default function ResultScreen() {
                 <View style={styles.pattern}>
                   <View style={styles.patternBody}>
                     <Body>{pattern.name}</Body>
-                    <Caption tone="faint" numberOfLines={2}>
-                      {pattern.description}
-                    </Caption>
+                    {/* Wraps: a rule you cannot finish reading is not a rule
+                        you can check the score against. */}
+                    <Caption tone="faint">{pattern.description}</Caption>
                   </View>
                   <View style={styles.patternValue}>
                     {pattern.count > 1 ? (
@@ -206,13 +206,13 @@ export default function ResultScreen() {
         </Section>
 
         {result.fu ? (
-          <Section title="Minor points">
+          <Section title="Minor points" icon={<MeldIcon size={15} color={colors.inkFaint} />}>
             <Panel flush>
               {result.fu.lines.map((line, index) => (
                 <View key={`${line.label}-${index}`}>
                   {index > 0 ? <Divider inset={space.lg} /> : null}
                   <View style={styles.fuLine}>
-                    <Body tone="muted" style={styles.fuLabel} numberOfLines={1}>
+                    <Body tone="muted" style={styles.fuLabel}>
                       {line.label}
                     </Body>
                     <CaptionStrong numeric>+{line.fu}</CaptionStrong>
@@ -223,7 +223,7 @@ export default function ResultScreen() {
           </Section>
         ) : null}
 
-        <Section title="Settlement">
+        <Section title="Settlement" icon={<CoinsIcon size={15} color={colors.inkFaint} />}>
           <Panel>
             <Body tone="muted">{result.settlement?.explanation}</Body>
             <View style={styles.settlement}>

@@ -25,42 +25,51 @@
  * the brass of a score both gain contrast against it - and it means every
  * screen belongs to the same object without any screen having to decorate
  * itself to prove it.
+ *
+ * It is also a *lit* jade rather than a jade-tinted black. The first attempt
+ * measured well and looked right in a screenshot on a bright monitor, then
+ * arrived on an actual phone as four shades of almost-black: the hue was
+ * there, but there was not enough light in it to see the hue, and not enough
+ * distance between the steps to see the structure. Every step here is lifted
+ * and given more chroma, and the gap between ground and surface is roughly
+ * doubled, so a panel reads as a raised thing at half brightness in daylight
+ * rather than only in a dark room.
  */
 
 export const colors = {
   /** Screen background. */
-  ground: '#0B1714',
+  ground: '#123A2E',
   /** Rows, panels, anything sitting on the ground. */
-  surface: '#13251F',
+  surface: '#1B4D3B',
   /** Raised or pressed state of a surface. */
-  surfaceHigh: '#1A3229',
+  surfaceHigh: '#26624B',
   /** Input fields and wells, which sit *below* the surface. */
-  well: '#07110E',
+  well: '#0C2C22',
 
-  line: '#22423A',
-  lineStrong: '#2F594C',
+  line: '#357355',
+  lineStrong: '#4A9A73',
 
   /** Warm off-white, picked to sit next to the bone of a tile face. */
-  ink: '#F1EFE7',
-  inkMuted: '#9CB3AA',
-  inkFaint: '#6A8179',
+  ink: '#F4F2E8',
+  inkMuted: '#B6D4C1',
+  inkFaint: '#8AB29B',
 
   /** The single accent. */
-  brass: '#E3B63E',
-  brassDim: '#B28F24',
-  brassWash: 'rgba(227, 182, 62, 0.14)',
-  onBrass: '#120E05',
+  brass: '#F5C63C',
+  brassDim: '#C79E27',
+  brassWash: 'rgba(245, 198, 60, 0.16)',
+  onBrass: '#16120A',
 
-  /** Score movement. Muted on purpose - these appear in lists, in quantity. */
-  gain: '#5FCB8B',
-  loss: '#E28D66',
+  /** Score movement. Bright enough to read at caption size in a list. */
+  gain: '#5FE39B',
+  loss: '#FF9E6E',
 
   /** Destructive actions only. */
-  danger: '#E0685A',
+  danger: '#FF7A67',
 
   /** Tile face, for placeholders and the capture overlay. */
-  bone: '#F6F2E9',
-  overlay: 'rgba(9, 12, 11, 0.72)',
+  bone: '#F8F4EB',
+  overlay: 'rgba(8, 26, 20, 0.76)',
 
   /**
    * The table itself.
@@ -68,14 +77,17 @@ export const colors = {
    * The one place the interface is allowed to look like the object it is
    * about. Everywhere else stays on the neutral ramp; a mahjong table is
    * green baize inside a wooden rim, and a screen standing in for one reads
-   * as a panel until it is. The green is desaturated well below a real baize
-   * so it sits in a dark room rather than glowing out of it.
+   * as a panel until it is.
+   *
+   * Now that the whole app is jade, the baize has to be *brighter* than its
+   * surroundings rather than merely greener, or the table stops being an
+   * object on a screen and becomes a slightly different patch of screen.
    */
-  felt: '#17492F',
-  feltHigh: '#1D5738',
-  feltLine: '#2C6E4B',
+  felt: '#22824F',
+  feltHigh: '#2C9B60',
+  feltLine: '#45BC81',
   /** Warm rim around the baize, the wood of the table edge. */
-  rim: '#5A462A',
+  rim: '#8A6C39',
 } as const;
 
 export const space = {
@@ -119,6 +131,31 @@ export const type = {
 export const tabular = { fontVariant: ['tabular-nums' as const] };
 
 export const hairline = 1;
+
+/**
+ * Elevation, as a shadow rather than as a lighter fill.
+ *
+ * Used on the two things that are genuinely lifted off the page - the primary
+ * action and the table - and nowhere else. A dark interface that shadows
+ * everything ends up looking like it is made of floating cards; one that
+ * shadows nothing at all reads as flat paint, which is what this did.
+ */
+export const shadow = {
+  raised: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  sunken: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.22,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+} as const;
 
 /**
  * Tiles are 3:4. Every place a tile is drawn derives its box from one of

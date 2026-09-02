@@ -17,17 +17,28 @@ import { ChevronRightIcon } from '../icons';
 
 export interface SectionProps extends ViewProps {
   title?: string;
+  /**
+   * A mark beside the heading.
+   *
+   * Only worth having when it is drawn from the game - a wind rose, a flower,
+   * three tiles set down. A generic glyph next to a section label says "this
+   * is a section" twice, which the label already said once.
+   */
+  icon?: React.ReactNode;
   /** Right-aligned note beside the title. */
   note?: string;
   first?: boolean;
 }
 
-export function Section({ title, note, first, style, children, ...rest }: SectionProps) {
+export function Section({ title, icon, note, first, style, children, ...rest }: SectionProps) {
   return (
     <View style={[first ? styles.sectionFirst : styles.section, style]} {...rest}>
       {title ? (
         <View style={styles.sectionHeader}>
-          <Overline>{title.toUpperCase()}</Overline>
+          <View style={styles.sectionTitle}>
+            {icon ? <View style={styles.sectionIcon}>{icon}</View> : null}
+            <Overline>{title.toUpperCase()}</Overline>
+          </View>
           {note ? <Caption tone="faint">{note}</Caption> : null}
         </View>
       ) : null}
@@ -88,8 +99,11 @@ export function Row({
         <Body tone={destructive ? 'loss' : 'default'} numberOfLines={1}>
           {title}
         </Body>
+        {/* Wraps. A hint that ends in an ellipsis with no way to open it is
+            worse than no hint, and every one of these is short enough to
+            simply fit. */}
         {subtitle ? (
-          <Caption tone="faint" numberOfLines={2} style={styles.rowSubtitle}>
+          <Caption tone="faint" style={styles.rowSubtitle}>
             {subtitle}
           </Caption>
         ) : null}
@@ -122,11 +136,13 @@ const styles = StyleSheet.create({
   sectionFirst: { marginTop: space.lg },
   sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: space.md,
     paddingHorizontal: space.xs,
   },
+  sectionTitle: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  sectionIcon: { opacity: 0.9 },
   panel: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -141,6 +157,9 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    // Aligns a wrapping subtitle with its title rather than centring the whole
+    // block against a one-line trailing control.
+    alignSelf: 'stretch',
     gap: space.md,
     minHeight: 52,
     paddingHorizontal: space.lg,

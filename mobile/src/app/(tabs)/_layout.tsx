@@ -13,11 +13,14 @@ export default function TabsLayout() {
         headerShadowVisible: false,
         sceneStyle: { backgroundColor: colors.ground },
         tabBarStyle: {
-          backgroundColor: colors.ground,
+          backgroundColor: colors.well,
           borderTopColor: colors.line,
           borderTopWidth: 1,
         },
-        tabBarActiveTintColor: colors.ink,
+        // The one place navigation is allowed the accent. "Where am I" is a
+        // primary state, and on a screen that is otherwise one hue it is also
+        // the cheapest colour in the app.
+        tabBarActiveTintColor: colors.brass,
         tabBarInactiveTintColor: colors.inkFaint,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600', letterSpacing: 0.1 },
       }}
