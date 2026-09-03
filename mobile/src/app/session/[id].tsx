@@ -1,8 +1,15 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+  type ColorValue,
+} from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  Body,
   BodyStrong,
   Button,
   Caption,
@@ -13,8 +20,10 @@ import {
   Screen,
   Section,
   Title,
+  ChoiceGrid,
+  TileFace,
 } from '@/design/components';
-import { HistoryIcon, PlayersIcon, TrashIcon } from '@/design/icons';
+import { DiscardIcon, HistoryIcon, PlayersIcon, SelfDrawIcon, TrashIcon } from '@/design/icons';
 import { colors, radius, space } from '@/design/tokens';
 import {
   allRuleSets,
@@ -79,18 +88,33 @@ export default function SessionScreen() {
    * ask about.
    */
   const startHand = (discarderId: string | null, selfDrawn: boolean) => {
-    if (!winnerId) return;
+    const winner = session.players.find((player) => player.id === winnerId);
+    if (!winnerId || !winner) return;
     resetDraft({
       sessionId: session.id,
       ruleSetId: session.ruleSetId,
       winnerId,
       discarderId,
-      context: { selfDrawn },
+      /*
+       * The whole scoring context, settled here rather than on a screen of
+       * its own.
+       *
+       * Who won and where the tile came from are the only two things anyone
+       * says out loud at the table, and the seat, the round and the deal all
+       * follow from the winner. That left the old circumstances screen with
+       * nothing to ask that mattered on an ordinary hand - it was a step that
+       * existed to hold a list nobody needed - so what remains of it now sits
+       * above the camera as one closed expander.
+       */
+      context: {
+        selfDrawn,
+        seatWind: winner.seat,
+        roundWind: session.roundWind,
+        isDealer: session.dealerId === winnerId,
+      },
     });
     setWinnerId(null);
-    // Circumstances first, camera second. Everything the scorer needs that a
-    // photograph cannot show is settled while the hand is still on the table.
-    router.push('/hand/context');
+    router.push('/hand/capture');
   };
 
   const confirmDelete = () => {
@@ -191,36 +215,41 @@ export default function SessionScreen() {
           onRename={(playerId, name) => renamePlayer(session.id, playerId, name)}
         />
 
+        {/*
+          * Where the winning tile came from, asked as four faces rather than
+          * as a sentence and a row of name chips.
+          *
+          * Each opponent is shown by their seat tile, which is the same mark
+          * they carry on the table above, so the answer is a picture of the
+          * person's seat rather than a name to read. Self-draw gets the
+          * drawing of a tile coming off the wall - the one option that is not
+          * a person, and the one whose name is hardest to translate.
+          */}
         {winnerId ? (
           <Panel style={styles.askPanel}>
-            <CaptionStrong>
-              {session.players.find((p) => p.id === winnerId)?.name} won. Who discarded?
-            </CaptionStrong>
-            <View style={styles.ruleChips}>
-              {session.players
-                .filter((player) => player.id !== winnerId)
-                .map((player) => (
-                  <Pressable
-                    key={player.id}
-                    accessibilityRole="button"
-                    onPress={() => startHand(player.id, false)}
-                    style={({ pressed }) => [styles.ruleChip, pressed && styles.pressedChip]}
-                  >
-                    <Caption tone="muted">{player.name}</Caption>
-                  </Pressable>
-                ))}
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => startHand(null, true)}
-                style={({ pressed }) => [
-                  styles.ruleChip,
-                  styles.ruleChipOn,
-                  pressed && styles.pressedChip,
-                ]}
-              >
-                <Caption tone="accent">Self-drawn</Caption>
-              </Pressable>
+            <View style={styles.askHead}>
+              <DiscardIcon size={18} color={colors.inkFaint} />
+              <CaptionStrong tone="muted">Winning tile came from</CaptionStrong>
             </View>
+            <ChoiceGrid
+              columns={2}
+              items={[
+                ...session.players
+                  .filter((player) => player.id !== winnerId)
+                  .map((player) => ({
+                    key: player.id,
+                    label: player.name,
+                    icon: () => <TileFace code={player.seat} width={22} />,
+                    onPress: () => startHand(player.id, false),
+                  })),
+                {
+                  key: 'self-draw',
+                  label: 'Self-draw',
+                  icon: (color: ColorValue) => <SelfDrawIcon size={24} color={color} />,
+                  onPress: () => startHand(null, true),
+                },
+              ]}
+            />
           </Panel>
         ) : null}
 
@@ -231,11 +260,9 @@ export default function SessionScreen() {
         >
           {session.hands.length === 0 ? (
             <Panel style={styles.emptyPanel}>
-              <Body tone="muted" center>
-                No hands scored yet.
-              </Body>
+              <PlayersIcon size={26} color={colors.inkFaint} />
               <Caption tone="faint" center style={styles.emptyNote}>
-                Photograph a winning hand and the tiles will be read for you.
+                Tap whoever won
               </Caption>
             </Panel>
           ) : (
@@ -359,6 +386,7 @@ const styles = StyleSheet.create({
   },
   ruleChipOn: { borderColor: colors.brass, backgroundColor: colors.brassWash },
   pressedChip: { backgroundColor: colors.surfaceHigh },
+  askHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   askPanel: { marginTop: space.sm, gap: space.xs, padding: space.md },
   // Clears the fixed action bar so the last row can be scrolled into view.
   content: { paddingHorizontal: space.xl, paddingBottom: 96 },

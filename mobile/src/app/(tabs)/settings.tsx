@@ -43,7 +43,7 @@ export default function SettingsScreen() {
         <Panel flush>
           <Toggle
             label="Read tiles from photos"
-            hint="Run the detection model on capture. Turn off to enter every hand by hand."
+            hint="Turn off to type every hand in."
             value={settings.detectionEnabled}
             onChange={(detectionEnabled) => updateSettings({ detectionEnabled })}
           />
@@ -56,7 +56,7 @@ export default function SettingsScreen() {
           <Divider inset={space.lg} />
           <Toggle
             label="Haptics"
-            hint="A short tap when a hand is scored."
+            hint="A tap when a hand is scored."
             value={settings.hapticsEnabled}
             onChange={(hapticsEnabled) => updateSettings({ hapticsEnabled })}
           />
@@ -75,7 +75,7 @@ export default function SettingsScreen() {
           />
         </Panel>
         <Caption tone="faint" style={styles.note}>
-          Everything stays on this device. Nothing is uploaded, and hands are scored offline.
+          Everything stays on this device. Nothing is uploaded.
         </Caption>
       </Section>
 

@@ -17,6 +17,13 @@ import { colors } from './tokens';
  * a tile turned face down. Those exist because the screens they label are
  * about mahjong and were reading as a form, and a generic glyph on a section
  * heading is worse than no glyph: it says "this is a section" twice.
+ *
+ * The situation icons at the end carry more weight than an icon usually does.
+ * Every name this app has for what happened - kong, meld, self-draw, robbing
+ * a kong - is a translation somebody invented, and none of them is what a
+ * player calls it at their own table. Four identical tiles with one being
+ * pulled out of them needs no translation. So on those screens the picture
+ * does the explaining and the words underneath are only labels.
  */
 
 export interface IconProps {
@@ -254,5 +261,151 @@ export const PlayersIcon = (p: IconProps) => (
     <Circle cx={4.6} cy={12} r={2} />
     <Circle cx={19.4} cy={12} r={2} />
     <Rect x={8.6} y={8.6} width={6.8} height={6.8} rx={1.6} />
+  </Icon>
+);
+
+// ---------------------------------------------------------------------------
+// Situations
+//
+// These are the ones carrying an idea rather than naming a screen, so they are
+// drawn as small diagrams: a thing, and what happened to it.
+// ---------------------------------------------------------------------------
+
+/** The wall, two tiles high, with the last one gone. */
+export const WallIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Rect x={2.6} y={5.4} width={5.4} height={5.6} rx={1.2} />
+    <Rect x={9.3} y={5.4} width={5.4} height={5.6} rx={1.2} />
+    <Rect x={16} y={5.4} width={5.4} height={5.6} rx={1.2} />
+    <Rect x={2.6} y={13} width={5.4} height={5.6} rx={1.2} />
+    <Rect x={9.3} y={13} width={5.4} height={5.6} rx={1.2} />
+    <Path d="M16 13h5.4v5.6H16" strokeDasharray="2 2" />
+  </Icon>
+);
+
+/**
+ * A tile pushed out of the hand.
+ *
+ * One tile and one arrow. The first version was two small tiles joined by a
+ * hairline arc, which at the eighteen pixels it is actually drawn at was a
+ * smudge.
+ */
+export const DiscardIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Rect x={3.4} y={6.6} width={7.4} height={10.8} rx={1.8} />
+    <Path d="M13.8 12h6.8M20.6 12l-2.6-2.6M20.6 12l-2.6 2.6" />
+  </Icon>
+);
+
+/**
+ * A tile lifted straight up out of the wall.
+ *
+ * The arrow points away from the row, because the tile came to the player
+ * rather than being put down - drawn the other way up, this was an inbox.
+ */
+export const SelfDrawIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Rect x={2.2} y={14.4} width={5} height={7} rx={1.2} />
+    <Rect x={9.5} y={14.4} width={5} height={7} rx={1.2} />
+    <Rect x={16.8} y={14.4} width={5} height={7} rx={1.2} />
+    <Rect x={9.5} y={2.6} width={5} height={8.4} rx={1.2} />
+  </Icon>
+);
+
+/** Four identical tiles doing the work of three. */
+export const KongIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Rect x={1.6} y={7} width={4.4} height={10} rx={1.1} />
+    <Rect x={7.1} y={7} width={4.4} height={10} rx={1.1} />
+    <Rect x={12.6} y={7} width={4.4} height={10} rx={1.1} />
+    <Rect x={18.1} y={7} width={4.4} height={10} rx={1.1} />
+  </Icon>
+);
+
+/** The tile somebody was adding to a triplet, claimed on its way down. */
+export const RobKongIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Rect x={2.4} y={10.4} width={4.6} height={9.2} rx={1.2} />
+    <Rect x={8.1} y={10.4} width={4.6} height={9.2} rx={1.2} />
+    <Rect x={13.8} y={10.4} width={4.6} height={9.2} rx={1.2} />
+    <Rect x={16.6} y={2} width={4.6} height={6.2} rx={1.2} />
+    <Path d="M14.2 7.4 18.9 8.2" />
+  </Icon>
+);
+
+/** The last of its kind: three already gone, one left. */
+export const LastOfKindIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Path d="M2.4 8.2h3.4v7.6H2.4Z" strokeDasharray="2 2" />
+    <Path d="M7.6 8.2H11v7.6H7.6Z" strokeDasharray="2 2" />
+    <Path d="M12.8 8.2h3.4v7.6h-3.4Z" strokeDasharray="2 2" />
+    <Rect x={18} y={6.4} width={4.6} height={11.2} rx={1.2} />
+  </Icon>
+);
+
+/** A hand one tile short, with the gap where it goes. */
+export const ReadyIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Rect x={1.8} y={7.6} width={4.4} height={8.8} rx={1.1} />
+    <Rect x={7.2} y={7.6} width={4.4} height={8.8} rx={1.1} />
+    <Rect x={12.6} y={7.6} width={4.4} height={8.8} rx={1.1} />
+    <Path d="M18 7.6h4.4v8.8H18Z" strokeDasharray="2 2" />
+  </Icon>
+);
+
+/** The betting stick put down to declare. */
+export const RiichiStickIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Rect x={2.2} y={9.4} width={19.6} height={5.2} rx={2.6} />
+    <Circle cx={12} cy={12} r={1.5} />
+  </Icon>
+);
+
+/** A tile marked as worth extra. */
+export const DoraIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Rect x={5.4} y={2.8} width={13.2} height={18.4} rx={2.4} />
+    <Path d="m12 7.4 1.5 3.5 3.6.3-2.7 2.4.8 3.6L12 15.3 8.8 17.2l.8-3.6-2.7-2.4 3.6-.3Z" />
+  </Icon>
+);
+
+/** The dice that break the wall: the deal itself. */
+export const DealIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Rect x={3.4} y={3.4} width={17.2} height={17.2} rx={3.6} />
+    <Circle cx={8.4} cy={8.4} r={1.2} />
+    <Circle cx={15.6} cy={8.4} r={1.2} />
+    <Circle cx={12} cy={12} r={1.2} />
+    <Circle cx={8.4} cy={15.6} r={1.2} />
+    <Circle cx={15.6} cy={15.6} r={1.2} />
+  </Icon>
+);
+
+/**
+ * A hand laid inside the viewfinder.
+ *
+ * Corner brackets rather than a closed box: a rounded rectangle with bars
+ * inside it and anything at all on one end reads as a battery, which is what
+ * the first attempt at this turned out to be.
+ */
+export const FramingIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Path d="M2.4 8.4V4.9a2.5 2.5 0 0 1 2.5-2.5h3.5" />
+    <Path d="M15.6 2.4h3.5a2.5 2.5 0 0 1 2.5 2.5v3.5" />
+    <Path d="M21.6 15.6v3.5a2.5 2.5 0 0 1-2.5 2.5h-3.5" />
+    <Path d="M8.4 21.6H4.9a2.5 2.5 0 0 1-2.5-2.5v-3.5" />
+    <Rect x={6.6} y={9} width={3.2} height={6} rx={0.9} />
+    <Rect x={11} y={9} width={3.2} height={6} rx={0.9} />
+    <Rect x={15.4} y={9} width={2} height={6} rx={0.7} strokeDasharray="1.6 1.6" />
+  </Icon>
+);
+
+/** Tiles resting flat on the table, in one level row. */
+export const FlatRowIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Rect x={2.6} y={6.4} width={5} height={9} rx={1.2} />
+    <Rect x={9.5} y={6.4} width={5} height={9} rx={1.2} />
+    <Rect x={16.4} y={6.4} width={5} height={9} rx={1.2} />
+    <Path d="M1.6 18.6h20.8" />
   </Icon>
 );

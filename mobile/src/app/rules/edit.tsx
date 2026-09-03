@@ -304,7 +304,7 @@ export default function RuleEditorScreen() {
             ))}
           </Panel>
           <Caption tone="faint" style={styles.note}>
-            Picking a preset replaces every value below with that table&apos;s. Do it first.
+            Pick this first — it replaces everything below.
           </Caption>
         </Section>
 

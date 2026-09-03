@@ -35,7 +35,6 @@ export default function RootLayout() {
         <Stack.Screen name="session/[id]" options={{ title: '' }} />
         <Stack.Screen name="hand/capture" options={{ title: 'Photograph the Hand' }} />
         <Stack.Screen name="hand/review" options={{ title: 'Check the Tiles' }} />
-        <Stack.Screen name="hand/context" options={{ title: 'How It Was Won' }} />
         <Stack.Screen name="hand/result" options={{ title: 'Score' }} />
         <Stack.Screen name="rules/[id]" options={{ title: '' }} />
         <Stack.Screen name="rules/edit" options={{ title: 'Custom Rules' }} />

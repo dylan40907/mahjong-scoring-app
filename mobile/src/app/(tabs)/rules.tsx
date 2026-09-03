@@ -43,7 +43,7 @@ export default function RulesScreen() {
   return (
     <Screen scroll>
       <Body tone="muted" style={styles.intro}>
-        Scoring differs by region and by table. Pick a preset, or build your own from any of them.
+        Every table counts differently. Pick a preset, or build your own.
       </Body>
 
       {FAMILY_ORDER.map((family) => {
@@ -77,9 +77,7 @@ export default function RulesScreen() {
           onPress={() => router.push('/rules/edit')}
         />
         <Caption tone="faint" style={styles.note}>
-          Start from any preset, then change the hand size, how it is counted, who pays on a
-          discard, and what every pattern is worth. Hands your table made up can be described from
-          scratch.
+          Start from a preset and change what differs.
         </Caption>
       </Section>
     </Screen>

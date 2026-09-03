@@ -48,7 +48,7 @@ export default function SessionsScreen() {
         <EmptyState
           icon={<SessionsIcon size={40} color={colors.inkFaint} />}
           title="No sessions yet"
-          body="Start a session to keep score across a run of hands, with the deal and the standings tracked for you."
+          body="Keep score across a run of hands. The deal and the standings follow along."
           action={
             <Button
               label="New Session"

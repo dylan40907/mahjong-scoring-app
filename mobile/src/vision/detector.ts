@@ -161,7 +161,7 @@ export function visionDiagnostics(): string {
 export function visionUnavailableReason(): string | null {
   if (isVisionSupported()) return null;
   if (Platform.OS === 'web') {
-    return 'Reading tiles from a photo needs the native app. Enter the hand by hand here.';
+    return 'Photo reading needs the installed app.';
   }
   if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
     return 'Expo Go cannot load the tile models. Everything else works — enter the hand by hand, or open this in the development build to read tiles from photos.';

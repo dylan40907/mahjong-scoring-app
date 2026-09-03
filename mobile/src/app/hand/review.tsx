@@ -11,7 +11,7 @@ import {
   TileFace,
   TileScanner,
 } from '@/design/components';
-import { CropIcon, FlowerIcon, MeldIcon, PlusIcon, TrophyIcon } from '@/design/icons';
+import { CropIcon, FlowerIcon, KongIcon, MeldIcon, PlusIcon, TrophyIcon } from '@/design/icons';
 import { colors, radius, space, tileSize } from '@/design/tokens';
 import { TilePicker } from '@/components/TilePicker';
 import { HandBoundary } from '@/components/HandBoundary';
@@ -139,7 +139,6 @@ export default function ReviewScreen() {
         {!draft.photoUri ? (
           <Button
             label="Add a photo"
-            variant="ghost"
             block
             onPress={() => router.push('/hand/capture')}
             style={styles.addPhoto}
@@ -162,8 +161,7 @@ export default function ReviewScreen() {
             <View style={styles.photoHintRow}>
               <CropIcon size={15} color={colors.inkFaint} />
               <Caption tone="faint" style={styles.photoHint}>
-                Everything in the frame was read. Drag a corner in to leave something out, then
-                read it again.
+                Drag a corner in to leave tiles out
               </Caption>
             </View>
             <View style={styles.photoActions}>
@@ -196,17 +194,27 @@ export default function ReviewScreen() {
               ? `${validation.tileCount} tiles`
               : `${validation.tileCount} of ${validation.nominal} tiles`}
           </CaptionStrong>
+          {/*
+            * Four tiles and a count, rather than the word.
+            *
+            * "Kong" is the one piece of jargon here nobody can avoid - every
+            * table borrows some version of it - but the drawing says what it
+            * is without needing the borrowed word to have landed.
+            */}
           {validation.kongs > 0 ? (
-            <Caption tone="muted">
-              including {validation.kongs === 1 ? 'a kong' : `${validation.kongs} kongs`}
-            </Caption>
+            <View style={styles.kongNote}>
+              <KongIcon size={20} color={colors.inkMuted} />
+              <Caption tone="muted" numeric>
+                ×{validation.kongs}
+              </Caption>
+            </View>
           ) : null}
         </View>
 
         <Section
           title={
             mode === 'winning' ? 'Tap the winning tile'
-            : mode === 'exposed' ? 'Sweep across what you melded'
+            : mode === 'exposed' ? 'On the table'
             : 'The hand'
           }
           icon={
@@ -235,32 +243,51 @@ export default function ReviewScreen() {
             >
               <PlusIcon size={20} color={colors.inkFaint} />
             </Pressable>
+            {/*
+              * "On the table" rather than "melded" or "exposed".
+              *
+              * Both of those are translations somebody invented for a thing
+              * the player did physically, and neither is what anyone says at
+              * a table. Where the tiles ended up is plain, literal, and true
+              * in any language the phrase gets translated into.
+              */}
             <Button
-              label={mode === 'exposed' ? 'Done' : 'Melded tiles'}
-              variant="ghost"
+              label={mode === 'exposed' ? 'Done' : 'On the table'}
+              icon={
+                <MeldIcon
+                  size={16}
+                  color={mode === 'exposed' ? colors.melded : colors.inkMuted}
+                />
+              }
               onPress={() => setMode(mode === 'exposed' ? 'edit' : 'exposed')}
             />
           </View>
 
           <Caption tone="faint" style={styles.hint}>
             {mode === 'exposed'
-              ? 'Drag a finger across every tile you had already set down. Sweep them again to clear.'
-              : 'Tap a tile to correct it, or hold and drag to move it. Everything counts as still in hand unless you mark it melded.'}
+              ? 'Drag across the tiles you showed. Drag again to clear.'
+              : 'Tap to fix · hold to move'}
           </Caption>
         </Section>
 
         <Section title="Winning tile" icon={<TrophyIcon size={15} color={colors.inkFaint} />}>
           <View style={styles.winning}>
+            {/*
+              * The tile itself, at a size you can read, with its name beside
+              * it rather than instead of it. The name is the part that does
+              * not survive translation, so it is the part that gets to be
+              * secondary.
+              */}
             {draft.winningTile ? (
               <>
                 <TileFace code={draft.winningTile} width={tileSize.md} />
-                <Body tone="muted" style={styles.winningLabel}>
+                <Caption tone="faint" style={styles.winningLabel}>
                   {TILE_BY_CODE[draft.winningTile].label}
-                </Body>
+                </Caption>
               </>
             ) : (
               <Body tone="loss" style={styles.winningLabel}>
-                Not chosen yet
+                Not chosen
               </Body>
             )}
             <Button
@@ -273,7 +300,7 @@ export default function ReviewScreen() {
 
         {rules?.usesBonusTiles ? (
           <Section
-            title="Flowers &amp; seasons"
+            title="Flowers"
             icon={<FlowerIcon size={15} color={colors.inkFaint} />}
             note={draft.bonus.length === 0 ? 'None' : undefined}
           >
@@ -381,6 +408,7 @@ const styles = StyleSheet.create({
   },
   photoImage: { width: '100%', height: '100%' },
   box: { position: 'absolute', borderWidth: 1.5, borderRadius: 2 },
+  kongNote: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',

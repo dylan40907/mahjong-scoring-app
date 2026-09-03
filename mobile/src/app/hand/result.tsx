@@ -1,5 +1,5 @@
-import React, { useCallback, useMemo } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
@@ -44,6 +44,8 @@ import { keepPhoto } from '@/lib/photos';
  * a hand contains. A number with no reasoning attached settles nothing.
  */
 export default function ResultScreen() {
+  /** Which pattern is showing its reason. One at a time keeps the list short. */
+  const [explaining, setExplaining] = useState<string | null>(null);
   const router = useRouter();
   const draft = useDraft(useCallback((d) => d, []));
   const settings = useAppState(useCallback((state) => state.settings, []));
@@ -177,31 +179,55 @@ export default function ResultScreen() {
           </View>
         ) : null}
 
-        <Section title="How it scores" icon={<SparkIcon size={15} color={colors.brass} />} first>
+        <Section
+          title="How it scores"
+          icon={<SparkIcon size={15} color={colors.brass} />}
+          note="tap for why"
+          first
+        >
           <Panel flush>
-            {result.patterns.map((pattern, index) => (
-              <View key={pattern.id}>
-                {index > 0 ? <Divider inset={space.lg} /> : null}
-                <View style={styles.pattern}>
-                  <View style={styles.patternBody}>
-                    <Body>{pattern.name}</Body>
-                    {/* Wraps: a rule you cannot finish reading is not a rule
-                        you can check the score against. */}
-                    <Caption tone="faint">{pattern.description}</Caption>
-                  </View>
-                  <View style={styles.patternValue}>
-                    {pattern.count > 1 ? (
-                      <Caption tone="faint" numeric>
-                        {pattern.count} × {pattern.unitValue}
-                      </Caption>
-                    ) : null}
-                    <BodyStrong tone="accent" numeric>
-                      {pattern.isLimit ? 'Limit' : `+${pattern.total}`}
-                    </BodyStrong>
-                  </View>
+            {/*
+              * Name and value by default; the reason on tap.
+              *
+              * These sentences are the app justifying itself, so deleting them
+              * would make the score something to be trusted rather than
+              * checked. But five of them at once turned the one screen with
+              * something to celebrate into a wall of text, and four of the
+              * five are read once and never again. Folded away they are still
+              * one tap from the person who wants to argue with the total.
+              */}
+            {result.patterns.map((pattern, index) => {
+              const open = explaining === pattern.id;
+              return (
+                <View key={pattern.id}>
+                  {index > 0 ? <Divider inset={space.lg} /> : null}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: open }}
+                    accessibilityHint="Why this scored"
+                    onPress={() => setExplaining(open ? null : pattern.id)}
+                    style={({ pressed }) => [styles.pattern, pressed && styles.patternPressed]}
+                  >
+                    <View style={styles.patternBody}>
+                      <Body>{pattern.name}</Body>
+                      {/* Wraps: a rule you cannot finish reading is not a rule
+                          you can check the score against. */}
+                      {open ? <Caption tone="faint">{pattern.description}</Caption> : null}
+                    </View>
+                    <View style={styles.patternValue}>
+                      {pattern.count > 1 ? (
+                        <Caption tone="faint" numeric>
+                          {pattern.count} × {pattern.unitValue}
+                        </Caption>
+                      ) : null}
+                      <BodyStrong tone="accent" numeric>
+                        {pattern.isLimit ? 'Limit' : `+${pattern.total}`}
+                      </BodyStrong>
+                    </View>
+                  </Pressable>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </Panel>
         </Section>
 
@@ -284,7 +310,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingVertical: space.md,
   },
-  patternBody: { flex: 1, gap: 1 },
+  patternBody: { flex: 1, gap: 2 },
+  patternPressed: { opacity: 0.65 },
   patternValue: { alignItems: 'flex-end', gap: 1 },
   fuLine: {
     flexDirection: 'row',

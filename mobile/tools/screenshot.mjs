@@ -240,16 +240,14 @@ async function main() {
   await page.waitForTimeout(400);
   await shoot(page, '09-who-discarded');
 
-  await page.getByText('Self-drawn', { exact: true }).click();
+  await page.getByText('Self-draw', { exact: true }).click();
   await page.waitForTimeout(700);
-  await shoot(page, '10-context');
 
-  // Circumstances are asked before the camera now, so this button leads to it.
-  await page.getByText('Photograph the Hand', { exact: true }).last().click();
-  await page.waitForTimeout(700);
+  // The camera screen carries the recap and the rare circumstances now, so
+  // answering "who fed the tile" lands straight on it.
   await shoot(page, '11-capture');
 
-  await page.getByText('Enter tiles by hand', { exact: true }).click();
+  await page.getByText('Type the tiles in', { exact: true }).click();
   await page.waitForTimeout(700);
   await shoot(page, '12-review-empty');
 
