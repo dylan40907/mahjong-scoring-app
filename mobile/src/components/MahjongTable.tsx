@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { BodyStrong, Caption, CountUp, TileFace } from '@/design/components';
+import { BodyStrong, Caption, CaptionStrong, CountUp, TileFace } from '@/design/components';
 import { colors, radius, shadow, space } from '@/design/tokens';
 import type { SessionPlayer } from '@/store/types';
 import type { Wind } from '@/tiles/tileset';
@@ -29,6 +29,8 @@ interface Props {
   players: readonly SessionPlayer[];
   totals: Record<string, number>;
   dealerId: string;
+  /** Consecutive deals the dealer has held - 連莊. */
+  dealerStreak?: number;
   roundWind: Wind;
   handCount: number;
   /** Highlighted while choosing who a hand was won by. */
@@ -63,6 +65,7 @@ function Seat({
   player,
   total,
   isDealer,
+  streak,
   selected,
   slot,
   onSelect,
@@ -71,6 +74,7 @@ function Seat({
   player: SessionPlayer;
   total: number;
   isDealer: boolean;
+  streak: number;
   selected: boolean;
   slot: Slot;
   onSelect: () => void;
@@ -88,7 +92,10 @@ function Seat({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${player.name}, seated ${WIND_LABEL[player.seat]}, ${total} points`}
+      accessibilityLabel={
+        `${player.name}, seated ${WIND_LABEL[player.seat]}, ${total} points` +
+        (isDealer ? `, dealing${streak > 0 ? ` for ${streak + 1} hands` : ''}` : '')
+      }
       onPress={onSelect}
       onLongPress={() => {
         setText(player.name);
@@ -106,7 +113,24 @@ function Seat({
       <View style={styles.seatHead}>
         {/* The wind as the tile it is, not as a character in the UI font. */}
         <TileFace code={player.seat} width={WIND_TILE} />
-        {isDealer ? <Caption tone="accent">Dealer</Caption> : null}
+        {/*
+          * A streak replaces the word rather than crowding in beside it.
+          *
+          * The brass border and the warmer surface already say "dealer" on
+          * their own, so once there is a number to show, the number is the
+          * more useful thing to spend ninety pixels on: it is what the table
+          * is watching, and under Taiwanese scoring it is what the dealer is
+          * about to win or lose by.
+          */}
+        {isDealer && streak > 0 ? (
+          <View style={styles.streak}>
+            <CaptionStrong tone="onAccent" numeric>
+              {streak}
+            </CaptionStrong>
+          </View>
+        ) : isDealer ? (
+          <Caption tone="accent">Dealer</Caption>
+        ) : null}
       </View>
 
       {editing ? (
@@ -145,6 +169,7 @@ export function MahjongTable({
   players,
   totals,
   dealerId,
+  dealerStreak = 0,
   roundWind,
   handCount,
   selectedId,
@@ -175,6 +200,7 @@ export function MahjongTable({
           player={player}
           total={totals[player.id] ?? 0}
           isDealer={player.id === dealerId}
+          streak={player.id === dealerId ? dealerStreak : 0}
           selected={selectedId === player.id}
           slot={SLOTS[index]}
           onSelect={() => onSelect(player.id)}
@@ -244,6 +270,15 @@ const styles = StyleSheet.create({
   seatSelected: { borderColor: colors.feltLine, backgroundColor: colors.feltHigh },
   seatPressed: { backgroundColor: colors.surfaceHigh },
   seatHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  /** The one brass fill on this screen, because it is the one live number. */
+  streak: {
+    minWidth: 22,
+    paddingHorizontal: space.xs,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    backgroundColor: colors.brass,
+    alignItems: 'center',
+  },
   nameInput: {
     color: colors.ink,
     fontSize: 15,

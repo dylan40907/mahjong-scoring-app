@@ -14,8 +14,15 @@ import type { FaanPayout, McrPayout, PayoutConfig, RiichiPayout, TaiPayout } fro
  */
 
 export interface PlayerPayment {
-  /** Seat relative to the winner, or 'discarder'. */
-  readonly from: 'discarder' | 'dealer' | 'each-opponent';
+  /**
+   * Who owes it.
+   *
+   * 'dealer' replaces that player's ordinary share, which is what Riichi's
+   * self-draw does. 'dealer-extra' is charged *on top* of whatever else they
+   * already owe, which is what a Taiwanese streak does to a dealer who just
+   * lost one.
+   */
+  readonly from: 'discarder' | 'dealer' | 'dealer-extra' | 'each-opponent';
   readonly amount: number;
   readonly label: string;
 }
@@ -42,9 +49,41 @@ export interface Settlement {
 // ---------------------------------------------------------------------------
 
 export function settleTai(config: TaiPayout, tai: number, context: HandContext): Settlement {
-  const cappedTai = config.maxTai > 0 ? Math.min(tai, config.maxTai) : tai;
+  /*
+   * 連莊 - what the deal is worth for having been held.
+   *
+   * One tai for sitting as dealer plus two for each repeat is the ordinary
+   * Taiwanese table, and it cuts both ways: the dealer collects it when they
+   * win again and pays it when they finally deal in. That second half is the
+   * whole reason a long streak is tense rather than simply good, so leaving it
+   * out would have made streaks a pure bonus.
+   */
+  const streak = Math.max(0, context.dealerStreak ?? 0);
+  const dealerTai = config.dealerTai + config.streakTai * streak;
+
+  const handTai = config.maxTai > 0 ? Math.min(tai, config.maxTai) : tai;
+  const cappedTai = context.isDealer
+    ? config.maxTai > 0
+      ? Math.min(tai + dealerTai, config.maxTai)
+      : tai + dealerTai
+    : handTai;
   const dealerFactor = context.isDealer ? config.dealerMultiplier : 1;
   const unit = Math.round((config.base + cappedTai * config.perTai) * dealerFactor);
+
+  /*
+   * What the dealer owes on top, having lost while holding the deal.
+   *
+   * The streak only, not the flat tai for sitting as dealer: 拉莊 is a charge
+   * for the run they were on, and a dealer who has just picked up the deal is
+   * on no run at all. So a fresh dealership costs its holder nothing extra,
+   * and the third hand of a streak costs them plenty.
+   */
+  const streakDue = context.isDealer ? 0 : Math.round(config.streakTai * streak * config.perTai);
+  const streakLine: PlayerPayment[] =
+    streakDue > 0
+      ? [{ from: 'dealer-extra', amount: streakDue, label: 'Dealer (streak)' }]
+      : [];
+  const streakNote = streakDue > 0 ? ` The dealer adds ${streakDue} for the deal they held.` : '';
 
   // The tai count multiplied out, so the sentence lands on the amount paid.
   const hand = `${config.base} + ${cappedTai} × ${config.perTai}`;
@@ -52,18 +91,25 @@ export function settleTai(config: TaiPayout, tai: number, context: HandContext):
 
   if (context.selfDrawn || config.discardPayer === 'everyone') {
     return {
-      winnerReceives: unit * 3,
-      payments: [{ from: 'each-opponent', amount: unit, label: 'Each opponent' }],
-      explanation: context.selfDrawn
-        ? `Self-draw: each opponent pays ${sum} = ${unit}.`
-        : `Each opponent pays ${sum} = ${unit}.`,
+      winnerReceives: unit * 3 + streakDue,
+      payments: [
+        { from: 'each-opponent', amount: unit, label: 'Each opponent' },
+        ...streakLine,
+      ],
+      explanation:
+        (context.selfDrawn
+          ? `Self-draw: each opponent pays ${sum} = ${unit}.`
+          : `Each opponent pays ${sum} = ${unit}.`) + streakNote,
     };
   }
 
   return {
-    winnerReceives: unit,
-    payments: [{ from: 'discarder', amount: unit, label: 'Discarder' }],
-    explanation: `The discarder pays it alone: ${sum} = ${unit}.`,
+    winnerReceives: unit + streakDue,
+    payments: [
+      { from: 'discarder', amount: unit, label: 'Discarder' },
+      ...streakLine,
+    ],
+    explanation: `The discarder pays it alone: ${sum} = ${unit}.` + streakNote,
   };
 }
 

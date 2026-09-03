@@ -111,6 +111,9 @@ export default function SessionScreen() {
         seatWind: winner.seat,
         roundWind: session.roundWind,
         isDealer: session.dealerId === winnerId,
+        // How long the deal has been held, which Taiwanese tables price on
+        // both sides: the dealer's hand is worth more, and so is dealing in.
+        dealerStreak: session.dealerStreak ?? 0,
       },
     });
     setWinnerId(null);
@@ -208,6 +211,7 @@ export default function SessionScreen() {
           players={session.players}
           totals={totals}
           dealerId={session.dealerId}
+          dealerStreak={session.dealerStreak ?? 0}
           roundWind={session.roundWind}
           handCount={session.hands.length}
           selectedId={winnerId}

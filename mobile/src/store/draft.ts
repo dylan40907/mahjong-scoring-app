@@ -2,7 +2,12 @@ import { useCallback, useSyncExternalStore } from 'react';
 import type { TileCode } from '@/tiles/tileset';
 import { TILE_BY_CODE, isBonus } from '@/tiles/tileset';
 import type { HandContext, HandInput } from '@/scoring';
-import { formsCompleteHand, kongsImpliedBy, setsForHandSize } from '@/scoring';
+import {
+  formsCompleteHand,
+  kongsImpliedBy,
+  meldedTilesFormSets,
+  setsForHandSize,
+} from '@/scoring';
 import type { Detection } from '@/vision/ordering';
 import { moveTile } from './tiles';
 import type { HandRecord } from './types';
@@ -303,14 +308,24 @@ export function validateDraft(
     const over = total - (nominal + setsForHandSize(handSize));
     problems.push(`${over} too many tiles, even counting every set as a kong.`);
   } else if (!complete) {
-    problems.push(
-      surplus > 0
-        ? // The count is only legal if the extra tiles really are kongs, and
-          // whether they are depends on the whole hand rather than on the
-          // count. Saying which part is missing is the useful half.
-          `${total} tiles means ${surplus === 1 ? 'a kong' : `${surplus} kongs`}, and these tiles do not make ${surplus === 1 ? 'one' : 'that many'}.`
-        : 'These tiles do not form a complete hand.',
-    );
+    /*
+     * Say what is actually wrong, in the order it is worth checking.
+     *
+     * This used to blame the kong for every failure at a surplus count, which
+     * was a guess dressed up as a diagnosis: a hand can hold a perfectly good
+     * kong and still not parse because two tiles were swept into the revealed
+     * row by mistake. Telling somebody their four nines are not a kong, while
+     * the four nines sit there on screen, is worse than saying nothing.
+     */
+    if (!meldedTilesFormSets(exposed)) {
+      problems.push('The revealed tiles do not make whole sets on their own.');
+    } else if (surplus > 0 && !hasFourOfAKind(state.tiles)) {
+      problems.push(
+        `${total} tiles means ${surplus === 1 ? 'a kong' : `${surplus} kongs`}, and there is no four of a kind here.`,
+      );
+    } else {
+      problems.push('These tiles do not form a complete hand.');
+    }
   }
 
   if (!state.winningTile) problems.push('Choose the tile that completed the hand.');
@@ -323,6 +338,14 @@ export function validateDraft(
     kongs: complete ? (surplus ?? 0) : 0,
     complete,
   };
+}
+
+/** Whether any tile appears four times, wherever those four are sitting. */
+function hasFourOfAKind(tiles: readonly TileCode[]): boolean {
+  const counts = new Map<TileCode, number>();
+  for (const code of tiles) counts.set(code, (counts.get(code) ?? 0) + 1);
+  for (const n of counts.values()) if (n >= 4) return true;
+  return false;
 }
 
 export function buildHandInput(state: HandDraft, context: HandContext): HandInput | null {

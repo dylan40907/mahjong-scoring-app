@@ -41,6 +41,15 @@ export interface HandContext {
   readonly seatWind: Wind;
   readonly roundWind: Wind;
   readonly isDealer: boolean;
+  /**
+   * Consecutive deals the dealer has already held - 連莊.
+   *
+   * Zero on a fresh dealership. Taiwanese tables price this: the dealer's hand
+   * is worth more the longer they have held the deal, and - the part that
+   * makes a long streak frightening rather than just good - they pay that same
+   * premium when somebody else wins.
+   */
+  readonly dealerStreak?: number;
 
   /** Won on the very last tile of the live wall. */
   readonly lastTileFromWall?: boolean;

@@ -1,3 +1,4 @@
+import type { TileCode } from '@/tiles/tileset';
 import { decompose } from './decompose';
 import type { Decomposition, HandInput } from './hand';
 import { buildContext } from './patterns/context';
@@ -35,6 +36,8 @@ export interface ScoredPattern {
   readonly id: string;
   readonly name: string;
   readonly description: string;
+  /** Example tiles, where the pattern's name is a set of tiles. */
+  readonly tiles?: readonly TileCode[];
   /** How many times it applied - dragon triplets and flowers can repeat. */
   readonly count: number;
   /** The value of a single occurrence under this ruleset. */
@@ -134,6 +137,7 @@ function toScoredPatterns(matches: Match[], isConcealed: boolean): ScoredPattern
         id: match.definition.id,
         name: match.definition.name,
         description: match.definition.description,
+        tiles: match.definition.tiles,
         count: match.count,
         unitValue,
         total: unitValue * match.count,

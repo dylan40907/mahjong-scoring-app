@@ -162,13 +162,19 @@ export function getSession(id: string): Session | undefined {
 }
 
 export function addHand(sessionId: string, record: HandRecord): void {
-  replaceSession(sessionId, (session) => ({
-    ...session,
-    hands: [record, ...session.hands],
+  replaceSession(sessionId, (session) => {
     // The deal passes unless the dealer won, which is the near-universal rule
-    // across all four variants the app supports.
-    dealerId: record.winnerId === session.dealerId ? session.dealerId : nextDealer(session),
-  }));
+    // across all four variants the app supports. Holding it is 連莊, and the
+    // count only ever moves here - a hand corrected later must not advance it
+    // a second time.
+    const held = record.winnerId === session.dealerId;
+    return {
+      ...session,
+      hands: [record, ...session.hands],
+      dealerId: held ? session.dealerId : nextDealer(session),
+      dealerStreak: held ? (session.dealerStreak ?? 0) + 1 : 0,
+    };
+  });
 }
 
 function nextDealer(session: Session): string {

@@ -111,7 +111,8 @@ const seed = {
   'mj.sessions': JSON.stringify([
     {
       id: 'sess1', name: 'Thursday night', createdAt: iso(60), updatedAt: iso(6),
-      ruleSetId: 'taiwanese-common', players, roundWind: 'east', dealerId: 'p2', hands,
+      ruleSetId: 'taiwanese-common', players, roundWind: 'east', dealerId: 'p2',
+      dealerStreak: 2, hands,
     },
     {
       id: 'sess2', name: 'August 14', createdAt: iso(4000), updatedAt: iso(3900),

@@ -86,6 +86,11 @@ export const TAIWANESE_COMMON: RuleSet = {
     maxTai: 0,
     discardPayer: 'discarder-alone',
     dealerMultiplier: 1,
+    // 連N拉N: one tai for dealing, two more for every repeat. The dealer
+    // collects it on a win and pays it on a loss, which is what makes a long
+    // streak worth being frightened of.
+    dealerTai: 1,
+    streakTai: 2,
   },
   builtIn: true,
   notes:
@@ -169,6 +174,11 @@ export const TAIWANESE_REFERENCE: RuleSet = {
     maxTai: 40,
     discardPayer: 'discarder-alone',
     dealerMultiplier: 1,
+    // 連N拉N: one tai for dealing, two more for every repeat. The dealer
+    // collects it on a win and pays it on a loss, which is what makes a long
+    // streak worth being frightened of.
+    dealerTai: 1,
+    streakTai: 2,
   },
   builtIn: true,
   notes:

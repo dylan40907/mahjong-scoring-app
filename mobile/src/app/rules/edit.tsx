@@ -78,7 +78,16 @@ const HAND_GROUPS: { group: Exclude<PatternGroup, 'situational' | 'bonus' | 'cus
  * is a dozen thresholds, and Hong Kong's is the only one anybody uses.
  */
 const PAYOUT_DEFAULTS: Record<PayoutConfig['model'], PayoutConfig> = {
-  tai: { model: 'tai', base: 30, perTai: 10, maxTai: 0, discardPayer: 'discarder-alone', dealerMultiplier: 1 },
+  tai: {
+    model: 'tai',
+    base: 30,
+    perTai: 10,
+    maxTai: 0,
+    discardPayer: 'discarder-alone',
+    dealerMultiplier: 1,
+    dealerTai: 1,
+    streakTai: 2,
+  },
   faan: {
     model: 'faan',
     minimumFaan: 3,
@@ -545,6 +554,18 @@ function PayoutFields({
             onChange={(next) => onChange({ ...payout, discardPayer: next as 'discarder-alone' | 'everyone' })}
           />
         </Field>
+        <Divider inset={space.lg} />
+        <Row
+          title="Dealer's own tai"
+          subtitle="Extra tai the dealer's winning hand is worth."
+          trailing={<Stepper value={payout.dealerTai} min={0} max={10} onChange={(dealerTai) => onChange({ ...payout, dealerTai })} />}
+        />
+        <Divider inset={space.lg} />
+        <Row
+          title="Tai per dealer repeat"
+          subtitle="Added for each hand the dealer has already held. Most tables play two, which the dealer also pays when they lose."
+          trailing={<Stepper value={payout.streakTai} min={0} max={10} onChange={(streakTai) => onChange({ ...payout, streakTai })} />}
+        />
         <Divider inset={space.lg} />
         <Row
           title="Dealer multiplier"

@@ -335,6 +335,23 @@ export function decompose(hand: HandInput, options: DecomposeOptions): Decomposi
 }
 
 /**
+ * Whether the melded tiles form whole sets on their own.
+ *
+ * A meld is either on the table or in the hand, never half of each, so this is
+ * checkable without looking at the rest of the hand - and it is the mistake
+ * worth naming, because the alternative is telling somebody their eighteen
+ * tiles are not a hand when what actually happened is that they swept one tile
+ * too many.
+ */
+export function meldedTilesFormSets(exposed: readonly TileCode[]): boolean {
+  const clean = exposed.filter((code) => !isBonus(TILE_BY_CODE[code]));
+  if (clean.length === 0) return true;
+  const out: Meld[][] = [];
+  partitionSets(countTiles(clean), false, [], out);
+  return out.length > 0;
+}
+
+/**
  * Whether these tiles form a complete hand at all, ignoring which tile won it.
  *
  * The review screen needs this before a winning tile has been chosen: it is

@@ -17,6 +17,7 @@ import {
   Panel,
   Screen,
   Section,
+  TileFace,
   TileRow,
 } from '@/design/components';
 import { AlertIcon, CoinsIcon, MeldIcon, SparkIcon } from '@/design/icons';
@@ -211,7 +212,21 @@ export default function ResultScreen() {
                       <Body>{pattern.name}</Body>
                       {/* Wraps: a rule you cannot finish reading is not a rule
                           you can check the score against. */}
-                      {open ? <Caption tone="faint">{pattern.description}</Caption> : null}
+                      {open ? (
+                        <>
+                          <Caption tone="faint">{pattern.description}</Caption>
+                          {/* The tiles the sentence is about, for the words
+                              that only mean something once you have seen
+                              them. */}
+                          {pattern.tiles ? (
+                            <View style={styles.patternTiles}>
+                              {pattern.tiles.map((code, tileIndex) => (
+                                <TileFace key={`${code}-${tileIndex}`} code={code} width={22} />
+                              ))}
+                            </View>
+                          ) : null}
+                        </>
+                      ) : null}
                     </View>
                     <View style={styles.patternValue}>
                       {pattern.count > 1 ? (
@@ -311,6 +326,12 @@ const styles = StyleSheet.create({
   },
   patternBody: { flex: 1, gap: 2 },
   patternPressed: { opacity: 0.65 },
+  patternTiles: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 3,
+    marginTop: space.xs,
+  },
   patternValue: { alignItems: 'flex-end', gap: 1 },
   fuLine: {
     flexDirection: 'row',

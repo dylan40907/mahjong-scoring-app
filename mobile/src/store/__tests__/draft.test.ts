@@ -190,3 +190,54 @@ describe('buildHandInput', () => {
     expect(buildHandInput(getDraft(), CONTEXT)).toBeNull();
   });
 });
+
+describe('saying what is actually wrong', () => {
+  /*
+   * Reported from a real hand: four nines sitting plainly on screen, and the
+   * app saying eighteen tiles means a kong and these tiles do not make one.
+   * The kong was fine. Two extra tiles had been swept into the revealed row,
+   * so the melded bag could not be cut into whole sets - and blaming the kong
+   * for that sent somebody looking in the wrong place.
+   */
+  const REPORTED = [
+    'man1', 'man2', 'man3', 'south', 'south', 'man4', 'man5', 'man8',
+    'red', 'red', 'red', 'man9', 'man9', 'man9', 'man9',
+    'pin4', 'pin4', 'pin4',
+  ] as TileCode[];
+
+  it('blames the revealed tiles, not the kong, when the melds do not divide', () => {
+    updateDraft({ tiles: REPORTED, winningTile: 'south', exposed: [0, 1, 2, 5, 6, 7] });
+    const validation = validateDraft(getDraft(), 16);
+    expect(validation.ok).toBe(false);
+    expect(validation.problems[0]).toBe('The revealed tiles do not make whole sets on their own.');
+  });
+
+  it('says a kong is missing only when there is no four of a kind at all', () => {
+    const noFour = REPORTED.map((tile, index) => (index === 14 ? ('sou2' as TileCode) : tile));
+    updateDraft({ tiles: noFour, winningTile: 'south' });
+    expect(validateDraft(getDraft(), 16).problems[0]).toContain('no four of a kind');
+  });
+
+  it('accepts the same hand once the melded run is a real run', () => {
+    // man8 corrected to man6, so the revealed tiles are 1-2-3 and 4-5-6.
+    const fixed = REPORTED.map((tile, index) => (index === 7 ? ('man6' as TileCode) : tile));
+    updateDraft({ tiles: fixed, winningTile: 'south', exposed: [0, 1, 2, 5, 6, 7] });
+    const validation = validateDraft(getDraft(), 16);
+    expect(validation.problems).toEqual([]);
+    expect(validation.kongs).toBe(1);
+    expect(validation.ok).toBe(true);
+  });
+
+  it('does not care where in the row the four tiles sit', () => {
+    // The same tiles, shuffled: grouping is counted, never read off positions.
+    const scattered = [...REPORTED].map((tile, index) => (index === 7 ? ('man6' as TileCode) : tile));
+    const shuffled = [
+      scattered[11], scattered[0], scattered[12], scattered[1], scattered[13],
+      scattered[2], scattered[14], scattered[3], scattered[4], scattered[5],
+      scattered[6], scattered[7], scattered[8], scattered[9], scattered[10],
+      scattered[15], scattered[16], scattered[17],
+    ];
+    updateDraft({ tiles: shuffled, winningTile: 'south' });
+    expect(validateDraft(getDraft(), 16).complete).toBe(true);
+  });
+});

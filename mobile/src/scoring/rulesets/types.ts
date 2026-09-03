@@ -56,6 +56,19 @@ export interface TaiPayout {
   readonly discardPayer: 'discarder-alone' | 'everyone';
   /** Dealer wins and losses are often multiplied. 1 disables it. */
   readonly dealerMultiplier: number;
+  /**
+   * Tai the dealer's seat is worth on its own - 莊家. Zero disables it.
+   */
+  readonly dealerTai: number;
+  /**
+   * Tai added per consecutive deal already held - 連莊. Zero disables it.
+   *
+   * The near-universal Taiwanese table plays 連N拉N: one tai for dealing plus
+   * two more for every repeat, so a dealer on their third straight hand carries
+   * seven tai before a single tile is looked at. Tables that play 連N拉1, or
+   * that ignore the streak entirely, set this to one or zero.
+   */
+  readonly streakTai: number;
 }
 
 /** Hong Kong: faan doubles into a points table that flattens at the top. */

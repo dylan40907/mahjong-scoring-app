@@ -53,6 +53,16 @@ export interface PatternDefinition {
   readonly id: string;
   readonly name: string;
   readonly description: string;
+  /**
+   * Tiles that show what the words are talking about.
+   *
+   * Only on the patterns whose name *is* a set of tiles. "Dragon" and "wind"
+   * are the clearest cases: nothing explains them as fast as the three faces
+   * themselves, and a player who has known those tiles their whole life under
+   * another name recognises them instantly while the English word means
+   * nothing to them.
+   */
+  readonly tiles?: readonly TileCode[];
   /** Filled in when the list is assembled; individual entries do not set it. */
   readonly group?: PatternGroup;
   /**
@@ -115,7 +125,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'all-chows',
     name: 'All Chows',
-    description: 'Every set is a run, and the pair is not a dragon or a scoring wind.',
+    description: 'Every set is a run of three. The pair is not a dragon, and not a wind that would score on its own.',
     detect: (ctx) =>
       ctx.sets.length > 0 &&
       ctx.chows.length === ctx.sets.length &&
@@ -148,7 +158,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'all-pungs',
     name: 'All Pungs',
-    description: 'Every set is a triplet or a kong.',
+    description: 'Every set is three or four of the same tile. No runs.',
     detect: (ctx) =>
       ctx.sets.length > 0 && ctx.triplets.length === ctx.sets.length && !ctx.reading.special ? 1 : 0,
   },
@@ -174,66 +184,66 @@ const structural: PatternDefinition[] = [
   {
     id: 'two-concealed-pungs',
     name: 'Two Concealed Pungs',
-    description: 'Two triplets formed without claiming a discard.',
+    description: 'Two sets of three of a kind, neither taken from a discard.',
     detect: (ctx) => (ctx.concealedTriplets.length === 2 ? 1 : 0),
   },
   {
     id: 'three-concealed-pungs',
     name: 'Three Concealed Pungs',
-    description: 'Three triplets formed without claiming a discard.',
+    description: 'Three sets of three of a kind, none taken from a discard.',
     supersedes: ['two-concealed-pungs'],
     detect: (ctx) => (ctx.concealedTriplets.length === 3 ? 1 : 0),
   },
   {
     id: 'four-concealed-pungs',
     name: 'Four Concealed Pungs',
-    description: 'Four triplets formed without claiming a discard.',
+    description: 'Four sets of three of a kind, none taken from a discard.',
     supersedes: ['three-concealed-pungs', 'two-concealed-pungs', 'all-pungs'],
     detect: (ctx) => (ctx.concealedTriplets.length === 4 ? 1 : 0),
   },
   {
     id: 'five-concealed-pungs',
     name: 'Five Concealed Pungs',
-    description: 'All five triplets of a sixteen-tile hand formed without claiming.',
+    description: 'All five sets of a sixteen-tile hand are three of a kind, none taken from a discard.',
     supersedes: ['four-concealed-pungs', 'three-concealed-pungs', 'two-concealed-pungs'],
     detect: (ctx) => (ctx.concealedTriplets.length === 5 ? 1 : 0),
   },
   {
     id: 'concealed-kong',
     name: 'Concealed Kong',
-    description: 'A kong declared from four tiles held in hand. Scores per kong.',
+    description: 'Four of the same tile, all drawn rather than claimed. Scores per set of four.',
     detect: (ctx) => ctx.concealedKongs.length,
   },
   {
     id: 'melded-kong',
     name: 'Melded Kong',
-    description: 'A kong completed with a claimed tile. Scores per kong.',
+    description: 'Four of the same tile, the last one claimed from a discard. Scores per set of four.',
     detect: (ctx) => ctx.meldedKongs.length,
   },
   {
     id: 'two-concealed-kongs',
     name: 'Two Concealed Kongs',
-    description: 'Two kongs, both declared from the hand.',
+    description: 'Two sets of four, both made without claiming a discard.',
     supersedes: ['concealed-kong'],
     detect: (ctx) => (ctx.concealedKongs.length === 2 ? 1 : 0),
   },
   {
     id: 'two-melded-kongs',
     name: 'Two Melded Kongs',
-    description: 'Two kongs, at least one of them claimed.',
+    description: 'Two sets of four, at least one completed from a discard.',
     detect: (ctx) => (ctx.kongs.length === 2 && ctx.concealedKongs.length < 2 ? 1 : 0),
   },
   {
     id: 'three-kongs',
     name: 'Three Kongs',
-    description: 'Three kongs in one hand.',
+    description: 'Three sets of four in one hand.',
     supersedes: ['two-melded-kongs', 'two-concealed-kongs'],
     detect: (ctx) => (ctx.kongs.length === 3 ? 1 : 0),
   },
   {
     id: 'four-kongs',
     name: 'Four Kongs',
-    description: 'Four kongs in one hand.',
+    description: 'Four sets of four in one hand.',
     supersedes: ['three-kongs', 'two-melded-kongs', 'two-concealed-kongs', 'all-pungs'],
     detect: (ctx) => (ctx.kongs.length === 4 ? 1 : 0),
   },
@@ -246,7 +256,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'seven-shifted-pairs',
     name: 'Seven Shifted Pairs',
-    description: 'Seven pairs in one suit at consecutive ranks.',
+    description: 'Seven pairs in one suit, at seven numbers in a row.',
     supersedes: ['seven-pairs', 'full-flush'],
     detect: (ctx) => {
       if (ctx.reading.special !== 'seven-pairs') return 0;
@@ -266,13 +276,14 @@ const structural: PatternDefinition[] = [
   {
     id: 'thirteen-orphans',
     name: 'Thirteen Orphans',
-    description: 'One of each terminal and honour, plus a duplicate of any one.',
+    description: 'One of every 1, every 9, every wind and every dragon, plus a second copy of any one of them.',
+    tiles: ['man1', 'man9', 'pin1', 'pin9', 'sou1', 'sou9', 'east', 'south', 'west', 'north', 'red', 'green', 'white'],
     detect: (ctx) => (ctx.reading.special === 'thirteen-orphans' ? 1 : 0),
   },
   {
     id: 'pure-double-chow',
     name: 'Pure Double Chow',
-    description: 'Two identical runs in the same suit.',
+    description: 'The same run of three, twice, in the same suit.',
     detect: (ctx) => {
       const keys = chowKeys(ctx);
       let count = 0;
@@ -311,7 +322,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'mixed-double-chow',
     name: 'Mixed Double Chow',
-    description: 'Two runs at the same ranks in different suits.',
+    description: 'The same three numbers run twice, in two different suits.',
     detect: (ctx) => {
       const keys = chowKeys(ctx);
       let count = 0;
@@ -330,7 +341,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'short-straight',
     name: 'Short Straight',
-    description: 'Two runs in one suit that continue each other, such as 1-2-3 and 4-5-6.',
+    description: 'Two runs in one suit that carry straight on from each other, like 1-2-3 and 4-5-6.',
     detect: (ctx) => {
       const bySuit = chowStartsBySuit(ctx);
       let count = 0;
@@ -351,7 +362,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'two-terminal-chows',
     name: 'Two Terminal Chows',
-    description: '1-2-3 and 7-8-9 in the same suit.',
+    description: '1-2-3 and 7-8-9, both in the same suit.',
     detect: (ctx) => {
       const bySuit = chowStartsBySuit(ctx);
       let count = 0;
@@ -366,7 +377,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'pure-straight',
     name: 'Pure Straight',
-    description: '1 through 9 of one suit as three runs.',
+    description: '1 through 9 of one suit, as three runs.',
     detect: (ctx) => {
       const bySuit = chowStartsBySuit(ctx);
       for (const starts of bySuit.values()) {
@@ -378,7 +389,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'mixed-straight',
     name: 'Mixed Straight',
-    description: '1-2-3, 4-5-6 and 7-8-9 spread across all three suits.',
+    description: '1-2-3, 4-5-6 and 7-8-9, one run from each of the three suits.',
     detect: (ctx) => {
       const keys = chowKeys(ctx);
       for (const [i, j, k] of triples(keys.length)) {
@@ -393,7 +404,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'pure-triple-chow',
     name: 'Pure Triple Chow',
-    description: 'Three identical runs in one suit.',
+    description: 'The same run of three, three times, in one suit.',
     supersedes: ['pure-double-chow', 'twice-pure-double-chow'],
     detect: (ctx) => {
       const keys = chowKeys(ctx);
@@ -410,7 +421,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'mixed-triple-chow',
     name: 'Mixed Triple Chow',
-    description: 'The same run in all three suits.',
+    description: 'The same run of three in all three suits.',
     supersedes: ['mixed-double-chow'],
     detect: (ctx) => {
       const keys = chowKeys(ctx);
@@ -425,7 +436,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'quadruple-chow',
     name: 'Quadruple Chow',
-    description: 'Four identical runs in one suit.',
+    description: 'The same run of three, four times, in one suit.',
     supersedes: ['pure-triple-chow', 'pure-double-chow', 'twice-pure-double-chow', 'tile-hog'],
     detect: (ctx) => {
       const keys = chowKeys(ctx);
@@ -440,7 +451,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'pure-shifted-chows',
     name: 'Pure Shifted Chows',
-    description: 'Three runs in one suit, each shifted by the same one or two ranks.',
+    description: 'Three runs in one suit, each starting the same one or two numbers above the last.',
     detect: (ctx) => {
       const bySuit = chowStartsBySuit(ctx);
       for (const starts of bySuit.values()) {
@@ -457,7 +468,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'mixed-shifted-chows',
     name: 'Mixed Shifted Chows',
-    description: 'Three runs, one per suit, each shifted up by one rank.',
+    description: 'Three runs, one per suit, each starting one number above the last.',
     detect: (ctx) => {
       const keys = chowKeys(ctx);
       for (const [i, j, k] of triples(keys.length)) {
@@ -472,7 +483,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'four-shifted-chows',
     name: 'Four Shifted Chows',
-    description: 'Four runs in one suit, each shifted by the same one or two ranks.',
+    description: 'Four runs in one suit, each starting the same one or two numbers above the last.',
     supersedes: ['pure-shifted-chows'],
     detect: (ctx) => {
       const bySuit = chowStartsBySuit(ctx);
@@ -496,7 +507,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'triple-pung',
     name: 'Triple Pung',
-    description: 'The same rank tripled in all three suits.',
+    description: 'The same number, three of a kind, in all three suits.',
     detect: (ctx) => {
       const keys = numberedTripletKeys(ctx);
       for (const [i, j, k] of triples(keys.length)) {
@@ -513,7 +524,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'double-pung',
     name: 'Double Pung',
-    description: 'The same rank tripled in two different suits.',
+    description: 'The same number, three of a kind, in two of the suits.',
     detect: (ctx) => {
       const keys = numberedTripletKeys(ctx);
       let count = 0;
@@ -532,7 +543,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'pure-shifted-pungs',
     name: 'Pure Shifted Pungs',
-    description: 'Three triplets at consecutive ranks in one suit.',
+    description: 'Three of a kind at three numbers in a row, all in one suit.',
     detect: (ctx) => {
       const bySuit = tripletRanksBySuit(ctx);
       for (const ranks of bySuit.values()) {
@@ -547,7 +558,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'four-shifted-pungs',
     name: 'Four Shifted Pungs',
-    description: 'Four triplets at consecutive ranks in one suit.',
+    description: 'Three of a kind at four numbers in a row, all in one suit.',
     supersedes: ['pure-shifted-pungs'],
     detect: (ctx) => {
       const bySuit = tripletRanksBySuit(ctx);
@@ -568,7 +579,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'mixed-shifted-pungs',
     name: 'Mixed Shifted Pungs',
-    description: 'Three triplets, one per suit, each shifted up by one rank.',
+    description: 'Three of a kind three times, one per suit, each one number above the last.',
     detect: (ctx) => {
       const keys = numberedTripletKeys(ctx);
       for (const [i, j, k] of triples(keys.length)) {
@@ -583,7 +594,7 @@ const structural: PatternDefinition[] = [
   {
     id: 'tile-hog',
     name: 'Tile Hog',
-    description: 'All four copies of a tile used without declaring a kong.',
+    description: 'All four copies of a tile used in the hand without being set down as a set of four.',
     detect: (ctx) => {
       let count = 0;
       const kongTiles = new Set(ctx.kongs.map((k) => k.tiles[0]));
@@ -603,66 +614,73 @@ const honours: PatternDefinition[] = [
   {
     id: 'dragon-pung',
     name: 'Dragon Pung',
-    description: 'A triplet or kong of red, green or white dragons. Scores per set.',
+    description: 'Three or four of one dragon. Scores per set.',
+    tiles: ['red', 'red', 'red'],
     detect: (ctx) => dragonTriplets(ctx).length,
   },
   {
     id: 'two-dragon-pungs',
     name: 'Two Dragon Pungs',
-    description: 'Triplets of two different dragons.',
+    description: 'Three of a kind in two different dragons.',
+    tiles: ['red', 'red', 'red', 'green', 'green', 'green'],
     supersedes: ['dragon-pung'],
     detect: (ctx) => (dragonTriplets(ctx).length === 2 ? 1 : 0),
   },
   {
     id: 'little-three-dragons',
     name: 'Little Three Dragons',
-    description: 'Triplets of two dragons and a pair of the third.',
+    description: 'Three of a kind in two dragons, and a pair of the third.',
+    tiles: ['red', 'red', 'red', 'green', 'green', 'green', 'white', 'white'],
     supersedes: ['dragon-pung', 'two-dragon-pungs'],
     detect: (ctx) => (dragonTriplets(ctx).length === 2 && pairIsDragon(ctx) ? 1 : 0),
   },
   {
     id: 'big-three-dragons',
     name: 'Big Three Dragons',
-    description: 'Triplets of all three dragons.',
+    description: 'Three of a kind in every dragon.',
+    tiles: ['red', 'red', 'red', 'green', 'green', 'green', 'white', 'white', 'white'],
     supersedes: ['dragon-pung', 'two-dragon-pungs', 'little-three-dragons'],
     detect: (ctx) => (dragonTriplets(ctx).length === 3 ? 1 : 0),
   },
   {
     id: 'seat-wind-pung',
     name: 'Seat Wind',
-    description: "A triplet of the player's own wind.",
+    description: "Three of a kind in the wind of your own seat.",
     detect: (ctx) => windTriplets(ctx).filter((m) => m.tiles[0] === ctx.seatWind).length,
   },
   {
     id: 'prevalent-wind-pung',
     name: 'Prevalent Wind',
-    description: "A triplet of the round's wind.",
+    description: "Three of a kind in the wind the round is named after.",
     detect: (ctx) => windTriplets(ctx).filter((m) => m.tiles[0] === ctx.roundWind).length,
   },
   {
     id: 'wind-pung',
     name: 'Wind Pung',
-    description: 'A triplet of any wind, scoring regardless of seat or round.',
+    description: 'Three of a kind in any wind, whichever seat you are sitting in.',
+    tiles: ['east', 'east', 'east'],
     detect: (ctx) => windTriplets(ctx).length,
   },
   {
     id: 'little-three-winds',
     name: 'Little Three Winds',
-    description: 'Triplets of two winds and a pair of a third.',
+    description: 'Three of a kind in two winds, and a pair of a third.',
     detect: (ctx) =>
       windTriplets(ctx).length === 2 && ctx.pair !== null && isWindCode(ctx.pair.tiles[0]) ? 1 : 0,
   },
   {
     id: 'big-three-winds',
     name: 'Big Three Winds',
-    description: 'Triplets of three different winds.',
+    description: 'Three of a kind in three different winds.',
+    tiles: ['east', 'east', 'east', 'south', 'south', 'south', 'west', 'west', 'west'],
     supersedes: ['little-three-winds', 'wind-pung'],
     detect: (ctx) => (windTriplets(ctx).length === 3 ? 1 : 0),
   },
   {
     id: 'little-four-winds',
     name: 'Little Four Winds',
-    description: 'Triplets of three winds and a pair of the fourth.',
+    description: 'Three of a kind in three winds, and a pair of the fourth.',
+    tiles: ['east', 'east', 'east', 'south', 'south', 'south', 'west', 'west', 'west', 'north', 'north'],
     supersedes: ['big-three-winds', 'little-three-winds', 'wind-pung', 'seat-wind-pung', 'prevalent-wind-pung'],
     detect: (ctx) =>
       windTriplets(ctx).length === 3 && ctx.pair !== null && isWindCode(ctx.pair.tiles[0]) ? 1 : 0,
@@ -670,7 +688,8 @@ const honours: PatternDefinition[] = [
   {
     id: 'big-four-winds',
     name: 'Big Four Winds',
-    description: 'Triplets of all four winds.',
+    description: 'Three of a kind in every wind.',
+    tiles: ['east', 'east', 'east', 'south', 'south', 'south', 'west', 'west', 'west', 'north', 'north', 'north'],
     supersedes: [
       'little-four-winds', 'big-three-winds', 'little-three-winds',
       'wind-pung', 'seat-wind-pung', 'prevalent-wind-pung', 'all-pungs',
@@ -680,14 +699,16 @@ const honours: PatternDefinition[] = [
   {
     id: 'all-honours',
     name: 'All Honours',
-    description: 'Nothing but winds and dragons.',
+    description: 'Nothing numbered at all. Only winds and dragons.',
+    tiles: ['east', 'south', 'west', 'north', 'red', 'green', 'white'],
     supersedes: ['all-terminals-and-honours', 'half-flush', 'no-simples'],
     detect: (ctx) => (ctx.tiles.every((c) => isHonour(TILE_BY_CODE[c])) ? 1 : 0),
   },
   {
     id: 'pung-of-terminals-or-honours',
     name: 'Pung of Terminals or Honours',
-    description: 'A triplet of ones, nines, winds or dragons. Scores per set.',
+    description: 'Three of a kind in a 1, a 9, a wind or a dragon. Scores per set.',
+    tiles: ['man1', 'man1', 'man1'],
     detect: (ctx) => ctx.triplets.filter((t) => isTerminalOrHonourCode(t.tiles[0])).length,
   },
 ];
@@ -700,33 +721,35 @@ const suits: PatternDefinition[] = [
   {
     id: 'full-flush',
     name: 'Full Flush',
-    description: 'One suit only, with no honours at all.',
+    description: 'One suit and nothing else: no winds, no dragons.',
+    tiles: ['pin1', 'pin4', 'pin7', 'pin9'],
     supersedes: ['half-flush', 'one-voided-suit', 'no-honours'],
     detect: (ctx) => (allNumbered(ctx) && ctx.numberedSuits.size === 1 ? 1 : 0),
   },
   {
     id: 'half-flush',
     name: 'Half Flush',
-    description: 'One suit plus honours.',
+    description: 'One suit, plus any winds and dragons.',
+    tiles: ['pin1', 'pin4', 'pin7', 'east', 'red'],
     supersedes: ['one-voided-suit'],
     detect: (ctx) => (ctx.numberedSuits.size === 1 && ctx.hasHonours ? 1 : 0),
   },
   {
     id: 'one-voided-suit',
     name: 'One Voided Suit',
-    description: 'One of the three suits is entirely absent.',
+    description: 'One of the three suits is missing from the hand entirely.',
     detect: (ctx) => (ctx.numberedSuits.size === 2 ? 1 : 0),
   },
   {
     id: 'no-honours',
     name: 'No Honours',
-    description: 'No winds or dragons anywhere in the hand.',
+    description: 'Numbered tiles only. No winds, no dragons.',
     detect: (ctx) => (!ctx.hasHonours ? 1 : 0),
   },
   {
     id: 'all-types',
     name: 'All Types',
-    description: 'All three suits plus both a wind and a dragon.',
+    description: 'All three suits, plus at least one wind and at least one dragon.',
     detect: (ctx) => {
       const hasWind = ctx.tiles.some((c) => isWindCode(c));
       const hasDragon = ctx.tiles.some((c) => isDragonCode(c));
@@ -736,14 +759,15 @@ const suits: PatternDefinition[] = [
   {
     id: 'all-simples',
     name: 'All Simples',
-    description: 'Nothing but twos through eights: no terminals, no honours.',
+    description: 'Nothing but 2 through 8. No 1s, no 9s, no winds, no dragons.',
+    tiles: ['man2', 'pin5', 'sou8'],
     supersedes: ['no-honours'],
     detect: (ctx) => (ctx.tiles.every(isSimpleCode) ? 1 : 0),
   },
   {
     id: 'outside-hand',
     name: 'Outside Hand',
-    description: 'Every set and the pair contains a terminal or an honour.',
+    description: 'Every set and the pair holds a 1, a 9, a wind or a dragon.',
     detect: (ctx) =>
       ctx.reading.melds.length > 0 && ctx.reading.melds.every(touchesTerminalOrHonour) && ctx.hasHonours
         ? 1
@@ -752,7 +776,7 @@ const suits: PatternDefinition[] = [
   {
     id: 'fully-outside-hand',
     name: 'Fully Outside Hand',
-    description: 'Every set and the pair contains a terminal, and there are no honours.',
+    description: 'Every set and the pair holds a 1 or a 9, and there are no winds or dragons.',
     supersedes: ['outside-hand', 'no-honours'],
     detect: (ctx) =>
       ctx.reading.melds.length > 0 && ctx.reading.melds.every(touchesTerminalNoHonour) ? 1 : 0,
@@ -760,14 +784,16 @@ const suits: PatternDefinition[] = [
   {
     id: 'all-terminals-and-honours',
     name: 'All Terminals and Honours',
-    description: 'Nothing but ones, nines, winds and dragons.',
+    description: 'Nothing but 1s, 9s, winds and dragons.',
+    tiles: ['man1', 'man9', 'pin1', 'pin9', 'east', 'red'],
     supersedes: ['outside-hand', 'all-pungs'],
     detect: (ctx) => (ctx.tiles.every(isTerminalOrHonourCode) && ctx.hasHonours && ctx.hasTerminals ? 1 : 0),
   },
   {
     id: 'all-terminals',
     name: 'All Terminals',
-    description: 'Nothing but ones and nines.',
+    description: 'Nothing but 1s and 9s.',
+    tiles: ['man1', 'man9', 'pin1', 'pin9', 'sou1', 'sou9'],
     supersedes: ['all-terminals-and-honours', 'fully-outside-hand', 'outside-hand', 'no-honours', 'all-pungs'],
     detect: (ctx) =>
       ctx.tiles.every((c) => isNumbered(TILE_BY_CODE[c]) && isTerminal(TILE_BY_CODE[c])) ? 1 : 0,
@@ -775,7 +801,8 @@ const suits: PatternDefinition[] = [
   {
     id: 'all-green',
     name: 'All Green',
-    description: 'Only 2, 3, 4, 6 and 8 of bamboo and the green dragon.',
+    description: 'Only tiles that are entirely green: 2, 3, 4, 6 and 8 of bamboo, and the green dragon.',
+    tiles: ['sou2', 'sou3', 'sou4', 'sou6', 'sou8', 'green'],
     detect: (ctx) => {
       const green = new Set<TileCode>(['sou2', 'sou3', 'sou4', 'sou6', 'sou8', 'green']);
       return ctx.tiles.every((c) => green.has(c)) ? 1 : 0;
@@ -784,7 +811,7 @@ const suits: PatternDefinition[] = [
   {
     id: 'nine-gates',
     name: 'Nine Gates',
-    description: '1112345678999 in one suit, plus any tile of that suit.',
+    description: '1112345678999 in one suit, plus any one more tile of that suit.',
     detect: (ctx) => {
       if (!ctx.isConcealed || !allNumbered(ctx) || ctx.numberedSuits.size !== 1) return 0;
       const ranks = new Array(10).fill(0) as number[];
@@ -844,7 +871,7 @@ const suits: PatternDefinition[] = [
   {
     id: 'all-even-pungs',
     name: 'All Even Pungs',
-    description: 'Triplets only, all of even-numbered suit tiles.',
+    description: 'Three of a kind only, and every one of them an even number.',
     supersedes: ['all-pungs', 'all-simples'],
     detect: (ctx) =>
       ctx.sets.length > 0 &&
@@ -869,7 +896,7 @@ const suits: PatternDefinition[] = [
   {
     id: 'pure-terminal-chows',
     name: 'Pure Terminal Chows',
-    description: '1-2-3 twice, 7-8-9 twice, and a pair of fives, all in one suit.',
+    description: '1-2-3 twice, 7-8-9 twice, and a pair of 5s, all in one suit.',
     supersedes: ['full-flush', 'pure-double-chow', 'twice-pure-double-chow', 'two-terminal-chows'],
     detect: (ctx) => {
       if (ctx.numberedSuits.size !== 1 || !allNumbered(ctx)) return 0;
@@ -884,7 +911,7 @@ const suits: PatternDefinition[] = [
   {
     id: 'three-suited-terminal-chows',
     name: 'Three Suited Terminal Chows',
-    description: '1-2-3 and 7-8-9 in two suits, with a pair of fives in the third.',
+    description: '1-2-3 and 7-8-9 in two suits, and a pair of 5s in the third.',
     detect: (ctx) => {
       if (ctx.hasHonours || ctx.pair === null) return 0;
       if (rankOf(ctx.pair.tiles[0]) !== 5) return 0;
@@ -927,13 +954,13 @@ const situational: PatternDefinition[] = [
   {
     id: 'out-with-replacement-tile',
     name: 'Out with Replacement Tile',
-    description: 'Won on the tile drawn to replace a kong.',
+    description: 'Won on the tile drawn to replace a set of four.',
     detect: (ctx) => (ctx.hand.context.afterKong ? 1 : 0),
   },
   {
     id: 'robbing-the-kong',
     name: 'Robbing the Kong',
-    description: 'Won by claiming the tile another player was adding to a melded triplet.',
+    description: 'Won by taking the tile another player was adding to their three of a kind.',
     detect: (ctx) => (ctx.hand.context.robbingKong ? 1 : 0),
   },
   {
@@ -963,7 +990,7 @@ const situational: PatternDefinition[] = [
   {
     id: 'riichi',
     name: 'Riichi',
-    description: 'A ready hand declared while concealed.',
+    description: 'Declared one tile away from winning, having claimed nothing from a discard.',
     detect: (ctx) => (ctx.hand.context.riichi && !ctx.hand.context.doubleRiichi ? 1 : 0),
   },
   {

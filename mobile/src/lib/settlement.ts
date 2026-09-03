@@ -33,9 +33,11 @@ export function computeDeltas(input: {
       continue;
     }
 
-    if (payment.from === 'dealer') {
+    if (payment.from === 'dealer' || payment.from === 'dealer-extra') {
       // Only meaningful when someone other than the dealer won; a dealer who
-      // wins does not pay themselves.
+      // wins does not pay themselves. The two differ in what they do to the
+      // 'each-opponent' line below: 'dealer' replaces the dealer's share,
+      // 'dealer-extra' is charged on top of it.
       if (input.dealerId !== input.winnerId) {
         deltas[input.dealerId] = (deltas[input.dealerId] ?? 0) - payment.amount;
       }

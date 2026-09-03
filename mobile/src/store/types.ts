@@ -65,6 +65,18 @@ export interface Session {
   readonly roundWind: Wind;
   /** Player id currently dealing. */
   readonly dealerId: string;
+  /**
+   * Consecutive hands the current dealer has held the deal - 連莊.
+   *
+   * Zero on the first hand of a dealership, one after they win it once, and so
+   * on. It is session state rather than something a hand carries, because it
+   * is a fact about the table that outlives any single hand, and because it has
+   * to survive an old hand being corrected without being counted twice.
+   *
+   * Optional: sessions written before this existed have no streak, and reading
+   * them as zero is right.
+   */
+  readonly dealerStreak?: number;
   readonly hands: HandRecord[];
   readonly closed?: boolean;
 }
