@@ -1,23 +1,23 @@
 {
   "expo": {
-    "name": "Mahjong Scorer",
+    "name": "Tile Tally",
     "slug": "mahjong-scorer",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mahjongscorer",
+    "scheme": "tiletally",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#123A2E",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.dylansken.mahjongscorer",
+      "bundleIdentifier": "com.tangent.tiletally",
       "infoPlist": {
         "NSCameraUsageDescription": "Photograph your hand so the app can read the tiles and score it.",
         "NSPhotoLibraryUsageDescription": "Score a hand from a photo you have already taken."
       }
     },
     "android": {
-      "package": "com.dylansken.mahjongscorer",
+      "package": "com.tangent.tiletally",
       "adaptiveIcon": {
         "backgroundColor": "#123A2E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -59,7 +59,8 @@
       "onnxruntime-react-native",
       "./plugins/with-onnxruntime-gradle9-fix",
       "./plugins/with-onnxruntime-bridgeless-fix",
-      "./plugins/with-onnxruntime-register-package"
+      "./plugins/with-onnxruntime-register-package",
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,

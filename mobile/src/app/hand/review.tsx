@@ -339,7 +339,7 @@ export default function ReviewScreen() {
 
       <View style={styles.footer}>
         <Button
-          label="Score the Hand"
+          label="Tally It Up"
           variant="primary"
           block
           disabled={!validation.ok}

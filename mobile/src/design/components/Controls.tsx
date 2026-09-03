@@ -230,6 +230,9 @@ export interface TextFieldProps {
   placeholder?: string;
   label?: string;
   autoFocus?: boolean;
+  /** Commit on leaving the field, for values saved as you go. */
+  onBlur?: () => void;
+  onSubmitEditing?: () => void;
   maxLength?: number;
   keyboardType?: 'default' | 'number-pad';
   style?: ViewStyle;
@@ -251,6 +254,8 @@ export function TextField({
   maxLength,
   keyboardType = 'default',
   style,
+  onBlur,
+  onSubmitEditing,
 }: TextFieldProps) {
   return (
     <View style={style}>
@@ -261,7 +266,9 @@ export function TextField({
         placeholder={placeholder}
         placeholderTextColor={colors.inkFaint}
         autoFocus={autoFocus}
-        maxLength={maxLength}
+        onBlur={onBlur}
+      onSubmitEditing={onSubmitEditing}
+      maxLength={maxLength}
         keyboardType={keyboardType}
         selectionColor={colors.brass}
         style={fieldStyles.input}

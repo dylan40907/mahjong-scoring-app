@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { CustomRuleSet } from '@/scoring';
 import { DEFAULT_SETTINGS, type Session, type Settings, type StoredHand } from './types';
+import { pruneTombstones, type Tombstone } from './sync/meta';
 
 /**
  * Persistence.
@@ -17,6 +18,7 @@ import { DEFAULT_SETTINGS, type Session, type Settings, type StoredHand } from '
 const KEYS = {
   version: 'mj.schemaVersion',
   sessions: 'mj.sessions',
+  deletedSessions: 'mj.deletedSessions',
   customRules: 'mj.customRuleSets',
   settings: 'mj.settings',
 } as const;
@@ -61,11 +63,13 @@ async function writeJson(key: string, value: unknown): Promise<void> {
 
 export async function loadAll(): Promise<{
   sessions: Session[];
+  deletedSessions: Tombstone[];
   customRuleSets: CustomRuleSet[];
   settings: Settings;
 }> {
-  const [sessions, customRuleSets, settings] = await Promise.all([
+  const [sessions, deletedSessions, customRuleSets, settings] = await Promise.all([
     readJson<Session[]>(KEYS.sessions, []),
+    readJson<Tombstone[]>(KEYS.deletedSessions, []),
     readJson<CustomRuleSet[]>(KEYS.customRules, []),
     readJson<Settings>(KEYS.settings, DEFAULT_SETTINGS),
   ]);
@@ -79,6 +83,7 @@ export async function loadAll(): Promise<{
           hands: session.hands.map((record) => ({ ...record, hand: migrateHand(record.hand) })),
         }))
       : [],
+    deletedSessions: Array.isArray(deletedSessions) ? pruneTombstones(deletedSessions) : [],
     customRuleSets: Array.isArray(customRuleSets) ? customRuleSets : [],
     settings: { ...DEFAULT_SETTINGS, ...settings },
   };
@@ -96,6 +101,8 @@ function isPlausibleSession(value: unknown): value is Session {
 }
 
 export const saveSessions = (sessions: Session[]) => writeJson(KEYS.sessions, sessions);
+export const saveDeletedSessions = (stones: Tombstone[]) =>
+  writeJson(KEYS.deletedSessions, stones);
 export const saveCustomRuleSets = (rules: CustomRuleSet[]) => writeJson(KEYS.customRules, rules);
 export const saveSettings = (settings: Settings) => writeJson(KEYS.settings, settings);
 

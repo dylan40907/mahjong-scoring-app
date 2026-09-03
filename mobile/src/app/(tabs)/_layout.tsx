@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { RulesIcon, SessionsIcon, SettingsIcon } from '@/design/icons';
+import { PlayersIcon, RulesIcon, SessionsIcon, SettingsIcon } from '@/design/icons';
 import { colors, type } from '@/design/tokens';
 
 export default function TabsLayout() {
@@ -37,6 +37,13 @@ export default function TabsLayout() {
         options={{
           title: 'Rules',
           tabBarIcon: ({ color }) => <RulesIcon size={22} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'You',
+          tabBarIcon: ({ color }) => <PlayersIcon size={22} color={color} />,
         }}
       />
       <Tabs.Screen

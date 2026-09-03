@@ -270,12 +270,15 @@ async function main() {
 
   // The review screen scores directly: who won and how were settled before the
   // photograph was ever taken.
-  await page.getByText('Score the Hand', { exact: true }).last().click();
+  await page.getByText('Tally It Up', { exact: true }).last().click();
   await page.waitForTimeout(900);
   await shoot(page, '15-result');
 
   await scrollBy(page, 1400);
   await shoot(page, '16-result-settlement');
+
+  await goto(page, '/(tabs)/profile');
+  await shoot(page, '08b-profile');
 
   await contactSheet(page);
 

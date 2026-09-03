@@ -1,5 +1,6 @@
 import type { TileCode, Wind } from '@/tiles/tileset';
 import type { HandContext, Meld } from '@/scoring';
+import type { Tombstone } from './sync/meta';
 
 /**
  * What the app persists.
@@ -79,6 +80,12 @@ export interface Session {
   readonly dealerStreak?: number;
   readonly hands: HandRecord[];
   readonly closed?: boolean;
+  /**
+   * The `updatedAt` the server has acknowledged. Absent until first pushed,
+   * and differing from `updatedAt` exactly while there is something to push.
+   * See `sync/meta.ts` for why dirtiness is derived rather than flagged.
+   */
+  readonly syncedAt?: string | null;
 }
 
 /**
@@ -95,6 +102,14 @@ export interface Settings {
 }
 
 export interface AppState {
+  /**
+   * Sessions deleted here, kept so the delete can travel.
+   *
+   * A delete that syncs as an absence is not a delete: to a device that had
+   * not heard about it, the missing row is indistinguishable from a new
+   * session arriving, and it comes back.
+   */
+  readonly deletedSessions: Tombstone[];
   readonly ready: boolean;
   readonly sessions: Session[];
   readonly customRuleSets: import('@/scoring').CustomRuleSet[];

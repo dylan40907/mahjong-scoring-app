@@ -16,6 +16,8 @@ module.exports = {
     // storage is swapped for a Map rather than the suite being kept away from
     // it.
     '^@react-native-async-storage/async-storage$': '<rootDir>/src/store/__mocks__/asyncStorage.ts',
+    '^expo-secure-store$': '<rootDir>/src/store/__mocks__/nativeStub.ts',
+    '^react-native-url-polyfill/auto$': '<rootDir>/src/store/__mocks__/nativeStub.ts',
   },
   transform: {
     '^.+\\.tsx?$': [

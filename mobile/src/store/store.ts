@@ -2,7 +2,14 @@ import { useCallback, useSyncExternalStore } from 'react';
 import type { CustomRuleSet, RuleSet } from '@/scoring';
 import { BUILT_IN_RULESETS } from '@/scoring';
 import type { Wind } from '@/tiles/tileset';
-import { loadAll, saveCustomRuleSets, saveSessions, saveSettings } from './persistence';
+import {
+  loadAll,
+  saveCustomRuleSets,
+  saveDeletedSessions,
+  saveSessions,
+  saveSettings,
+} from './persistence';
+import { pruneTombstones } from './sync/meta';
 import {
   DEFAULT_SETTINGS,
   type AppState,
@@ -28,6 +35,7 @@ import {
 let state: AppState = {
   ready: false,
   sessions: [],
+  deletedSessions: [],
   customRuleSets: [],
   settings: DEFAULT_SETTINGS,
 };
@@ -178,6 +186,16 @@ function replaceSession(id: string, update: (session: Session) => Session): void
   void saveSessions(next);
 }
 
+/**
+ * The whole state, for tests and for the sync layer.
+ *
+ * Screens use `useAppState` and re-render; the sync engine needs to read
+ * everything once, off the render path, without subscribing to any of it.
+ */
+export function getState(): AppState {
+  return state;
+}
+
 export function getSession(id: string): Session | undefined {
   return state.sessions.find((session) => session.id === id);
 }
@@ -260,11 +278,27 @@ export function setSessionRuleSet(sessionId: string, ruleSetId: string): void {
  * on the table itself. Nobody has ever wanted to name a mahjong session before
  * playing it.
  */
+/**
+ * The name to put in seat one, when anything knows it.
+ *
+ * Pushed in by the account layer rather than pulled out of it: the store is
+ * the bottom of the stack and has no business importing auth, which drags a
+ * native module through every test that touches a session.
+ */
+let defaultPlayerName: string | null = null;
+
+export function setDefaultPlayerName(name: string | null): void {
+  defaultPlayerName = name?.trim() || null;
+}
+
 export function createQuickSession(): Session {
   return createSession({
     name: defaultSessionName(),
     ruleSetId: state.settings.defaultRuleSetId,
-    playerNames: ['Player 1', 'Player 2', 'Player 3', 'Player 4'],
+    // Seat one is whoever is holding the phone, when the app knows who that
+    // is. It is the one name in four it can already answer, and four names are
+    // the only setup starting a session cannot skip.
+    playerNames: [defaultPlayerName || 'Player 1', 'Player 2', 'Player 3', 'Player 4'],
   });
 }
 
@@ -281,8 +315,16 @@ export function defaultSessionName(now: Date = new Date()): string {
 
 export function deleteSession(id: string): void {
   const next = state.sessions.filter((session) => session.id !== id);
-  set({ sessions: next });
+  // The row goes, but a note that it went stays behind, so the delete can
+  // travel to the other devices instead of looking like a session they have
+  // and this one has merely lost.
+  const stones = pruneTombstones([
+    ...state.deletedSessions.filter((stone) => stone.id !== id),
+    { id, deletedAt: new Date().toISOString() },
+  ]);
+  set({ sessions: next, deletedSessions: stones });
   void saveSessions(next);
+  void saveDeletedSessions(stones);
 }
 
 /** Running totals for every player in a session. */

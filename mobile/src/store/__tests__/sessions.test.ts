@@ -2,7 +2,9 @@ import {
   addHand,
   createSession,
   createSessionLike,
+  deleteSession,
   getSession,
+  getState,
   sessionTotals,
 } from '../store';
 import type { HandRecord, Session } from '../types';
@@ -119,5 +121,18 @@ describe('playing again with the same people', () => {
     const again = createSessionLike(first);
     const ids = new Set(first.players.map((player) => player.id));
     expect(again.players.every((player) => !ids.has(player.id))).toBe(true);
+  });
+});
+
+describe('deleting a session', () => {
+  it('leaves a tombstone so the delete can travel', () => {
+    const session = fresh();
+    deleteSession(session.id);
+
+    expect(getSession(session.id)).toBeUndefined();
+    const stone = getState().deletedSessions.find((s) => s.id === session.id);
+    expect(stone).toBeDefined();
+    // Never pushed yet, so it is still owed to the server.
+    expect(stone!.syncedAt ?? null).toBeNull();
   });
 });
