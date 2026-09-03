@@ -57,6 +57,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "export:web": "expo export --platform web --output-dir dist",
+    "update": "eas update --branch preview",
     "screenshots": "node tools/screenshot.mjs",
     "start:go": "expo start --go"
   },

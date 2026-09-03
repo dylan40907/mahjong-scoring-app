@@ -68,6 +68,10 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "updates": {
+      "url": "https://u.expo.dev/69784d63-a36d-4dfe-806c-888c0c849b70",
+      "fallbackToCacheTimeout": 0
+    },
     "extra": {
       "router": {},
       "eas": {
