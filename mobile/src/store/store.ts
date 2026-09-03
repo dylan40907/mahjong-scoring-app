@@ -149,6 +149,27 @@ export function createSession(input: {
   return session;
 }
 
+/**
+ * Start a fresh session with the same people round the table.
+ *
+ * The names are the only thing worth carrying over, and they are the only
+ * thing anybody types into this app twice: the same four play again next week
+ * and renaming all of them is the one piece of setup the quick-start path
+ * cannot skip. Seats keep their order, so whoever dealt first deals first
+ * again - the alternative is a silent reshuffle nobody asked for.
+ *
+ * Scores, hands and the deal deliberately do not come along. This is a new
+ * session, not a continuation of the old one, which is what "play again" means
+ * when the previous night is already finished and totalled.
+ */
+export function createSessionLike(source: Session): Session {
+  return createSession({
+    name: defaultSessionName(),
+    ruleSetId: source.ruleSetId,
+    playerNames: source.players.map((player) => player.name),
+  });
+}
+
 function replaceSession(id: string, update: (session: Session) => Session): void {
   const next = state.sessions.map((session) =>
     session.id === id ? { ...update(session), updatedAt: new Date().toISOString() } : session,

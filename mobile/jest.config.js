@@ -12,6 +12,10 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
+    // The store is worth testing and reaches persistence on every write, so
+    // storage is swapped for a Map rather than the suite being kept away from
+    // it.
+    '^@react-native-async-storage/async-storage$': '<rootDir>/src/store/__mocks__/asyncStorage.ts',
   },
   transform: {
     '^.+\\.tsx?$': [

@@ -10,9 +10,15 @@ import {
   Heading,
   Screen,
 } from '@/design/components';
-import { PlusIcon, SessionsIcon } from '@/design/icons';
+import { PlayersIcon, PlusIcon, SessionsIcon } from '@/design/icons';
 import { colors, radius, space } from '@/design/tokens';
-import { createQuickSession, findRuleSet, sessionTotals, useAppState } from '@/store/store';
+import {
+  createQuickSession,
+  createSessionLike,
+  findRuleSet,
+  sessionTotals,
+  useAppState,
+} from '@/store/store';
 import type { Session } from '@/store/types';
 import { plural, relativeDate, signed } from '@/lib/format';
 
@@ -81,24 +87,46 @@ export default function SessionsScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <SessionCard session={item} onPress={() => router.push(`/session/${item.id}`)} />
+          <SessionCard
+            session={item}
+            onPress={() => router.push(`/session/${item.id}`)}
+            onPlayAgain={() => {
+              const session = createSessionLike(item);
+              router.push(`/session/${session.id}`);
+            }}
+          />
         )}
       />
     </Screen>
   );
 }
 
-function SessionCard({ session, onPress }: { session: Session; onPress: () => void }) {
+function SessionCard({
+  session,
+  onPress,
+  onPlayAgain,
+}: {
+  session: Session;
+  onPress: () => void;
+  onPlayAgain: () => void;
+}) {
   const totals = sessionTotals(session);
   const rules = findRuleSet(session.ruleSetId);
   const ranked = [...session.players].sort((a, b) => (totals[b.id] ?? 0) - (totals[a.id] ?? 0));
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-    >
+    /*
+     * The card holds two targets, so the body is the pressable rather than the
+     * card: a button nested inside a pressable card works, but every tap near
+     * its edge becomes a question about which one meant it.
+     */
+    <View style={styles.card}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${session.name}`}
+        onPress={onPress}
+        style={({ pressed }) => [styles.cardBody, pressed && styles.cardPressed]}
+      >
       <View style={styles.cardHeader}>
         <Heading numberOfLines={2} style={styles.cardTitle}>
           {session.name}
@@ -128,7 +156,27 @@ function SessionCard({ session, onPress }: { session: Session; onPress: () => vo
           );
         })}
       </View>
-    </Pressable>
+      </Pressable>
+
+      {/*
+        * The one piece of setup starting a session cannot skip.
+        *
+        * Everything else about a new session has a sensible default and is a
+        * tap to change on the table itself - but four names have to be typed,
+        * and it is the same four every week. Carrying them over is the whole
+        * feature; the scores and the deal deliberately stay behind, because
+        * this is a new night rather than a continuation of the last one.
+        */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Start a new session with ${ranked.map((p) => p.name).join(', ')}`}
+        onPress={onPlayAgain}
+        style={({ pressed }) => [styles.again, pressed && styles.againPressed]}
+      >
+        <PlayersIcon size={16} color={colors.inkMuted} />
+        <CaptionStrong tone="muted">Play again, same players</CaptionStrong>
+      </Pressable>
+    </View>
   );
 }
 
@@ -140,11 +188,21 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.line,
-    padding: space.lg,
     marginBottom: space.md,
-    gap: space.xs,
+    overflow: 'hidden',
   },
+  cardBody: { padding: space.lg, gap: space.xs },
   cardPressed: { backgroundColor: colors.surfaceHigh },
+  again: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.sm,
+    paddingVertical: space.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.line,
+  },
+  againPressed: { backgroundColor: colors.surfaceHigh },
   cardHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space.md },
   cardTitle: { flex: 1 },
   standings: { marginTop: space.md, gap: space.xs },
