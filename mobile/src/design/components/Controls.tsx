@@ -234,7 +234,10 @@ export interface TextFieldProps {
   onBlur?: () => void;
   onSubmitEditing?: () => void;
   maxLength?: number;
-  keyboardType?: 'default' | 'number-pad';
+  keyboardType?: 'default' | 'number-pad' | 'email-address';
+  /** Hides what is typed, and stops the keyboard offering to remember it. */
+  secureTextEntry?: boolean;
+  autoCapitalize?: 'none' | 'sentences';
   style?: ViewStyle;
 }
 
@@ -256,6 +259,8 @@ export function TextField({
   style,
   onBlur,
   onSubmitEditing,
+  secureTextEntry,
+  autoCapitalize,
 }: TextFieldProps) {
   return (
     <View style={style}>
@@ -266,7 +271,9 @@ export function TextField({
         placeholder={placeholder}
         placeholderTextColor={colors.inkFaint}
         autoFocus={autoFocus}
-        onBlur={onBlur}
+        secureTextEntry={secureTextEntry}
+      autoCapitalize={autoCapitalize ?? (secureTextEntry || keyboardType === 'email-address' ? 'none' : undefined)}
+      onBlur={onBlur}
       onSubmitEditing={onSubmitEditing}
       maxLength={maxLength}
         keyboardType={keyboardType}

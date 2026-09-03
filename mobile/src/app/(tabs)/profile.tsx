@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import {
   Body,
   BodyStrong,
@@ -18,7 +18,15 @@ import {
 import { PlayersIcon, SparkIcon, TrophyIcon } from '@/design/icons';
 import { colors, space, tileSize } from '@/design/tokens';
 import { findRuleSet, useAppState } from '@/store/store';
-import { setDisplayName, useAccount } from '@/store/account';
+import {
+  deleteAccount,
+  setDisplayName,
+  signInWithEmail,
+  signOut,
+  upgradeWithEmail,
+  useAccount,
+} from '@/store/account';
+import { syncNow } from '@/store/sync/engine';
 import { isCloudConfigured } from '@/lib/supabase';
 import type { TileCode } from '@/tiles/tileset';
 import type { HandRecord, Session } from '@/store/types';
@@ -38,6 +46,10 @@ export default function ProfileScreen() {
   const sessions = useAppState(useCallback((state) => state.sessions, []));
   const account = useAccount(useCallback((a) => a, []));
   const [draftName, setDraftName] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const best = useMemo(() => bestHand(sessions), [sessions]);
   const handsScored = sessions.reduce((sum, session) => sum + session.hands.length, 0);
@@ -45,6 +57,49 @@ export default function ProfileScreen() {
   const commitName = () => {
     if (draftName !== null) void setDisplayName(draftName);
     setDraftName(null);
+  };
+
+  /**
+   * One form for both, because from here they are the same action.
+   *
+   * An anonymous account is upgraded in place - `updateUser` attaches the
+   * credentials to the *same* user id, so every session already stored against
+   * it stays put. Only if that fails because the address is already taken does
+   * this become a sign-in, which is the case where the games on this device
+   * belong to somebody who already has an account elsewhere.
+   */
+  const connect = async () => {
+    setBusy(true);
+    setProblem(null);
+    const upgraded = await upgradeWithEmail(email, password);
+    if (upgraded) {
+      const signedIn = await signInWithEmail(email, password);
+      if (signedIn) {
+        setProblem(signedIn);
+        setBusy(false);
+        return;
+      }
+    }
+    setPassword('');
+    await syncNow();
+    setBusy(false);
+  };
+
+  const confirmDelete = () => {
+    Alert.alert(
+      'Delete your account?',
+      'Your account and everything stored with it are removed for good. Games on this device stay where they are.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void deleteAccount().then((error) => setProblem(error));
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -118,22 +173,49 @@ export default function ProfileScreen() {
 
       <Section title="Account">
         {account.status === 'identified' ? (
-          <Panel flush>
-            <Row title="Signed in as" value={account.email ?? '—'} />
+          <>
+            <Panel flush>
+              <Row title="Signed in as" value={account.email ?? '—'} />
+            </Panel>
+            <View style={styles.accountActions}>
+              <Button label="Sign out" block onPress={() => void signOut()} />
+              {/* Required in the app by both stores, not merely polite. */}
+              <Button label="Delete account" variant="danger" block onPress={confirmDelete} />
+            </View>
+          </>
+        ) : !isCloudConfigured() ? (
+          <Panel>
+            <Body tone="muted">
+              This build has no account server, so everything stays on this device.
+            </Body>
           </Panel>
         ) : (
           <Panel style={styles.upgrade}>
             <Body tone="muted">
-              {isCloudConfigured()
-                ? 'Your games are on this device. Sign in to reach them from another one.'
-                : 'This build has no account server configured, so everything stays on this device.'}
+              Your games are on this device. Add an email to reach them from another one —
+              nothing you have already scored is lost.
             </Body>
-            {isCloudConfigured() ? (
-              <Button label="Sign in" variant="primary" block disabled />
-            ) : null}
-            {isCloudConfigured() ? (
-              <CaptionStrong tone="faint">Coming in the next update</CaptionStrong>
-            ) : null}
+            <TextField
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Email"
+              keyboardType="email-address"
+            />
+            <TextField
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Password"
+              secureTextEntry
+            />
+            <Button
+              label="Save my games"
+              variant="primary"
+              block
+              loading={busy}
+              disabled={busy || email.trim().length < 3 || password.length < 6}
+              onPress={() => void connect()}
+            />
+            {problem ? <CaptionStrong tone="loss">{problem}</CaptionStrong> : null}
           </Panel>
         )}
       </Section>
@@ -170,5 +252,6 @@ const styles = StyleSheet.create({
   bestTiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 3 },
   bestLine: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   empty: { alignItems: 'center', gap: space.sm, paddingVertical: space.lg },
-  upgrade: { gap: space.md, alignItems: 'flex-start' },
+  upgrade: { gap: space.md },
+  accountActions: { gap: space.sm, marginTop: space.md },
 });

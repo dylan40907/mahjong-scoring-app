@@ -189,6 +189,50 @@ export async function upgradeWithEmail(email: string, password: string): Promise
   return null;
 }
 
+/** Sign in to an existing account on this device. */
+export async function signInWithEmail(email: string, password: string): Promise<string | null> {
+  if (!supabase) return 'Accounts are unavailable in this build.';
+  const { error } = await supabase.auth.signInWithPassword({
+    email: email.trim(),
+    password,
+  });
+  return error ? error.message : null;
+}
+
+/**
+ * Delete the account and everything belonging to it.
+ *
+ * Both stores require this to exist inside the app - Play also wants a public
+ * URL that does the same - and it is a listing blocker rather than a nicety.
+ *
+ * Photographs are cleared first, from the client, because Supabase refuses
+ * direct deletes against `storage.objects` from SQL: a function that tried
+ * failed with 42501 and took the whole deletion down with it. Everything else
+ * cascades from the auth user.
+ */
+export async function deleteAccount(): Promise<string | null> {
+  if (!supabase || !account.userId) return 'Not signed in.';
+
+  try {
+    const { data } = await supabase.storage.from('hand-photos').list(account.userId);
+    if (data && data.length > 0) {
+      await supabase.storage
+        .from('hand-photos')
+        .remove(data.map((file) => `${account.userId}/${file.name}`));
+    }
+  } catch {
+    // Storage being unreachable must not block deleting the account itself;
+    // the objects are orphaned but unreadable once their owner is gone.
+  }
+
+  const { error } = await supabase.rpc('delete_own_account');
+  if (error) return error.message;
+
+  await supabase.auth.signOut();
+  set(EMPTY);
+  return null;
+}
+
 export async function signOut(): Promise<void> {
   if (!supabase) return;
   await supabase.auth.signOut();
