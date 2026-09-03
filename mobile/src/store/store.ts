@@ -9,7 +9,7 @@ import {
   saveSessions,
   saveSettings,
 } from './persistence';
-import { pruneTombstones } from './sync/meta';
+import { pruneTombstones, type Tombstone } from './sync/meta';
 import {
   DEFAULT_SETTINGS,
   type AppState,
@@ -192,6 +192,18 @@ function replaceSession(id: string, update: (session: Session) => Session): void
  * Screens use `useAppState` and re-render; the sync engine needs to read
  * everything once, off the render path, without subscribing to any of it.
  */
+/**
+ * Replace what sync owns, in one write.
+ *
+ * The sync engine has already decided which copy of each session wins and
+ * which deletes are real, so this is deliberately a wholesale swap rather than
+ * a merge - two things reconciling the same records by different rules is how
+ * they end up disagreeing.
+ */
+export function applySync(sessions: Session[], deletedSessions: Tombstone[]): void {
+  set({ sessions, deletedSessions });
+}
+
 export function getState(): AppState {
   return state;
 }

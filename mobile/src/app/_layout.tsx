@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -7,6 +7,7 @@ import { TileScanner } from '@/design/components';
 import { colors, type } from '@/design/tokens';
 import { useOtaUpdates } from '@/lib/updates';
 import { initAccount } from '@/store/account';
+import { syncNow } from '@/store/sync/engine';
 import { hydrate } from '@/store/store';
 
 /**
@@ -26,8 +27,17 @@ export default function RootLayout() {
   useEffect(() => {
     void hydrate();
     // Anonymous, silent, and allowed to fail: offline is an ordinary outcome
-    // and leaves the app exactly as it was before accounts existed.
-    void initAccount();
+    // and leaves the app exactly as it was before accounts existed. Sync
+    // follows whenever it succeeds, and again on every return to the
+    // foreground, which is the cheapest signal that the network may be back.
+    void initAccount().then(() => syncNow());
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (status) => {
+      if (status === 'active') void syncNow();
+    });
+    return () => sub.remove();
   }, []);
 
   const updateStatus = useOtaUpdates();
