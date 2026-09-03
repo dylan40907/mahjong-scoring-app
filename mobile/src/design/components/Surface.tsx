@@ -47,6 +47,34 @@ export function Section({ title, icon, note, first, style, children, ...rest }: 
   );
 }
 
+export interface FieldProps {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  style?: ViewStyle;
+}
+
+/**
+ * A labelled control that sits *below* its label rather than beside it.
+ *
+ * `Row` puts the control on the right, which works for a stepper and fails for
+ * anything that wants the whole width. A `Segmented` sizes itself entirely
+ * from its children's `flex: 1`, so in a row it has no width to divide up: on
+ * a phone the label vanished and the row grew to most of a screen, leaving one
+ * pair of buttons floating in an empty panel.
+ */
+export function Field({ title, subtitle, children, style }: FieldProps) {
+  return (
+    <View style={[styles.field, style]}>
+      <View style={styles.fieldLabel}>
+        <Body>{title}</Body>
+        {subtitle ? <Caption tone="faint">{subtitle}</Caption> : null}
+      </View>
+      {children}
+    </View>
+  );
+}
+
 export interface PanelProps extends ViewProps {
   /** Removes the horizontal padding, for edge-to-edge rows inside. */
   flush?: boolean;
@@ -96,9 +124,10 @@ export function Row({
     <>
       {leading ? <View style={styles.rowLeading}>{leading}</View> : null}
       <View style={styles.rowBody}>
-        <Body tone={destructive ? 'loss' : 'default'} numberOfLines={1}>
-          {title}
-        </Body>
+        {/* Wraps, like the subtitle. "Discards before the win" arrived as
+            "Discards b…" next to a stepper, which is exactly the ellipsis with
+            no way to open it that this app is not supposed to have. */}
+        <Body tone={destructive ? 'loss' : 'default'}>{title}</Body>
         {/* Wraps. A hint that ends in an ellipsis with no way to open it is
             worse than no hint, and every one of these is short enough to
             simply fit. */}
@@ -166,6 +195,13 @@ const styles = StyleSheet.create({
     paddingVertical: space.md,
   },
   rowPressed: { backgroundColor: colors.surfaceHigh },
+  field: {
+    alignSelf: 'stretch',
+    gap: space.sm,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+  },
+  fieldLabel: { gap: 2 },
   rowLeading: { width: 26, alignItems: 'center' },
   rowBody: { flex: 1, gap: 2 },
   rowSubtitle: { marginTop: 1 },

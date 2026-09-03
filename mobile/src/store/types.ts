@@ -69,12 +69,17 @@ export interface Session {
   readonly closed?: boolean;
 }
 
+/**
+ * The only preference worth storing.
+ *
+ * There were two more, and both were questions the app had already been
+ * answered: whether to read tiles from photos duplicated the camera permission
+ * the player granted the first time they scored a hand, and haptics is a
+ * system-wide switch every phone already has. Settings that shadow a decision
+ * made elsewhere go stale and then lie.
+ */
 export interface Settings {
   readonly defaultRuleSetId: string;
-  /** Run the detector on capture; off falls back to manual entry. */
-  readonly detectionEnabled: boolean;
-  /** Below this the review screen flags a tile for checking. */
-  readonly hapticsEnabled: boolean;
 }
 
 export interface AppState {
@@ -86,6 +91,4 @@ export interface AppState {
 
 export const DEFAULT_SETTINGS: Settings = {
   defaultRuleSetId: 'taiwanese-common',
-  detectionEnabled: true,
-  hapticsEnabled: true,
 };

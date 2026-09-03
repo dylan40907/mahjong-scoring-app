@@ -48,7 +48,6 @@ export default function ResultScreen() {
   const [explaining, setExplaining] = useState<string | null>(null);
   const router = useRouter();
   const draft = useDraft(useCallback((d) => d, []));
-  const settings = useAppState(useCallback((state) => state.settings, []));
   const session = useAppState(
     useCallback((state) => state.sessions.find((s) => s.id === draft.sessionId), [draft.sessionId]),
   );
@@ -114,7 +113,7 @@ export default function ResultScreen() {
     };
     if (draft.handId) updateHand(session.id, record);
     else addHand(session.id, record);
-    if (settings.hapticsEnabled) {
+    {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
     resetDraft();

@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { Alert, StyleSheet } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
 import Constants from 'expo-constants';
 import {
   Button,
@@ -9,16 +9,33 @@ import {
   Row,
   Screen,
   Section,
-  Toggle,
 } from '@/design/components';
-import { space } from '@/design/tokens';
+import { CheckIcon, RulesIcon } from '@/design/icons';
+import { colors, space } from '@/design/tokens';
 import { allRuleSets, updateSettings, useAppState } from '@/store/store';
 import { clearAll } from '@/store/persistence';
 
+/**
+ * Settings.
+ *
+ * Deliberately short. Two switches used to live here and neither earned its
+ * place: "read tiles from photos" duplicated a decision the player already
+ * made when they granted camera access, and haptics is something every phone
+ * turns off globally in its own settings. A preference that exists only
+ * because it was easy to add is a question the app asks and then ignores.
+ *
+ * What is left is the one genuine preference - which ruleset a new session
+ * starts on - and it is now something you can actually change, which it was
+ * not: it showed the current value and did nothing when tapped.
+ */
 export default function SettingsScreen() {
   const settings = useAppState(useCallback((state) => state.settings, []));
   const sessions = useAppState(useCallback((state) => state.sessions, []));
-  const defaultRules = allRuleSets().find((r) => r.id === settings.defaultRuleSetId);
+  useAppState(useCallback((state) => state.customRuleSets, []));
+
+  const rulesets = allRuleSets();
+  const defaultRules = rulesets.find((r) => r.id === settings.defaultRuleSetId);
+  const [picking, setPicking] = useState(false);
 
   const confirmReset = () => {
     Alert.alert(
@@ -39,27 +56,42 @@ export default function SettingsScreen() {
 
   return (
     <Screen scroll>
-      <Section title="Reading hands" first>
+      <Section title="Defaults" icon={<RulesIcon size={15} color={colors.inkFaint} />} first>
         <Panel flush>
-          <Toggle
-            label="Read tiles from photos"
-            hint="Turn off to type every hand in."
-            value={settings.detectionEnabled}
-            onChange={(detectionEnabled) => updateSettings({ detectionEnabled })}
+          <Row
+            title="New sessions use"
+            value={defaultRules?.name ?? 'None'}
+            onPress={() => setPicking(!picking)}
+            chevron={!picking}
           />
-        </Panel>
-      </Section>
-
-      <Section title="Defaults">
-        <Panel flush>
-          <Row title="Default ruleset" value={defaultRules?.name ?? 'None'} />
-          <Divider inset={space.lg} />
-          <Toggle
-            label="Haptics"
-            hint="A tap when a hand is scored."
-            value={settings.hapticsEnabled}
-            onChange={(hapticsEnabled) => updateSettings({ hapticsEnabled })}
-          />
+          {/*
+            * The list opens in place rather than on a screen of its own.
+            * Choosing a ruleset is one tap either side of one decision, and a
+            * pushed screen would cost two more for the navigation around it.
+            */}
+          {picking ? (
+            <View>
+              {rulesets.map((rules) => (
+                <View key={rules.id}>
+                  <Divider inset={space.lg} />
+                  <Row
+                    title={rules.name}
+                    subtitle={rules.subtitle}
+                    trailing={
+                      rules.id === settings.defaultRuleSetId ? (
+                        <CheckIcon size={18} color={colors.brass} />
+                      ) : undefined
+                    }
+                    chevron={false}
+                    onPress={() => {
+                      updateSettings({ defaultRuleSetId: rules.id });
+                      setPicking(false);
+                    }}
+                  />
+                </View>
+              ))}
+            </View>
+          ) : null}
         </Panel>
       </Section>
 

@@ -214,7 +214,7 @@ export default function ReviewScreen() {
         <Section
           title={
             mode === 'winning' ? 'Tap the winning tile'
-            : mode === 'exposed' ? 'On the table'
+            : mode === 'exposed' ? 'Revealed'
             : 'The hand'
           }
           icon={
@@ -244,15 +244,15 @@ export default function ReviewScreen() {
               <PlusIcon size={20} color={colors.inkFaint} />
             </Pressable>
             {/*
-              * "On the table" rather than "melded" or "exposed".
+              * "Revealed" rather than "melded" or "exposed".
               *
               * Both of those are translations somebody invented for a thing
               * the player did physically, and neither is what anyone says at
-              * a table. Where the tiles ended up is plain, literal, and true
-              * in any language the phrase gets translated into.
+              * a table. What actually happened is that everyone got to see the
+              * tiles, which is plain and survives being translated onward.
               */}
             <Button
-              label={mode === 'exposed' ? 'Done' : 'On the table'}
+              label={mode === 'exposed' ? 'Done' : 'Revealed'}
               icon={
                 <MeldIcon
                   size={16}
@@ -265,7 +265,7 @@ export default function ReviewScreen() {
 
           <Caption tone="faint" style={styles.hint}>
             {mode === 'exposed'
-              ? 'Drag across the tiles you showed. Drag again to clear.'
+              ? 'Drag across the tiles everyone saw. Drag again to clear.'
               : 'Tap to fix · hold to move'}
           </Caption>
         </Section>

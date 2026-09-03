@@ -20,6 +20,9 @@ import { colors, radius, space } from '../tokens';
  * of scrolling, which is what made it feel long.
  */
 
+/** Space between cards. Spent as padding inside each cell, not as a gap. */
+const GUTTER = space.sm;
+
 export interface ChoiceItem {
   key: string;
   /** One or two words. The picture is doing the explaining. */
@@ -38,36 +41,48 @@ export interface ChoiceGridProps {
 }
 
 export function ChoiceGrid({ items, columns = 3, style }: ChoiceGridProps) {
-  // Percentage rather than a measured width: the gap is subtracted in the
-  // margin, so the cards stay square-ish at any screen size without a layout
-  // pass.
-  const basis = columns === 2 ? '48.5%' : '31.8%';
+  /*
+   * Cells take an exact fraction of the width and hold the gutter as padding,
+   * with the grid pulled out by half a gutter so the outer edges still line up.
+   *
+   * The obvious version - `gap` on the grid and a percentage width on each
+   * card - does not work: a percentage is measured against the full container,
+   * so three 33.3% cards plus two gaps overflow and the third wraps onto its
+   * own line. That is why this arrived on the phone as two across when it had
+   * looked like three in a wider preview.
+   */
+  const cell: ViewStyle = { width: `${100 / columns}%`, padding: GUTTER / 2 };
 
   return (
     <View style={[styles.grid, style]}>
       {items.map((item) => (
-        <Pressable
-          key={item.key}
-          accessibilityRole="button"
-          accessibilityState={{ selected: !!item.selected }}
-          accessibilityLabel={item.label}
-          onPress={item.onPress}
-          style={({ pressed }) => [
-            styles.card,
-            { flexBasis: basis },
-            item.selected && styles.cardOn,
-            pressed && styles.pressed,
-          ]}
-        >
-          {item.icon ? (
-            <View style={styles.cardIcon}>
-              {item.icon(item.selected ? colors.brass : colors.inkMuted)}
-            </View>
-          ) : null}
-          <CaptionStrong tone={item.selected ? 'accent' : 'muted'} center>
-            {item.label}
-          </CaptionStrong>
-        </Pressable>
+        <View key={item.key} style={cell}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: !!item.selected }}
+            accessibilityLabel={item.label}
+            onPress={item.onPress}
+            style={({ pressed }) => [
+              styles.card,
+              item.selected && styles.cardOn,
+              pressed && styles.pressed,
+            ]}
+          >
+            {item.icon ? (
+              <View style={styles.cardIcon}>
+                {item.icon(item.selected ? colors.brass : colors.inkMuted)}
+              </View>
+            ) : null}
+            {/*
+              * Wraps to as many lines as it needs. These labels are already as
+              * short as they can be without becoming riddles, and a card
+              * reading "Robbed a…" would be worse than a taller card.
+              */}
+            <CaptionStrong tone={item.selected ? 'accent' : 'muted'} center>
+              {item.label}
+            </CaptionStrong>
+          </Pressable>
+        </View>
       ))}
     </View>
   );
@@ -116,14 +131,15 @@ export function Expander({ title, note, icon, defaultOpen = false, children }: E
 }
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', margin: -GUTTER / 2 },
   card: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: space.xs,
     paddingVertical: space.md,
     paddingHorizontal: space.xs,
-    minHeight: 82,
+    minHeight: 88,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.line,

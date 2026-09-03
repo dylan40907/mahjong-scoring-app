@@ -7,6 +7,7 @@ import {
   Caption,
   CaptionStrong,
   Divider,
+  Field,
   Panel,
   Row,
   Screen,
@@ -310,20 +311,19 @@ export default function RuleEditorScreen() {
 
         <Section title="The table" icon={<MeldIcon size={15} color={colors.inkFaint} />}>
           <Panel flush>
-            <Row
+            <Field
               title="Hand size"
               subtitle="Sixteen for Taiwanese, thirteen everywhere else."
-              trailing={
-                <Segmented
-                  options={[
-                    { value: '13', label: '13' },
-                    { value: '16', label: '16' },
-                  ]}
-                  value={String(handSize)}
-                  onChange={(next) => setHandSize(next === '16' ? 16 : 13)}
-                />
-              }
-            />
+            >
+              <Segmented
+                options={[
+                  { value: '13', label: '13' },
+                  { value: '16', label: '16' },
+                ]}
+                value={String(handSize)}
+                onChange={(next) => setHandSize(next === '16' ? 16 : 13)}
+              />
+            </Field>
             <Divider inset={space.lg} />
             <Toggle
               label="Flowers and seasons in play"
@@ -532,20 +532,19 @@ function PayoutFields({
           trailing={<Stepper value={payout.maxTai} min={0} max={100} step={5} onChange={(maxTai) => onChange({ ...payout, maxTai })} />}
         />
         <Divider inset={space.lg} />
-        <Row
+        <Field
           title="On a discard"
           subtitle="Taiwanese tables usually make the discarder pay it all."
-          trailing={
-            <Segmented
-              options={[
-                { value: 'discarder-alone', label: 'Discarder' },
-                { value: 'everyone', label: 'Everyone' },
-              ]}
-              value={payout.discardPayer}
-              onChange={(next) => onChange({ ...payout, discardPayer: next as 'discarder-alone' | 'everyone' })}
-            />
-          }
-        />
+        >
+          <Segmented
+            options={[
+              { value: 'discarder-alone', label: 'Discarder' },
+              { value: 'everyone', label: 'Everyone' },
+            ]}
+            value={payout.discardPayer}
+            onChange={(next) => onChange({ ...payout, discardPayer: next as 'discarder-alone' | 'everyone' })}
+          />
+        </Field>
         <Divider inset={space.lg} />
         <Row
           title="Dealer multiplier"

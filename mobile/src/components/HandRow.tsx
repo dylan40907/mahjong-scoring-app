@@ -264,7 +264,7 @@ export function HandRow({
             onLongPress={mode === 'edit' ? () => lift(context, index, setLifted, setOver) : undefined}
             accessibilityLabel={TILE_BY_CODE[code].label}
             accessibilityHint={
-              mode === 'exposed' ? 'Drag across the tiles you melded' : 'Hold and drag to move this tile'
+              mode === 'exposed' ? 'Drag across the tiles everyone saw' : 'Hold and drag to move this tile'
             }
           />
           {exposed.has(index) && mode !== 'exposed' ? <View style={styles.meldedBar} /> : null}

@@ -228,6 +228,8 @@ async function main() {
 
   await goto(page, '/rules/edit?base=taiwanese-common');
   await shoot(page, '07-rule-editor');
+  await scrollBy(page, 1250);
+  await shoot(page, '07b-rule-editor-table');
 
   await goto(page, '/settings');
   await shoot(page, '08-settings');
@@ -246,6 +248,9 @@ async function main() {
   // The camera screen carries the recap and the rare circumstances now, so
   // answering "who fed the tile" lands straight on it.
   await shoot(page, '11-capture');
+  await page.getByText('Anything unusual?', { exact: true }).click();
+  await page.waitForTimeout(400);
+  await shoot(page, '11b-capture-unusual');
 
   await page.getByText('Type the tiles in', { exact: true }).click();
   await page.waitForTimeout(700);

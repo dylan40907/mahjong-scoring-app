@@ -78,7 +78,6 @@ import {
  */
 export default function CaptureScreen() {
   const router = useRouter();
-  const settings = useAppState(useCallback((state) => state.settings, []));
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
 
@@ -118,8 +117,8 @@ export default function CaptureScreen() {
   const unavailable = visionUnavailableReason();
 
   useEffect(() => {
-    if (settings.detectionEnabled) warmUp();
-  }, [settings.detectionEnabled]);
+    warmUp();
+  }, []);
 
   const cameraReady = Platform.OS !== 'web' && permission?.granted;
 
@@ -171,7 +170,7 @@ export default function CaptureScreen() {
       updateDraft({ photoUri: uri });
       setCaptured(uri);
 
-      if (!settings.detectionEnabled || !isVisionSupported()) {
+      if (!isVisionSupported()) {
         setMessage(null);
         router.replace('/hand/review');
         return;
@@ -219,7 +218,7 @@ export default function CaptureScreen() {
         router.replace('/hand/review');
       }
     },
-    [router, settings.detectionEnabled],
+    [router],
   );
 
   const takePhoto = async () => {
