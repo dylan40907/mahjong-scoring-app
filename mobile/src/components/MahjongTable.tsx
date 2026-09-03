@@ -46,6 +46,18 @@ const SEAT_HEIGHT = 76;
 const WIND_TILE = 20;
 /** The baize is square, because a mahjong table is. */
 const FELT_SIZE = 164;
+/**
+ * The wooden edge, and the radius the baize needs so that edge stays even.
+ *
+ * Two concentric rounded rectangles only produce a band of constant width when
+ * the inner radius is the outer one minus the inset - that is what puts both
+ * corner arcs on the same centre. With the inner radius set independently the
+ * arcs drift apart and the band pinches: at 20 outside, 14 inside and a 3pt
+ * inset the gold narrowed to about 1.7pt on the diagonal while staying 3pt
+ * along the flats, which is exactly the thin corner it looked like.
+ */
+const RIM_WIDTH = 3;
+const FELT_RADIUS = radius.xl - RIM_WIDTH;
 
 function Seat({
   player,
@@ -195,12 +207,12 @@ const styles = StyleSheet.create({
     top: SEAT_HEIGHT + space.sm,
     alignSelf: 'center',
     borderRadius: radius.xl,
-    padding: 3,
+    padding: RIM_WIDTH,
     backgroundColor: colors.rim,
   },
   felt: {
     flex: 1,
-    borderRadius: radius.lg,
+    borderRadius: FELT_RADIUS,
     backgroundColor: colors.felt,
     borderWidth: 1,
     borderColor: colors.feltLine,

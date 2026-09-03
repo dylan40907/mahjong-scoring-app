@@ -24,7 +24,16 @@ export interface Settlement {
   /** What the winner collects in total. */
   readonly winnerReceives: number;
   readonly payments: readonly PlayerPayment[];
-  /** One line describing how the settlement was reached. */
+  /**
+   * One line describing how the settlement was reached.
+   *
+   * It has to end in the number the player is actually about to see change on
+   * the table, with every step that got there written out. "30 base + 49 tai"
+   * looked like it should come to 79 and the app then moved 520, because a tai
+   * is a *count* and the money is `perTai` per tai - which the sentence never
+   * said. A settlement nobody can check by hand is the one thing this screen
+   * exists to prevent.
+   */
   readonly explanation: string;
 }
 
@@ -37,20 +46,24 @@ export function settleTai(config: TaiPayout, tai: number, context: HandContext):
   const dealerFactor = context.isDealer ? config.dealerMultiplier : 1;
   const unit = Math.round((config.base + cappedTai * config.perTai) * dealerFactor);
 
+  // The tai count multiplied out, so the sentence lands on the amount paid.
+  const hand = `${config.base} + ${cappedTai} × ${config.perTai}`;
+  const sum = dealerFactor === 1 ? hand : `(${hand}) × ${dealerFactor}`;
+
   if (context.selfDrawn || config.discardPayer === 'everyone') {
     return {
       winnerReceives: unit * 3,
       payments: [{ from: 'each-opponent', amount: unit, label: 'Each opponent' }],
       explanation: context.selfDrawn
-        ? `Self-drawn: all three opponents pay ${config.base} base + ${cappedTai} tai.`
-        : `All three opponents pay ${config.base} base + ${cappedTai} tai.`,
+        ? `Self-draw: each opponent pays ${sum} = ${unit}.`
+        : `Each opponent pays ${sum} = ${unit}.`,
     };
   }
 
   return {
     winnerReceives: unit,
     payments: [{ from: 'discarder', amount: unit, label: 'Discarder' }],
-    explanation: `Won on a discard: the discarder alone pays ${config.base} base + ${cappedTai} tai.`,
+    explanation: `The discarder pays it alone: ${sum} = ${unit}.`,
   };
 }
 
@@ -80,7 +93,7 @@ export function settleFaan(
     return {
       winnerReceives: each * 3,
       payments: [{ from: 'each-opponent', amount: each, label: 'Each opponent' }],
-      explanation: `Self-drawn: all three opponents pay double the hand's ${points}.`,
+      explanation: `Self-draw: each opponent pays double, ${points} × 2 = ${each}.`,
     };
   }
 
@@ -89,7 +102,9 @@ export function settleFaan(
     return {
       winnerReceives: discarderAmount,
       payments: [{ from: 'discarder', amount: discarderAmount, label: 'Discarder' }],
-      explanation: `Won on a discard: the discarder alone pays ${discarderAmount}.`,
+      explanation: config.discardPaysDouble
+        ? `The discarder pays it alone, doubled: ${points} × 2 = ${discarderAmount}.`
+        : `The discarder pays it alone: ${discarderAmount}.`,
     };
   }
 
@@ -99,7 +114,9 @@ export function settleFaan(
       { from: 'discarder', amount: discarderAmount, label: 'Discarder' },
       { from: 'each-opponent', amount: points, label: 'Each other player' },
     ],
-    explanation: `Won on a discard: the discarder pays ${discarderAmount}, the other two pay ${points} each.`,
+    explanation:
+      `The discarder pays ${discarderAmount}, the other two ${points} each: ` +
+      `${discarderAmount + points * 2} in all.`,
   };
 }
 
@@ -175,7 +192,9 @@ export function settleRiichi(
     return {
       winnerReceives: rounded * 3,
       payments: [{ from: 'each-opponent', amount: rounded, label: 'Each opponent' }],
-      explanation: `${score.han} han ${score.fu} fu, self-drawn by the dealer: all three pay ${rounded}.`,
+      explanation:
+        `${score.han} han ${score.fu} fu, self-drawn by the dealer: ` +
+        `each opponent pays ${rounded}, ${rounded * 3} in all.`,
     };
   }
 
@@ -187,7 +206,9 @@ export function settleRiichi(
       { from: 'dealer', amount: fromDealer, label: 'Dealer' },
       { from: 'each-opponent', amount: fromOthers, label: 'Each other player' },
     ],
-    explanation: `${score.han} han ${score.fu} fu, self-drawn: the dealer pays ${fromDealer}, the others ${fromOthers} each.`,
+    explanation:
+      `${score.han} han ${score.fu} fu, self-drawn: the dealer pays ${fromDealer}, ` +
+      `the others ${fromOthers} each, ${fromDealer + fromOthers * 2} in all.`,
   };
 }
 
@@ -202,7 +223,7 @@ export function settleMcr(config: McrPayout, points: number, context: HandContex
     return {
       winnerReceives: each * 3,
       payments: [{ from: 'each-opponent', amount: each, label: 'Each opponent' }],
-      explanation: `Self-drawn: all three opponents pay ${points} + ${base}.`,
+      explanation: `Self-draw: each opponent pays ${points} + ${base} = ${each}.`,
     };
   }
   return {
@@ -211,7 +232,9 @@ export function settleMcr(config: McrPayout, points: number, context: HandContex
       { from: 'discarder', amount: points + base, label: 'Discarder' },
       { from: 'each-opponent', amount: base, label: 'Each other player' },
     ],
-    explanation: `Won on a discard: the discarder pays ${points} + ${base}, the other two pay ${base} each.`,
+    explanation:
+      `The discarder pays ${points} + ${base} = ${points + base}, ` +
+      `the other two ${base} each: ${points + base * 3} in all.`,
   };
 }
 

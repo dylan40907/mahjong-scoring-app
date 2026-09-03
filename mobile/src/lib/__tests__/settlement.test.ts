@@ -1,5 +1,11 @@
 import { computeDeltas } from '../settlement';
-import { scoreHand, HONG_KONG_OLD_STYLE, RIICHI, TAIWANESE_COMMON } from '@/scoring';
+import {
+  scoreHand,
+  CHINESE_OFFICIAL,
+  HONG_KONG_OLD_STYLE,
+  RIICHI,
+  TAIWANESE_COMMON,
+} from '@/scoring';
 import type { HandContext, HandInput } from '@/scoring';
 import type { TileCode } from '@/tiles/tileset';
 
@@ -169,5 +175,66 @@ describe('scored hands settle to zero', () => {
 
     expect(sum(deltas)).toBe(0);
     expect(deltas.b).toBe(result.settlement!.winnerReceives);
+  });
+});
+
+/**
+ * The sentence on the settlement panel has to be checkable by hand.
+ *
+ * It said "30 base + 49 tai" and then moved 520 points, because a tai is a
+ * count and the money is `perTai` per tai - a step the sentence never showed.
+ * Anyone reading it would work out 79 and conclude the app was wrong. So the
+ * rule is that the last number in the explanation is a number that actually
+ * changes hands, which is the cheapest possible check that no step is missing.
+ */
+describe('the settlement explains the number it moved', () => {
+  const lastNumber = (text: string): number => {
+    const numbers = text.match(/\d+/g);
+    expect(numbers).not.toBeNull();
+    return Number(numbers![numbers!.length - 1]);
+  };
+
+  const cases = [
+    ['Taiwanese, discard', TAIWANESE_COMMON, false],
+    ['Taiwanese, self-draw', TAIWANESE_COMMON, true],
+    ['Hong Kong, discard', HONG_KONG_OLD_STYLE, false],
+    ['Hong Kong, self-draw', HONG_KONG_OLD_STYLE, true],
+    ['Riichi, discard', RIICHI, false],
+    ['Riichi, self-draw', RIICHI, true],
+    ['Chinese Official, discard', CHINESE_OFFICIAL, false],
+    ['Chinese Official, self-draw', CHINESE_OFFICIAL, true],
+  ] as const;
+
+  it.each(cases)('%s', (_name, rules, selfDrawn) => {
+    // A concealed all-pungs hand, which scores under every ruleset here.
+    const tiles: TileCode[] = [
+      'man2', 'man2', 'man2',
+      'man5', 'man5', 'man5',
+      'pin3', 'pin3', 'pin3',
+      'sou7', 'sou7', 'sou7',
+      'red', 'red',
+    ];
+    const extra: TileCode[] = ['pin6', 'pin6', 'pin6'];
+    const concealed = rules.handSize === 16 ? [...tiles, ...extra] : tiles;
+
+    const result = scoreHand(
+      {
+        concealed,
+        exposed: [],
+        bonus: [],
+        winningTile: 'red',
+        context: { selfDrawn, seatWind: 'east', roundWind: 'east', isDealer: false },
+      },
+      rules,
+    );
+
+    const settlement = result.settlement;
+    expect(settlement).not.toBeNull();
+
+    const paid = [
+      settlement!.winnerReceives,
+      ...settlement!.payments.map((payment) => payment.amount),
+    ];
+    expect(paid).toContain(lastNumber(settlement!.explanation));
   });
 });
