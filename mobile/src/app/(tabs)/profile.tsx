@@ -22,6 +22,7 @@ import {
   deleteAccount,
   setDisplayName,
   signInWithEmail,
+  signInWithGoogle,
   signOut,
   upgradeWithEmail,
   useAccount,
@@ -82,6 +83,15 @@ export default function ProfileScreen() {
     }
     setPassword('');
     await syncNow();
+    setBusy(false);
+  };
+
+  const withGoogle = async () => {
+    setBusy(true);
+    setProblem(null);
+    const failure = await signInWithGoogle();
+    if (failure) setProblem(failure);
+    else await syncNow();
     setBusy(false);
   };
 
@@ -195,6 +205,18 @@ export default function ProfileScreen() {
               Your games are on this device. Add an email to reach them from another one —
               nothing you have already scored is lost.
             </Body>
+            <Button
+              label="Continue with Google"
+              variant="primary"
+              block
+              disabled={busy}
+              onPress={() => void withGoogle()}
+            />
+            <View style={styles.or}>
+              <View style={styles.orLine} />
+              <Caption tone="faint">or</Caption>
+              <View style={styles.orLine} />
+            </View>
             <TextField
               value={email}
               onChangeText={setEmail}
@@ -209,7 +231,6 @@ export default function ProfileScreen() {
             />
             <Button
               label="Save my games"
-              variant="primary"
               block
               loading={busy}
               disabled={busy || email.trim().length < 3 || password.length < 6}
@@ -253,5 +274,7 @@ const styles = StyleSheet.create({
   bestLine: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   empty: { alignItems: 'center', gap: space.sm, paddingVertical: space.lg },
   upgrade: { gap: space.md },
+  or: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  orLine: { flex: 1, height: 1, backgroundColor: colors.line },
   accountActions: { gap: space.sm, marginTop: space.md },
 });

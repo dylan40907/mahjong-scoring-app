@@ -1,4 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase';
 import { setDefaultPlayerName } from './store';
 
@@ -230,6 +232,48 @@ export async function deleteAccount(): Promise<string | null> {
 
   await supabase.auth.signOut();
   set(EMPTY);
+  return null;
+}
+
+/**
+ * Sign in with Google.
+ *
+ * The browser flow rather than the native one-tap sheet. Native Google
+ * Sign-In needs an Android OAuth client tied to the release keystore's SHA-1
+ * fingerprint, and a native module with it; this needs neither, works on both
+ * platforms today, and ships over the air. The nicer sheet is an upgrade to
+ * make later, not a reason to have no Google sign-in now.
+ *
+ * The redirect comes back on the app's own scheme, which any app on the device
+ * could in principle claim, so the flow is PKCE: the code that arrives is
+ * worthless without the verifier this client kept to itself.
+ *
+ * Like the email path, this *upgrades* the anonymous account rather than
+ * replacing it, so the games already on this device stay with the person who
+ * scored them.
+ */
+export async function signInWithGoogle(): Promise<string | null> {
+  if (!supabase) return 'Accounts are unavailable in this build.';
+
+  const redirectTo = Linking.createURL('auth/callback');
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo, skipBrowserRedirect: true },
+  });
+  if (error || !data?.url) return error?.message ?? 'Could not reach Google.';
+
+  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+  // Dismissing the sheet is a decision, not a failure, and should not raise
+  // anything at the person who made it.
+  if (result.type !== 'success') return null;
+
+  const code = new URL(result.url).searchParams.get('code');
+  if (!code) return 'Google did not return a sign-in code.';
+
+  const exchanged = await supabase.auth.exchangeCodeForSession(code);
+  if (exchanged.error) return exchanged.error.message;
+
+  await loadProfile();
   return null;
 }
 

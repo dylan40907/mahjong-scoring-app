@@ -90,9 +90,14 @@ export const supabase: SupabaseClient | null =
           storage: LargeSecureStore,
           autoRefreshToken: true,
           persistSession: true,
-          // There is no browser redirect to read a session out of; sign-in
-          // hands the tokens back directly.
+          // There is no page to read a session out of: the OAuth redirect
+          // comes back through the app's own URL scheme, and the code on it is
+          // exchanged by hand in `signInWithGoogle`.
           detectSessionInUrl: false,
+          // PKCE rather than the implicit flow. The redirect lands on a custom
+          // scheme any app on the device can claim, so the returned code has to
+          // be useless without the verifier this client kept.
+          flowType: 'pkce',
         },
       })
     : null;
