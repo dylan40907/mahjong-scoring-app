@@ -235,6 +235,21 @@ export function getAwayGame(sessionId: string): AwayGame | undefined {
   return state.awayGames.find((game) => game.session.id === sessionId);
 }
 
+/**
+ * Forget what belonged to whoever just signed out.
+ *
+ * The sessions on this device stay: they were scored here, they are the
+ * app working the way it did before accounts existed, and taking them away
+ * would make signing out a destructive act. What goes is everything that only
+ * makes sense against one account - games borrowed from that account's
+ * friends, and the queue of things still to tell the server on its behalf.
+ */
+export function clearAccountScopedState(): void {
+  set({ awayGames: [], outbox: [] });
+  void saveAwayGames([]);
+  void saveOutbox([]);
+}
+
 export function getState(): AppState {
   return state;
 }

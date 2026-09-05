@@ -1,6 +1,5 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import { supabase } from '@/lib/supabase';
-import { getAccount } from './account';
 import { loadFriends, saveFriends } from './persistence';
 import { queueIntent } from './store';
 
@@ -12,6 +11,12 @@ import { queueIntent } from './store';
  * of the stack and must not import auth. It behaves like both of them: an
  * observable read through `useFriends`, and actions that take effect locally
  * before anything is sent.
+ *
+ * It imports neither, and that is on purpose in one direction: the account
+ * layer has to be able to empty this list when somebody signs out, and if this
+ * file reached back for `getAccount()` that would be a cycle. Not knowing who
+ * is signed in costs nothing here - an unauthenticated request comes back as
+ * an error and is handled the same way as being offline.
  *
  * Every action here is optimistic and queued. That is not an optimisation - it
  * is the difference between a feature that works at a mahjong table and one
@@ -119,7 +124,7 @@ interface RawFriend {
  * answer comes back.
  */
 export async function refreshFriends(): Promise<void> {
-  if (!supabase || !getAccount().userId) return;
+  if (!supabase) return;
   set({ busy: true });
   try {
     const { data, error } = await supabase.rpc('friend_list');
@@ -196,9 +201,16 @@ export function blockUser(userId: string): void {
   queueIntent({ kind: 'friend:block', userId });
 }
 
-/** Wipe on sign-out. Somebody else's friends must not appear on this screen. */
+/**
+ * Wipe on sign-out.
+ *
+ * Two people share a phone more often than anybody plans for, and a list of
+ * somebody else's friends surviving a sign-out is both a small privacy failure
+ * and a way to seat the wrong person in a game.
+ */
 export function clearFriends(): void {
-  commit([]);
+  set({ friends: [], loaded: true });
+  void saveFriends([]);
 }
 
 /** A friend by account id, for putting a name to a seat or a shared game. */

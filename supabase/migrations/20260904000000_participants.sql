@@ -84,28 +84,25 @@ create policy session_players_delete on public.session_players for delete
 -- Sessions and hands become readable by the people seated in them
 -- ---------------------------------------------------------------------------
 
+-- Exactly two ways to read a game: you scored it, or you were seated in it.
+--
+-- There used to be a third, through `shares` - any friend could read a session
+-- its owner had marked shared. Nothing has ever written that table and no
+-- screen offers it, so the branch could not fire; it is dropped here rather
+-- than left in because a dead branch in a security policy is the worst kind of
+-- dead code. The day somebody adds a write path, a whole second sharing model
+-- goes live without anyone reviewing it as one.
+--
+-- The table stays, empty and inert. Sharing a whole night with a group is a
+-- real feature and a different one, and it can have this branch back when it
+-- exists and can be tested.
 drop policy if exists sessions_read on public.sessions;
 create policy sessions_read on public.sessions for select
-  using (
-    owner_id = auth.uid()
-    or public.is_participant(id)
-    or exists (
-      select 1 from public.shares s
-      where s.session_id = sessions.id and public.is_friend(sessions.owner_id)
-    )
-  );
+  using (owner_id = auth.uid() or public.is_participant(id));
 
 drop policy if exists hands_read on public.hands;
 create policy hands_read on public.hands for select
-  using (
-    owner_id = auth.uid()
-    or public.is_participant(session_id)
-    or exists (
-      select 1 from public.shares s
-      join public.sessions se on se.id = s.session_id
-      where s.session_id = hands.session_id and public.is_friend(se.owner_id)
-    )
-  );
+  using (owner_id = auth.uid() or public.is_participant(session_id));
 
 -- Reading is all a guest gets. `sessions_write` and `hands_write` still say
 -- `owner_id = auth.uid()`, so the phone that scored the night is the only one

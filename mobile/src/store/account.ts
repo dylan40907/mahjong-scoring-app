@@ -2,7 +2,8 @@ import { useCallback, useSyncExternalStore } from 'react';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase';
-import { setLocalIdentity } from './store';
+import { clearFriends } from './friends';
+import { clearAccountScopedState, setLocalIdentity } from './store';
 
 /**
  * Who is signed in, and what they are called.
@@ -121,6 +122,7 @@ export async function initAccount(): Promise<void> {
   supabase.auth.onAuthStateChange((_event, session) => {
     const user = session?.user;
     if (!user) {
+      forgetAccountData();
       set(EMPTY);
       return;
     }
@@ -231,6 +233,7 @@ export async function deleteAccount(): Promise<string | null> {
   if (error) return error.message;
 
   await supabase.auth.signOut();
+  forgetAccountData();
   set(EMPTY);
   return null;
 }
@@ -280,5 +283,23 @@ export async function signInWithGoogle(): Promise<string | null> {
 export async function signOut(): Promise<void> {
   if (!supabase) return;
   await supabase.auth.signOut();
+  forgetAccountData();
   set(EMPTY);
+}
+
+/**
+ * Everything on this device that belonged to the account, and nothing else.
+ *
+ * Two people share a phone more often than anybody plans for. The friends
+ * list, the games borrowed from those friends and the queue of things still to
+ * tell the server are all meaningless - and in the first two cases nobody
+ * else's business - once that account is gone.
+ *
+ * The sessions scored here stay. They were typed on this phone, they work with
+ * no account at all, and making signing out delete them would be the one
+ * destructive thing in the app nobody asked for.
+ */
+function forgetAccountData(): void {
+  clearFriends();
+  clearAccountScopedState();
 }
