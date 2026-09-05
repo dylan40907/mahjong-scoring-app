@@ -3,6 +3,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { identityTaken } from '@/lib/authErrors';
 import { supabase } from '@/lib/supabase';
 import { clearFriends } from './friends';
 import { clearAccountScopedState, setLocalIdentity } from './store';
@@ -52,6 +53,7 @@ import { clearAccountScopedState, setLocalIdentity } from './store';
 function shouldLink(): boolean {
   return account.status === 'anonymous' && !!account.userId;
 }
+
 
 export type AccountStatus =
   /** No backend in this build, or we have not reached one yet. */
@@ -286,25 +288,47 @@ export async function deleteAccount(): Promise<string | null> {
 export async function signInWithGoogle(): Promise<string | null> {
   if (!supabase) return 'Accounts are unavailable in this build.';
 
+  const failure = await googleFlow(shouldLink());
+  // Linking is refused after the redirect rather than before it, because only
+  // the server can see whose the identity is - so the retry costs a second
+  // sheet. Worth it: the alternative is telling somebody their own account is
+  // unreachable from their own phone.
+  if (failure?.retryAsSignIn) return (await googleFlow(false))?.message ?? null;
+  if (failure) return failure.message;
+
+  await loadProfile();
+  return null;
+}
+
+interface GoogleFailure {
+  readonly message: string | null;
+  readonly retryAsSignIn?: boolean;
+}
+
+async function googleFlow(link: boolean): Promise<GoogleFailure | null> {
+  if (!supabase) return { message: 'Accounts are unavailable in this build.' };
   const redirectTo = Linking.createURL('auth/callback');
   const options = { redirectTo, skipBrowserRedirect: true };
-  const { data, error } = shouldLink()
+
+  const { data, error } = link
     ? await supabase.auth.linkIdentity({ provider: 'google', options })
     : await supabase.auth.signInWithOAuth({ provider: 'google', options });
-  if (error || !data?.url) return error?.message ?? 'Could not reach Google.';
+  if (error && link && identityTaken(error)) return { message: null, retryAsSignIn: true };
+  if (error || !data?.url) return { message: error?.message ?? 'Could not reach Google.' };
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
   // Dismissing the sheet is a decision, not a failure, and should not raise
   // anything at the person who made it.
-  if (result.type !== 'success') return null;
+  if (result.type !== 'success') return { message: null };
 
   const code = new URL(result.url).searchParams.get('code');
-  if (!code) return 'Google did not return a sign-in code.';
+  if (!code) return { message: 'Google did not return a sign-in code.' };
 
   const exchanged = await supabase.auth.exchangeCodeForSession(code);
-  if (exchanged.error) return exchanged.error.message;
-
-  await loadProfile();
+  if (exchanged.error) {
+    if (link && identityTaken(exchanged.error)) return { message: null, retryAsSignIn: true };
+    return { message: exchanged.error.message };
+  }
   return null;
 }
 
@@ -356,11 +380,17 @@ export async function signInWithApple(): Promise<string | null> {
   const token = credential.identityToken;
   if (!token) return 'Apple did not return a sign-in token.';
 
-  const linking = shouldLink();
-  const { error } = linking
-    ? await supabase.auth.linkIdentity({ provider: 'apple', token })
-    : await supabase.auth.signInWithIdToken({ provider: 'apple', token });
-  if (error) return error.message;
+  let failed = shouldLink()
+    ? (await supabase.auth.linkIdentity({ provider: 'apple', token })).error
+    : (await supabase.auth.signInWithIdToken({ provider: 'apple', token })).error;
+
+  // Already somebody's Apple account - almost always their own, on another
+  // phone. The token is still in hand here, so signing in with it costs
+  // nothing and no second prompt.
+  if (failed && identityTaken(failed)) {
+    failed = (await supabase.auth.signInWithIdToken({ provider: 'apple', token })).error;
+  }
+  if (failed) return failed.message;
 
   // Only ever offered once by Apple, so it is saved before anything else can
   // go wrong, and only when we do not already have something better.
