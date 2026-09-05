@@ -45,11 +45,18 @@ identifier and nothing else — no name, no email, no password, no device
 fingerprint, no advertising id. Its only purpose is to own your rows in the
 database so that nobody else can read them.
 
-If you later sign in with an email address or a Google account, that identifier
-stays the same and gains those credentials. We then store:
+If you later sign in with an email address, a Google account or an Apple
+account, that identifier stays the same and gains those credentials — nothing
+moves and nothing is lost. We then store:
 
 - your email address, if you signed in with one;
 - a display name and a handle, if you choose to set them.
+
+If you use **Sign in with Apple**, Apple tells us an identifier for you and the
+email address you chose to share. If you chose to hide it, what we receive is
+Apple's private relay address, and that is the only address we ever have. Apple
+offers your name once, at the moment you first sign in; if it is there and you
+have not set one yourself, it becomes your display name.
 
 ### Your games
 
@@ -97,12 +104,25 @@ without either: hands can always be entered by hand.
 
 ## Sharing with other people
 
-Nothing you record is visible to anyone else unless you explicitly share it.
+Nothing you record is visible to anyone else unless you put them in a game.
 
-- **Friends** are added by handle, and either side can remove the connection.
-- **Sharing a session** is per session and off by default. A shared session
-  shows the hands, the scores and the players' names. It never includes
-  photographs. You can stop sharing at any time.
+- **Friends** are added by handle — a short name you choose, never an email
+  address, and the app has no directory to browse. A request has to be accepted,
+  and either side can end the connection.
+
+- **Being friends shares nothing on its own.** No scores, no games, no history.
+
+- **A game reaches somebody because you seat them in it.** On a session screen
+  you can say which of the four seats is a friend of yours. That, and only
+  that, lets them open that one game: its hands, its scores, and the names of
+  everyone at that table. It also means the game counts in their own history —
+  their totals, and their best hand.
+
+- **Taking them back out takes their copy with it.** So does ending the
+  friendship, which removes every seat either of you held in the other's games.
+  Their device stops being able to load those games at all.
+
+- **Photographs are never shared**, in any of this, by any route.
 
 ---
 
