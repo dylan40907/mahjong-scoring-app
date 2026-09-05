@@ -238,6 +238,13 @@ export interface TextFieldProps {
   /** Hides what is typed, and stops the keyboard offering to remember it. */
   secureTextEntry?: boolean;
   autoCapitalize?: 'none' | 'sentences';
+  /**
+   * Off for anything that is a name rather than prose.
+   *
+   * A keyboard that helpfully turns `wei_88` into `Wei 88` has broken the one
+   * field where the characters are the whole value.
+   */
+  autoCorrect?: boolean;
   style?: ViewStyle;
 }
 
@@ -261,6 +268,7 @@ export function TextField({
   onSubmitEditing,
   secureTextEntry,
   autoCapitalize,
+  autoCorrect,
 }: TextFieldProps) {
   return (
     <View style={style}>
@@ -273,6 +281,7 @@ export function TextField({
         autoFocus={autoFocus}
         secureTextEntry={secureTextEntry}
       autoCapitalize={autoCapitalize ?? (secureTextEntry || keyboardType === 'email-address' ? 'none' : undefined)}
+      autoCorrect={autoCorrect}
       onBlur={onBlur}
       onSubmitEditing={onSubmitEditing}
       maxLength={maxLength}

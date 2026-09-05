@@ -10,7 +10,7 @@ import {
   Heading,
   Screen,
 } from '@/design/components';
-import { PlayersIcon, PlusIcon, SessionsIcon } from '@/design/icons';
+import { AwayIcon, PlayersIcon, PlusIcon, SessionsIcon } from '@/design/icons';
 import { colors, radius, space } from '@/design/tokens';
 import {
   createQuickSession,
@@ -19,7 +19,8 @@ import {
   sessionTotals,
   useAppState,
 } from '@/store/store';
-import type { Session } from '@/store/types';
+import { useFriends } from '@/store/friends';
+import type { AwayGame, Session } from '@/store/types';
 import { plural, relativeDate, signed } from '@/lib/format';
 
 /**
@@ -46,9 +47,13 @@ export default function SessionsScreen() {
     router.push(`/session/${session.id}`);
   };
   const sessions = useAppState(useCallback((state) => state.sessions, []));
+  const awayGames = useAppState(useCallback((state) => state.awayGames, []));
+  const friends = useFriends(useCallback((state) => state.friends, []));
   const ready = useAppState(useCallback((state) => state.ready, []));
 
-  if (ready && sessions.length === 0) {
+  // Somebody whose friends do all the scoring still has a history, and it
+  // would be an odd first screen that told them they had none.
+  if (ready && sessions.length === 0 && awayGames.length === 0) {
     return (
       <Screen>
         <EmptyState
@@ -96,8 +101,88 @@ export default function SessionsScreen() {
             }}
           />
         )}
+        ListFooterComponent={
+          /*
+           * Below your own, in their own section, rather than mixed in by
+           * date. These are read-only and belong to somebody else, and a list
+           * where two thirds of the cards silently refuse to be edited would
+           * be worse than one that says which is which.
+           */
+          awayGames.length > 0 ? (
+            <View style={styles.away}>
+              <View style={styles.awayHead}>
+                <AwayIcon size={15} color={colors.inkFaint} />
+                <CaptionStrong tone="muted">Scored by a friend</CaptionStrong>
+              </View>
+              {awayGames.map((game) => {
+                const owner = friends.find((friend) => friend.id === game.ownerId);
+                return (
+                  <AwayCard
+                    key={game.session.id}
+                    game={game}
+                    scorer={owner?.displayName || owner?.handle || 'A friend'}
+                    onPress={() => router.push(`/away/${game.session.id}`)}
+                  />
+                );
+              })}
+            </View>
+          ) : null
+        }
       />
     </Screen>
+  );
+}
+
+/**
+ * A game somebody else scored, on the list beside your own.
+ *
+ * Same shape as a session card and deliberately quieter: no play-again, no
+ * standings ordering games it does not own, and a byline saying whose it is.
+ * The seat highlighted is yours, because on somebody else's scoresheet the
+ * first thing anybody looks for is their own line.
+ */
+function AwayCard({
+  game,
+  scorer,
+  onPress,
+}: {
+  game: AwayGame;
+  scorer: string;
+  onPress: () => void;
+}) {
+  const totals = sessionTotals(game.session);
+  const mine = game.session.players.find((player) => player.id === game.playerId);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${game.session.name}, scored by ${scorer}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, styles.cardBody, pressed && styles.cardPressed]}
+    >
+      <View style={styles.cardHeader}>
+        <Heading numberOfLines={2} style={styles.cardTitle}>
+          {game.session.name}
+        </Heading>
+        <Caption tone="faint">{relativeDate(game.session.updatedAt)}</Caption>
+      </View>
+      <Caption tone="faint">
+        {scorer} · {plural(game.session.hands.length, 'hand')}
+      </Caption>
+      {mine ? (
+        <View style={styles.awayLine}>
+          <CaptionStrong tone="muted">{mine.name}</CaptionStrong>
+          <CaptionStrong
+            numeric
+            tone={
+              (totals[mine.id] ?? 0) > 0 ? 'gain' : (totals[mine.id] ?? 0) < 0 ? 'loss' : 'muted'
+            }
+          >
+            {signed(totals[mine.id] ?? 0)}
+          </CaptionStrong>
+        </View>
+      ) : null}
+    </Pressable>
   );
 }
 
@@ -203,6 +288,20 @@ const styles = StyleSheet.create({
     borderTopColor: colors.line,
   },
   againPressed: { backgroundColor: colors.surfaceHigh },
+  away: { marginTop: space.lg, gap: space.xs },
+  awayHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    paddingHorizontal: space.xs,
+    paddingBottom: space.xs,
+  },
+  awayLine: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginTop: space.xs,
+  },
   cardHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space.md },
   cardTitle: { flex: 1 },
   standings: { marginTop: space.md, gap: space.xs },

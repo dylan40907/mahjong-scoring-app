@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import {
   Body,
   BodyStrong,
@@ -15,12 +16,15 @@ import {
   TileFace,
   Title,
 } from '@/design/components';
-import { PlayersIcon, SparkIcon, TrophyIcon } from '@/design/icons';
+import { AwayIcon, FriendsIcon, PlayersIcon, SparkIcon, TrophyIcon } from '@/design/icons';
 import { colors, space, tileSize } from '@/design/tokens';
 import { findRuleSet, useAppState } from '@/store/store';
+import { bestHandFor, playedGames, playerStats } from '@/store/stats';
+import { incomingRequests, useFriends } from '@/store/friends';
 import {
   deleteAccount,
   setDisplayName,
+  setHandle,
   signInWithEmail,
   signInWithGoogle,
   signOut,
@@ -29,8 +33,6 @@ import {
 } from '@/store/account';
 import { syncNow } from '@/store/sync/engine';
 import { isCloudConfigured } from '@/lib/supabase';
-import type { TileCode } from '@/tiles/tileset';
-import type { HandRecord, Session } from '@/store/types';
 import { relativeDate } from '@/lib/format';
 
 /**
@@ -44,20 +46,49 @@ import { relativeDate } from '@/lib/format';
  * session, which is the one piece of setup starting a game could never skip.
  */
 export default function ProfileScreen() {
+  const router = useRouter();
   const sessions = useAppState(useCallback((state) => state.sessions, []));
+  const awayGames = useAppState(useCallback((state) => state.awayGames, []));
   const account = useAccount(useCallback((a) => a, []));
+  const friends = useFriends(useCallback((state) => state.friends, []));
   const [draftName, setDraftName] = useState<string | null>(null);
+  const [draftHandle, setDraftHandle] = useState<string | null>(null);
+  const [handleProblem, setHandleProblem] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const best = useMemo(() => bestHand(sessions), [sessions]);
-  const handsScored = sessions.reduce((sum, session) => sum + session.hands.length, 0);
+  const me = useMemo(
+    () => ({ userId: account.userId, displayName: account.displayName }),
+    [account.userId, account.displayName],
+  );
+  // Every table this person sat at, whoever was holding the phone.
+  const games = useMemo(() => playedGames(sessions, awayGames), [sessions, awayGames]);
+  const best = useMemo(() => bestHandFor(games, me), [games, me]);
+  const stats = useMemo(() => playerStats(games, me), [games, me]);
+  const waiting = incomingRequests(friends).length;
 
   const commitName = () => {
     if (draftName !== null) void setDisplayName(draftName);
     setDraftName(null);
+  };
+
+  /**
+   * The name friends look you up by.
+   *
+   * Separate from the display name because they answer different questions.
+   * The display name is what goes on a seat, changes whenever you like, and
+   * two people may share one. The handle is unique, is typed by somebody else
+   * to find you, and is the only thing this app will look anybody up by - an
+   * email address is a fact about a person it has no business being a
+   * directory of.
+   */
+  const commitHandle = () => {
+    const wanted = draftHandle;
+    setDraftHandle(null);
+    if (wanted === null || wanted.trim().toLowerCase() === (account.handle ?? '')) return;
+    void setHandle(wanted).then(setHandleProblem);
   };
 
   /**
@@ -139,6 +170,40 @@ export default function ProfileScreen() {
         </Caption>
       </Section>
 
+      {isCloudConfigured() ? (
+        <Section title="Friends" icon={<FriendsIcon size={15} color={colors.inkFaint} />}>
+          <Panel flush>
+            <Row
+              title="Your friends"
+              subtitle="Put them in a game and it lands in their history too"
+              value={waiting > 0 ? `${waiting} waiting` : undefined}
+              onPress={() => router.push('/friends')}
+            />
+          </Panel>
+          <View style={styles.handle}>
+            <TextField
+              label="How people find you"
+              value={draftHandle ?? account.handle ?? ''}
+              onChangeText={(text) => setDraftHandle(text.toLowerCase())}
+              onBlur={commitHandle}
+              onSubmitEditing={commitHandle}
+              placeholder="a short name, e.g. wei_88"
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={20}
+            />
+            {handleProblem ? (
+              <CaptionStrong tone="loss">{handleProblem}</CaptionStrong>
+            ) : (
+              <Caption tone="faint">
+                Letters, numbers and underscores. Yours alone, and the only thing anyone can look
+                you up by.
+              </Caption>
+            )}
+          </View>
+        </Section>
+      ) : null}
+
       {/*
         * Highest score for now, which is the obvious pick and a bit boring:
         * for anyone who has ever had a limit hand it is that hand forever.
@@ -168,16 +233,33 @@ export default function ProfileScreen() {
         ) : (
           <Panel style={styles.empty}>
             <SparkIcon size={24} color={colors.inkFaint} />
-            <Caption tone="faint">Score a hand and it will show up here.</Caption>
+            <Caption tone="faint" center>
+              {stats.unidentified && stats.handsPlayed > 0
+                ? 'None of these games say which player you were. Set your name above, or take a seat in one from its Who’s here list.'
+                : 'Win a hand and it will show up here.'}
+            </Caption>
           </Panel>
         )}
       </Section>
 
       <Section title="All time">
         <Panel flush>
-          <Row title="Hands scored" value={String(handsScored)} />
+          <Row title="Hands you won" value={String(stats.handsWon)} />
           <Divider inset={space.lg} />
-          <Row title="Sessions played" value={String(sessions.length)} />
+          <Row title="Hands played" value={String(stats.handsPlayed)} />
+          <Divider inset={space.lg} />
+          <Row title="Sessions" value={String(stats.sessions)} />
+          {stats.awaySessions > 0 ? (
+            <>
+              <Divider inset={space.lg} />
+              <Row
+                title="Scored by a friend"
+                subtitle="Games you were seated in on somebody else’s phone"
+                leading={<AwayIcon size={18} color={colors.inkFaint} />}
+                value={String(stats.awaySessions)}
+              />
+            </>
+          ) : null}
         </Panel>
       </Section>
 
@@ -244,28 +326,6 @@ export default function ProfileScreen() {
   );
 }
 
-interface BestHand {
-  readonly record: HandRecord;
-  readonly ruleSetId: string;
-  readonly tiles: TileCode[];
-}
-
-/** The highest-scoring hand across every session, with its tiles. */
-function bestHand(sessions: readonly Session[]): BestHand | null {
-  let best: BestHand | null = null;
-  for (const session of sessions) {
-    for (const record of session.hands) {
-      if (best && record.summary.total <= best.record.summary.total) continue;
-      best = {
-        record,
-        ruleSetId: session.ruleSetId,
-        tiles: [...(record.hand.exposed ?? []), ...record.hand.concealed],
-      };
-    }
-  }
-  return best;
-}
-
 const styles = StyleSheet.create({
   head: { paddingTop: space.md, paddingBottom: space.xs, gap: 2 },
   note: { marginTop: space.sm, paddingHorizontal: space.xs },
@@ -277,4 +337,5 @@ const styles = StyleSheet.create({
   or: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   orLine: { flex: 1, height: 1, backgroundColor: colors.line },
   accountActions: { gap: space.sm, marginTop: space.md },
+  handle: { marginTop: space.md, gap: space.sm },
 });

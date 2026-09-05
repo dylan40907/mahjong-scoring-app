@@ -1,7 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { CustomRuleSet } from '@/scoring';
-import { DEFAULT_SETTINGS, type Session, type Settings, type StoredHand } from './types';
+import {
+  DEFAULT_SETTINGS,
+  type AwayGame,
+  type Session,
+  type Settings,
+  type StoredHand,
+} from './types';
 import { pruneTombstones, type Tombstone } from './sync/meta';
+import type { QueuedIntent } from './sync/outbox';
 
 /**
  * Persistence.
@@ -21,9 +28,12 @@ const KEYS = {
   deletedSessions: 'mj.deletedSessions',
   customRules: 'mj.customRuleSets',
   settings: 'mj.settings',
+  awayGames: 'mj.awayGames',
+  outbox: 'mj.outbox',
+  friends: 'mj.friends',
 } as const;
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 /**
  * Bring a hand written by an older build forward.
@@ -66,13 +76,20 @@ export async function loadAll(): Promise<{
   deletedSessions: Tombstone[];
   customRuleSets: CustomRuleSet[];
   settings: Settings;
+  awayGames: AwayGame[];
+  outbox: QueuedIntent[];
 }> {
-  const [sessions, deletedSessions, customRuleSets, settings] = await Promise.all([
-    readJson<Session[]>(KEYS.sessions, []),
-    readJson<Tombstone[]>(KEYS.deletedSessions, []),
-    readJson<CustomRuleSet[]>(KEYS.customRules, []),
-    readJson<Settings>(KEYS.settings, DEFAULT_SETTINGS),
-  ]);
+  const [sessions, deletedSessions, customRuleSets, settings, awayGames, outbox] =
+    await Promise.all([
+      readJson<Session[]>(KEYS.sessions, []),
+      readJson<Tombstone[]>(KEYS.deletedSessions, []),
+      readJson<CustomRuleSet[]>(KEYS.customRules, []),
+      readJson<Settings>(KEYS.settings, DEFAULT_SETTINGS),
+      // Kept across launches so a friend's game is still there on a train.
+      // It is a cache of the server's copy, so nothing is lost if it is not.
+      readJson<AwayGame[]>(KEYS.awayGames, []),
+      readJson<QueuedIntent[]>(KEYS.outbox, []),
+    ]);
 
   await writeJson(KEYS.version, SCHEMA_VERSION);
 
@@ -86,6 +103,10 @@ export async function loadAll(): Promise<{
     deletedSessions: Array.isArray(deletedSessions) ? pruneTombstones(deletedSessions) : [],
     customRuleSets: Array.isArray(customRuleSets) ? customRuleSets : [],
     settings: { ...DEFAULT_SETTINGS, ...settings },
+    awayGames: Array.isArray(awayGames)
+      ? awayGames.filter((game) => isPlausibleSession(game?.session))
+      : [],
+    outbox: Array.isArray(outbox) ? outbox.filter((queued) => !!queued?.intent) : [],
   };
 }
 
@@ -105,6 +126,18 @@ export const saveDeletedSessions = (stones: Tombstone[]) =>
   writeJson(KEYS.deletedSessions, stones);
 export const saveCustomRuleSets = (rules: CustomRuleSet[]) => writeJson(KEYS.customRules, rules);
 export const saveSettings = (settings: Settings) => writeJson(KEYS.settings, settings);
+export const saveAwayGames = (games: AwayGame[]) => writeJson(KEYS.awayGames, games);
+export const saveOutbox = (queue: QueuedIntent[]) => writeJson(KEYS.outbox, queue);
+
+/**
+ * The friends list, cached.
+ *
+ * Kept on the device so that seating somebody in tonight's game works in a
+ * basement. Without it the one social action that has to happen *during* a
+ * game - "put Wei in seat three" - would be the one that needs a signal.
+ */
+export const saveFriends = (friends: unknown) => writeJson(KEYS.friends, friends);
+export const loadFriends = <T,>(fallback: T) => readJson<T>(KEYS.friends, fallback);
 
 export async function clearAll(): Promise<void> {
   await AsyncStorage.multiRemove(Object.values(KEYS));

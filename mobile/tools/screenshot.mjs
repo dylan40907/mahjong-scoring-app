@@ -141,6 +141,48 @@ const seed = {
     hapticsEnabled: true,
   }),
   'mj.customRuleSets': JSON.stringify([]),
+  // The social half. Seeded rather than signed in for: these screens are
+  // mostly a list, and a list with nothing in it says nothing about how it
+  // looks with three names and a request waiting.
+  'mj.friends': JSON.stringify([
+    { id: 'u_mei', displayName: 'Mei', handle: 'mei_c', status: 'accepted', direction: 'out' },
+    { id: 'u_ravi', displayName: 'Ravi', handle: 'ravi', status: 'accepted', direction: 'out' },
+    { id: 'u_sam', displayName: 'Sam', handle: 'sam_88', status: 'pending', direction: 'in' },
+  ]),
+  'mj.awayGames': JSON.stringify([
+    {
+      ownerId: 'u_mei',
+      playerId: 'w2',
+      fetchedAt: iso(30),
+      session: {
+        id: 'away1',
+        name: 'Sunday at Mei\u2019s',
+        createdAt: iso(1500),
+        updatedAt: iso(1400),
+        ruleSetId: 'taiwanese-common',
+        players: [
+          { id: 'w1', name: 'Mei', seat: 'east', accountId: 'u_mei' },
+          { id: 'w2', name: 'Dylan', seat: 'south' },
+          { id: 'w3', name: 'Ravi', seat: 'west' },
+          { id: 'w4', name: 'Jo', seat: 'north' },
+        ],
+        roundWind: 'east',
+        dealerId: 'w1',
+        dealerStreak: 1,
+        hands: [
+          {
+            id: 'aw1',
+            createdAt: iso(1420),
+            winnerId: 'w2',
+            discarderId: 'w4',
+            hand: { concealed: [], exposed: [], bonus: [], winningTile: 'pin7', context: {} },
+            deltas: { w1: -30, w2: 90, w3: -30, w4: -30 },
+            summary: { total: 6, unit: 'tai', winnerReceives: 90, topPatterns: ['All Chows'] },
+          },
+        ],
+      },
+    },
+  ]),
 };
 
 // --- Driving ---------------------------------------------------------------
@@ -212,8 +254,16 @@ async function main() {
   await goto(page, '/');
   await shoot(page, '01-sessions');
 
+  await scrollBy(page, 900);
+  await shoot(page, '01b-sessions-away');
+
   await goto(page, '/session/sess1');
   await shoot(page, '02-session');
+
+  // The panel that puts a friend in a seat, which is the whole point of having
+  // friends. Down the page, so it has to be scrolled to.
+  await scrollBy(page, 1500);
+  await shoot(page, '02b-whos-here');
 
   await goto(page, '/rules');
   await shoot(page, '03-rules');
@@ -279,6 +329,12 @@ async function main() {
 
   await goto(page, '/(tabs)/profile');
   await shoot(page, '08b-profile');
+
+  await goto(page, '/friends');
+  await shoot(page, '17-friends');
+
+  await goto(page, '/away/away1');
+  await shoot(page, '18-away-game');
 
   await contactSheet(page);
 

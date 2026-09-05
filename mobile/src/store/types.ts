@@ -1,6 +1,7 @@
 import type { TileCode, Wind } from '@/tiles/tileset';
 import type { HandContext, Meld } from '@/scoring';
 import type { Tombstone } from './sync/meta';
+import type { QueuedIntent } from './sync/outbox';
 
 /**
  * What the app persists.
@@ -15,6 +16,16 @@ export interface SessionPlayer {
   readonly id: string;
   readonly name: string;
   readonly seat: Wind;
+  /**
+   * The account sitting in this seat, when one of the players has the app.
+   *
+   * Optional, and almost always absent. Three of the four people at a table
+   * will not have Tile Tally, and a seat is a name on a scoresheet first - the
+   * account is an extra fact about one of them, never a requirement. What it
+   * buys is the game appearing in that person's own history: their totals,
+   * their best hand, their profile, without them typing any of it.
+   */
+  readonly accountId?: string;
 }
 
 /** The scoring inputs, in a form safe to serialise. */
@@ -101,6 +112,29 @@ export interface Settings {
   readonly defaultRuleSetId: string;
 }
 
+/**
+ * A game somebody else scored, that we were seated in.
+ *
+ * Held apart from `sessions` rather than mixed in with a flag, because every
+ * write path in the app - adding a hand, renaming a seat, deleting, pushing -
+ * takes `sessions` and would have to learn to check that flag. One of them
+ * forgetting would mean editing a record we do not own, which the server
+ * would refuse and the app would never mention.
+ *
+ * It is a cache of the server's copy and nothing more: never edited, never
+ * pushed, replaced wholesale on every pull, and dropped the moment it stops
+ * coming back - which is how being unseated, or unfriended, takes the game
+ * away again.
+ */
+export interface AwayGame {
+  readonly session: Session;
+  readonly ownerId: string;
+  /** Which seat is ours, as an id into `session.players`. */
+  readonly playerId: string;
+  /** When this copy was pulled, so the screen can say how stale it is. */
+  readonly fetchedAt: string;
+}
+
 export interface AppState {
   /**
    * Sessions deleted here, kept so the delete can travel.
@@ -112,6 +146,16 @@ export interface AppState {
   readonly deletedSessions: Tombstone[];
   readonly ready: boolean;
   readonly sessions: Session[];
+  /** Games scored on somebody else's phone that we played in. Read-only. */
+  readonly awayGames: AwayGame[];
+  /**
+   * Social actions taken while there was nothing to tell.
+   *
+   * Sessions sync by comparing two copies of a record. Friend requests and
+   * seat changes are events, not records, so they queue instead. See
+   * `sync/outbox.ts`.
+   */
+  readonly outbox: QueuedIntent[];
   readonly customRuleSets: import('@/scoring').CustomRuleSet[];
   readonly settings: Settings;
 }

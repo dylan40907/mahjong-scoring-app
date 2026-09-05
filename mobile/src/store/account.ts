@@ -2,7 +2,7 @@ import { useCallback, useSyncExternalStore } from 'react';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/lib/supabase';
-import { setDefaultPlayerName } from './store';
+import { setLocalIdentity } from './store';
 
 /**
  * Who is signed in, and what they are called.
@@ -58,7 +58,7 @@ function set(partial: Partial<Account>): void {
   account = { ...account, ...partial };
   // Seat one of the next session, kept current without the store importing
   // any of this.
-  setDefaultPlayerName(account.displayName);
+  setLocalIdentity(account.displayName, account.userId);
   for (const listener of listeners) listener();
 }
 

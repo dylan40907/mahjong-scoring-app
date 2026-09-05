@@ -37,6 +37,7 @@ import {
   useAppState,
 } from '@/store/store';
 import { MahjongTable } from '@/components/MahjongTable';
+import { SeatSharing } from '@/components/SeatSharing';
 import type { HandRecord, Session } from '@/store/types';
 import { editHand, resetDraft } from '@/store/draft';
 import { discardPhoto } from '@/lib/photos';
@@ -294,6 +295,10 @@ export default function SessionScreen() {
             </Panel>
           )}
         </Section>
+
+        {/* Below the hands, because who is at the table is something you
+            settle once and the scores are what the screen is for. */}
+        <SeatSharing session={session} />
 
         <Section title="Session" icon={<PlayersIcon size={15} color={colors.inkFaint} />}>
           <Button label="Delete session" variant="danger" block onPress={confirmDelete} />

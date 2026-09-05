@@ -1,18 +1,23 @@
 import { useCallback, useSyncExternalStore } from 'react';
+import { makeId } from '@/lib/ids';
 import type { CustomRuleSet, RuleSet } from '@/scoring';
 import { BUILT_IN_RULESETS } from '@/scoring';
 import type { Wind } from '@/tiles/tileset';
 import {
   loadAll,
+  saveAwayGames,
   saveCustomRuleSets,
   saveDeletedSessions,
+  saveOutbox,
   saveSessions,
   saveSettings,
 } from './persistence';
 import { pruneTombstones, type Tombstone } from './sync/meta';
+import { enqueue, type Intent, type QueuedIntent } from './sync/outbox';
 import {
   DEFAULT_SETTINGS,
   type AppState,
+  type AwayGame,
   type HandRecord,
   type Session,
   type SessionPlayer,
@@ -36,6 +41,8 @@ let state: AppState = {
   ready: false,
   sessions: [],
   deletedSessions: [],
+  awayGames: [],
+  outbox: [],
   customRuleSets: [],
   settings: DEFAULT_SETTINGS,
 };
@@ -84,14 +91,8 @@ export function hydrate(): Promise<void> {
 // Identifiers
 // ---------------------------------------------------------------------------
 
-/**
- * Ids only have to be unique within one device's storage, so a timestamp with
- * a random suffix is sufficient and avoids a uuid dependency and its crypto
- * polyfill on React Native.
- */
-export function makeId(prefix: string): string {
-  return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-}
+/** Re-exported so the screens that build ids need not know where it moved to. */
+export { makeId };
 
 // ---------------------------------------------------------------------------
 // Rulesets
@@ -132,11 +133,23 @@ export function createSession(input: {
   ruleSetId: string;
   playerNames: string[];
 }): Session {
-  const players: SessionPlayer[] = input.playerNames.map((name, index) => ({
-    id: makeId('p'),
-    name: name.trim() || `Player ${index + 1}`,
-    seat: SEATS[index] ?? 'east',
-  }));
+  const players: SessionPlayer[] = input.playerNames.map((name, index) => {
+    const settled = name.trim() || `Player ${index + 1}`;
+    return {
+      id: makeId('p'),
+      name: settled,
+      seat: SEATS[index] ?? 'east',
+      // Whichever seat carries our own name is us, and saying so once here is
+      // what lets the profile count wins rather than hands, and what lets a
+      // friend's copy of this game know which of the four we were. It is the
+      // same rule the profile used to have to infer every time it drew a
+      // number; making it a fact on the record means renaming the seat later
+      // does not silently change who the history belonged to.
+      ...(localAccountId && localPlayerName && settled === localPlayerName
+        ? { accountId: localAccountId }
+        : {}),
+    };
+  });
 
   const now = new Date().toISOString();
   const session: Session = {
@@ -202,6 +215,24 @@ function replaceSession(id: string, update: (session: Session) => Session): void
  */
 export function applySync(sessions: Session[], deletedSessions: Tombstone[]): void {
   set({ sessions, deletedSessions });
+}
+
+/**
+ * Replace the cache of games we played in but did not score.
+ *
+ * Wholesale, and that is the entire delete story for them: an away game is
+ * whatever the server last said we could see, so one that stops coming back -
+ * because the owner deleted it, unseated us, or is no longer a friend - simply
+ * is not in the next list. There is nothing to tombstone, because we never had
+ * a copy anybody else depends on.
+ */
+export function applyAwayGames(games: AwayGame[]): void {
+  set({ awayGames: games });
+  void saveAwayGames(games);
+}
+
+export function getAwayGame(sessionId: string): AwayGame | undefined {
+  return state.awayGames.find((game) => game.session.id === sessionId);
 }
 
 export function getState(): AppState {
@@ -297,10 +328,17 @@ export function setSessionRuleSet(sessionId: string, ruleSetId: string): void {
  * the bottom of the stack and has no business importing auth, which drags a
  * native module through every test that touches a session.
  */
-let defaultPlayerName: string | null = null;
+let localPlayerName: string | null = null;
+let localAccountId: string | null = null;
 
-export function setDefaultPlayerName(name: string | null): void {
-  defaultPlayerName = name?.trim() || null;
+export function setLocalIdentity(name: string | null, accountId: string | null): void {
+  localPlayerName = name?.trim() || null;
+  localAccountId = accountId || null;
+}
+
+/** Who this device belongs to, for the parts of the app that need to ask. */
+export function localIdentity(): { userId: string | null; displayName: string | null } {
+  return { userId: localAccountId, displayName: localPlayerName };
 }
 
 export function createQuickSession(): Session {
@@ -310,7 +348,7 @@ export function createQuickSession(): Session {
     // Seat one is whoever is holding the phone, when the app knows who that
     // is. It is the one name in four it can already answer, and four names are
     // the only setup starting a session cannot skip.
-    playerNames: [defaultPlayerName || 'Player 1', 'Player 2', 'Player 3', 'Player 4'],
+    playerNames: [localPlayerName || 'Player 1', 'Player 2', 'Player 3', 'Player 4'],
   });
 }
 
@@ -337,6 +375,102 @@ export function deleteSession(id: string): void {
   set({ sessions: next, deletedSessions: stones });
   void saveSessions(next);
   void saveDeletedSessions(stones);
+}
+
+// ---------------------------------------------------------------------------
+// Seats, and the friends sitting in them
+// ---------------------------------------------------------------------------
+
+/**
+ * Say that a seat at this table is a particular account.
+ *
+ * The local half of adding a friend to a game. It takes effect at once and
+ * offline: the seat is marked and the screen redraws. Nothing is sent, because
+ * nothing needs to be - the seat is part of a session this device owns, and
+ * the next sync makes the server's copy match. The friend's phone finds out
+ * whenever both of them next have a signal, which in a basement is afterwards,
+ * and afterwards is fine because nothing about scoring the night depends on
+ * it.
+ *
+ * One account per table. Somebody cannot be two of the four players, and the
+ * server's primary key says so too, so moving a friend from one seat to
+ * another has to clear the old one rather than leaving them in both.
+ */
+export function linkSeat(
+  sessionId: string,
+  playerId: string,
+  accountId: string,
+  name?: string,
+): void {
+  replaceSession(sessionId, (session) => ({
+    ...session,
+    players: session.players.map((player) => {
+      if (player.id === playerId) {
+        return {
+          ...player,
+          accountId,
+          // Adopt their name only over a placeholder. Somebody who typed
+          // "Dad" meant "Dad", and having the app quietly replace it with the
+          // name on an account is a correction nobody asked for.
+          name: name && isPlaceholder(player.name) ? name : player.name,
+        };
+      }
+      return player.accountId === accountId ? { ...player, accountId: undefined } : player;
+    }),
+  }));
+}
+
+/**
+ * Take a friend back out of a game.
+ *
+ * The seat and everything scored in it stay exactly where they are - they
+ * played, and the night happened. What goes is the link, and with it their
+ * copy: once the removal reaches the server, the next pull on their phone will
+ * not include this session and their cache of it drops.
+ *
+ * Removing somebody from a game is often removing them from something they
+ * should not have seen, so this is the one social action worth being certain
+ * about. It is - not because it is sent urgently, but because it is not sent
+ * at all: `sync/seats.ts` compares the two copies every time, so every sync
+ * from here on tries again until the server agrees.
+ */
+export function unlinkSeat(sessionId: string, playerId: string): void {
+  const session = getSession(sessionId);
+  if (!session?.players.find((player) => player.id === playerId)?.accountId) return;
+
+  replaceSession(sessionId, (current) => ({
+    ...current,
+    players: current.players.map((player) =>
+      player.id === playerId ? { ...player, accountId: undefined } : player,
+    ),
+  }));
+}
+
+/** A seat nobody has bothered to name yet. */
+function isPlaceholder(name: string): boolean {
+  return /^player\s*\d+$/i.test(name.trim());
+}
+
+// ---------------------------------------------------------------------------
+// The outbox
+// ---------------------------------------------------------------------------
+
+/**
+ * Remember something to tell the server.
+ *
+ * Every social action goes through here rather than calling Supabase, so all
+ * of them behave the same way with no signal: instantly locally, eventually
+ * remotely, exactly once. See `sync/outbox.ts`.
+ */
+export function queueIntent(intent: Intent): void {
+  const next = enqueue(state.outbox, intent);
+  set({ outbox: next });
+  void saveOutbox(next);
+}
+
+export function applyOutbox(queue: QueuedIntent[]): void {
+  set({ outbox: queue });
+  void saveOutbox(queue);
 }
 
 /** Running totals for every player in a session. */

@@ -264,6 +264,37 @@ export const PlayersIcon = (p: IconProps) => (
   </Icon>
 );
 
+/**
+ * Two seats and the tile between them.
+ *
+ * Deliberately half of `PlayersIcon`: friends are the people at the table who
+ * also have the app, which is nearly always some of the four rather than all
+ * of them. Drawing it as a table with two of its seats filled says that
+ * without a word, and the two are drawn opposite each other because that is
+ * where the pairs sit.
+ */
+export const FriendsIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Circle cx={4.6} cy={12} r={2} />
+    <Circle cx={19.4} cy={12} r={2} />
+    <Rect x={8.8} y={7.4} width={6.4} height={9.2} rx={1.6} />
+  </Icon>
+);
+
+/**
+ * A game somebody else scored.
+ *
+ * A tile arriving rather than a tile held: the hand came from another table
+ * and this device only ever reads it.
+ */
+export const AwayIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Rect x={12.6} y={5.4} width={7.4} height={13.2} rx={1.8} />
+    <Path d="M3.4 12h6.2" />
+    <Path d="M7.2 9.4 9.8 12l-2.6 2.6" />
+  </Icon>
+);
+
 // ---------------------------------------------------------------------------
 // Situations
 //

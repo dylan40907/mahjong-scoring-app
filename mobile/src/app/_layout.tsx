@@ -7,6 +7,7 @@ import { TileScanner } from '@/design/components';
 import { colors, type } from '@/design/tokens';
 import { useOtaUpdates } from '@/lib/updates';
 import { initAccount } from '@/store/account';
+import { hydrateFriends } from '@/store/friends';
 import { syncNow } from '@/store/sync/engine';
 import { hydrate } from '@/store/store';
 
@@ -26,6 +27,9 @@ import { hydrate } from '@/store/store';
 export default function RootLayout() {
   useEffect(() => {
     void hydrate();
+    // The cached friends list, so the picker on a session screen has names in
+    // it before - and without - any network.
+    void hydrateFriends();
     // Anonymous, silent, and allowed to fail: offline is an ordinary outcome
     // and leaves the app exactly as it was before accounts existed. Sync
     // follows whenever it succeeds, and again on every return to the
@@ -62,6 +66,8 @@ export default function RootLayout() {
         <Stack.Screen name="hand/result" options={{ title: 'The Tally' }} />
         <Stack.Screen name="rules/[id]" options={{ title: '' }} />
         <Stack.Screen name="rules/edit" options={{ title: 'Custom Rules' }} />
+        <Stack.Screen name="friends" options={{ title: 'Friends' }} />
+        <Stack.Screen name="away/[id]" options={{ title: '' }} />
       </Stack>
 
       {updateStatus === 'applying' ? (
