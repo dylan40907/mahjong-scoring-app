@@ -15,7 +15,8 @@
         "NSCameraUsageDescription": "Photograph your hand so the app can read the tiles and score it.",
         "NSPhotoLibraryUsageDescription": "Score a hand from a photo you have already taken.",
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.tangent.tiletally",
@@ -61,6 +62,7 @@
       "./plugins/with-onnxruntime-gradle9-fix",
       "./plugins/with-onnxruntime-bridgeless-fix",
       "./plugins/with-onnxruntime-register-package",
+      "expo-apple-authentication",
       "expo-secure-store"
     ],
     "experiments": {

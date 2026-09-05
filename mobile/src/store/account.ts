@@ -1,6 +1,8 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { supabase } from '@/lib/supabase';
 import { clearFriends } from './friends';
 import { clearAccountScopedState, setLocalIdentity } from './store';
@@ -11,8 +13,23 @@ import { clearAccountScopedState, setLocalIdentity } from './store';
  * Everyone has an account from first launch, and almost nobody is asked to
  * make one. Supabase signs a new install in anonymously: a real user id, real
  * rows, real row-level security, and a profile that exists from minute one
- * with nothing to fill in. Signing in with Google or an email later *upgrades
- * the same user*, so no data moves and nothing is lost.
+ * with nothing to fill in. Signing in later *upgrades the same user*, so no
+ * data moves and nothing is lost.
+ *
+ * That last sentence is load-bearing and is easy to get wrong, because the
+ * obvious API does the opposite. `signInWithOAuth` and `signInWithIdToken`
+ * authenticate somebody - they hand back a session for whichever account owns
+ * that Google or Apple identity, which is a *different* account from the
+ * anonymous one holding this device's games, friends and handle. Only
+ * `linkIdentity` attaches the new identity to the session already in hand: it
+ * sends the current access token and asks the server to add to that user
+ * rather than to find another one.
+ *
+ * So every path below links when there is an anonymous session to link to, and
+ * only signs in when there is not. The failure is quiet either way - the games
+ * are on the device and would be pushed again under the new id - but the
+ * friends list, the handle and every seat somebody had been given would be
+ * left behind on an account nobody can reach any more.
  *
  * That is not only kinder than a registration wall, it is the difference
  * between shipping and not: Apple's guideline 5.1.1(v) forbids requiring
@@ -24,6 +41,17 @@ import { clearAccountScopedState, setLocalIdentity } from './store';
  * sign-in - each leaves `status: 'local'` and an app that works exactly as it
  * did before accounts existed.
  */
+
+/**
+ * Whether the identity should be attached to the session we already have.
+ *
+ * Anonymous means there is a user id here worth keeping. `local` means we
+ * never reached the server, and `identified` means somebody is already signed
+ * in properly - linking a second provider to that is a different feature.
+ */
+function shouldLink(): boolean {
+  return account.status === 'anonymous' && !!account.userId;
+}
 
 export type AccountStatus =
   /** No backend in this build, or we have not reached one yet. */
@@ -251,18 +279,18 @@ export async function deleteAccount(): Promise<string | null> {
  * could in principle claim, so the flow is PKCE: the code that arrives is
  * worthless without the verifier this client kept to itself.
  *
- * Like the email path, this *upgrades* the anonymous account rather than
- * replacing it, so the games already on this device stay with the person who
- * scored them.
+ * `linkIdentity` rather than `signInWithOAuth` whenever there is an anonymous
+ * account to keep, because the two do genuinely different things and only one
+ * of them keeps this device's history. See the note at the top of this file.
  */
 export async function signInWithGoogle(): Promise<string | null> {
   if (!supabase) return 'Accounts are unavailable in this build.';
 
   const redirectTo = Linking.createURL('auth/callback');
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: { redirectTo, skipBrowserRedirect: true },
-  });
+  const options = { redirectTo, skipBrowserRedirect: true };
+  const { data, error } = shouldLink()
+    ? await supabase.auth.linkIdentity({ provider: 'google', options })
+    : await supabase.auth.signInWithOAuth({ provider: 'google', options });
   if (error || !data?.url) return error?.message ?? 'Could not reach Google.';
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
@@ -275,6 +303,69 @@ export async function signInWithGoogle(): Promise<string | null> {
 
   const exchanged = await supabase.auth.exchangeCodeForSession(code);
   if (exchanged.error) return exchanged.error.message;
+
+  await loadProfile();
+  return null;
+}
+
+/** Whether to offer the Apple button at all. */
+export function isAppleSignInAvailable(): boolean {
+  return Platform.OS === 'ios';
+}
+
+/**
+ * Sign in with Apple.
+ *
+ * Required rather than optional: App Store guideline 4.8 says an app offering
+ * a third-party sign-in has to offer this one too, and Tile Tally offers
+ * Google. It is also the better button on an iPhone - the sheet is native,
+ * there is no browser, and Apple will hide the address behind a relay if the
+ * person wants that.
+ *
+ * The native flow hands back an identity token signed by Apple, which the
+ * server verifies against Apple's public keys, so there is no Services ID, no
+ * private key and no web redirect anywhere in this path. What the server does
+ * need is the bundle id registered as an allowed client, because that is the
+ * token's audience and the only thing tying it to this app.
+ *
+ * The name is the awkward part and the reason for the `fullName` handling
+ * below. Apple sends it exactly once, on the very first authorisation, and
+ * never again - not on a second sign-in, not on another device. A name that is
+ * not captured here is gone for good, so it is written to the profile
+ * immediately rather than being read back from the session later.
+ */
+export async function signInWithApple(): Promise<string | null> {
+  if (!supabase) return 'Accounts are unavailable in this build.';
+  if (!isAppleSignInAvailable()) return 'Apple sign-in needs an iPhone or iPad.';
+
+  let credential: AppleAuthentication.AppleAuthenticationCredential;
+  try {
+    credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    });
+  } catch (error) {
+    // Cancelling is a decision, not a failure, and should not raise anything
+    // at the person who made it.
+    const code = (error as { code?: string }).code;
+    return code === 'ERR_REQUEST_CANCELED' ? null : 'Could not reach Apple.';
+  }
+
+  const token = credential.identityToken;
+  if (!token) return 'Apple did not return a sign-in token.';
+
+  const linking = shouldLink();
+  const { error } = linking
+    ? await supabase.auth.linkIdentity({ provider: 'apple', token })
+    : await supabase.auth.signInWithIdToken({ provider: 'apple', token });
+  if (error) return error.message;
+
+  // Only ever offered once by Apple, so it is saved before anything else can
+  // go wrong, and only when we do not already have something better.
+  const given = credential.fullName?.givenName?.trim();
+  if (given && !account.displayName) await setDisplayName(given);
 
   await loadProfile();
   return null;

@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
 import {
   Body,
@@ -17,14 +18,16 @@ import {
   Title,
 } from '@/design/components';
 import { AwayIcon, FriendsIcon, PlayersIcon, SparkIcon, TrophyIcon } from '@/design/icons';
-import { colors, space, tileSize } from '@/design/tokens';
+import { colors, radius, space, tileSize } from '@/design/tokens';
 import { findRuleSet, useAppState } from '@/store/store';
 import { bestHandFor, playedGames, playerStats } from '@/store/stats';
 import { incomingRequests, useFriends } from '@/store/friends';
 import {
   deleteAccount,
+  isAppleSignInAvailable,
   setDisplayName,
   setHandle,
+  signInWithApple,
   signInWithEmail,
   signInWithGoogle,
   signOut,
@@ -121,6 +124,15 @@ export default function ProfileScreen() {
     setBusy(true);
     setProblem(null);
     const failure = await signInWithGoogle();
+    if (failure) setProblem(failure);
+    else await syncNow();
+    setBusy(false);
+  };
+
+  const withApple = async () => {
+    setBusy(true);
+    setProblem(null);
+    const failure = await signInWithApple();
     if (failure) setProblem(failure);
     else await syncNow();
     setBusy(false);
@@ -287,6 +299,26 @@ export default function ProfileScreen() {
               Your games are on this device. Add an email to reach them from another one —
               nothing you have already scored is lost.
             </Body>
+            {/*
+              * Apple first, and drawn by Apple.
+              *
+              * Guideline 4.8 requires this button wherever a third-party
+              * sign-in is offered, and its own guidelines govern the shape,
+              * the wording and the corner radius - so this is their component
+              * rather than ours. It is the one place in the app that does not
+              * use the house button, and matching the height of the one below
+              * is what keeps the two reading as equal choices, which is also
+              * something the guideline asks for.
+              */}
+            {isAppleSignInAvailable() ? (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
+                cornerRadius={radius.md}
+                style={styles.appleButton}
+                onPress={() => void withApple()}
+              />
+            ) : null}
             <Button
               label="Continue with Google"
               variant="primary"
@@ -338,4 +370,6 @@ const styles = StyleSheet.create({
   orLine: { flex: 1, height: 1, backgroundColor: colors.line },
   accountActions: { gap: space.sm, marginTop: space.md },
   handle: { marginTop: space.md, gap: space.sm },
+  /** 44 is Apple's minimum for their button, and the height of ours. */
+  appleButton: { height: 44, width: '100%' },
 });
