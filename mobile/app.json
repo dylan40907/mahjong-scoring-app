@@ -13,7 +13,8 @@
       "bundleIdentifier": "com.tangent.tiletally",
       "infoPlist": {
         "NSCameraUsageDescription": "Photograph your hand so the app can read the tiles and score it.",
-        "NSPhotoLibraryUsageDescription": "Score a hand from a photo you have already taken."
+        "NSPhotoLibraryUsageDescription": "Score a hand from a photo you have already taken.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

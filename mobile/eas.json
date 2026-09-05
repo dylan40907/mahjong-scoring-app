@@ -25,14 +25,35 @@
       "channel": "preview",
       "android": {
         "buildType": "apk"
-      }
+      },
+      "environment": "preview"
     },
     "production": {
       "channel": "production",
       "autoIncrement": true
+    },
+    "testflight": {
+      "extends": "preview",
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      },
+      "distribution": "store",
+      "autoIncrement": true,
+      "environment": "preview"
     }
   },
   "submit": {
-    "production": {}
+    "production": {},
+    "testflight": {
+      "ios": {
+        "appleId": "YOUR_APPLE_ID",
+        "ascAppId": "YOUR_ASC_APP_ID",
+        "appleTeamId": "YOUR_APPLE_TEAM_ID"
+      }
+    }
   }
 }
