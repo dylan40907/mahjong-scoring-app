@@ -136,7 +136,7 @@ export default function SessionScreen() {
   };
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} motif="zhong">
       {/*
         * The name lives in the page, not the bar: it is editable there, and
         * showing it in both places said the same thing twice.

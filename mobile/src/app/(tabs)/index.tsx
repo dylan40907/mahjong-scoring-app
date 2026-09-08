@@ -74,7 +74,7 @@ export default function SessionsScreen() {
   }
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} motif="rings">
       <FlatList
         data={sessions}
         keyExtractor={(session) => session.id}

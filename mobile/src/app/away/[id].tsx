@@ -63,7 +63,7 @@ export default function AwayGameScreen() {
   const totals = sessionTotals(session);
 
   return (
-    <Screen scroll>
+    <Screen scroll motif="zhong">
       <Stack.Screen options={{ title: '' }} />
       <View style={styles.head}>
         <Title>{session.name}</Title>

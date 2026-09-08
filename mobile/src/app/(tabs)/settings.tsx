@@ -55,7 +55,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll motif="wall">
       <Section title="Defaults" icon={<RulesIcon size={15} color={colors.inkFaint} />} first>
         <Panel flush>
           <Row

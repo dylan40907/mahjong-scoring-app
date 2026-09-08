@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, View, type ViewProps, type ViewStyle } from 'react-native';
-import { colors, radius, space } from '../tokens';
+import { colors, hairline, radius, space } from '../tokens';
 import { Body, Caption, Overline } from './Text';
 import { ChevronRightIcon } from '../icons';
 
@@ -39,6 +39,16 @@ export function Section({ title, icon, note, first, style, children, ...rest }: 
             {icon ? <View style={styles.sectionIcon}>{icon}</View> : null}
             <Overline>{title.toUpperCase()}</Overline>
           </View>
+          {/*
+            * A rule running out from the label to the right margin.
+            *
+            * Section headings were small capitals floating in space, which
+            * gave the page no structure to hang on - the eye had no line to
+            * follow from a heading to the thing it named. A hairline does that
+            * for the cost of one view, and it is the same device a scoresheet
+            * uses.
+            */}
+          <View style={styles.sectionRule} />
           {note ? <Caption tone="faint">{note}</Caption> : null}
         </View>
       ) : null}
@@ -172,11 +182,27 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   sectionIcon: { opacity: 0.9 },
+  sectionRule: {
+    flex: 1,
+    height: hairline,
+    marginLeft: space.md,
+    marginRight: space.sm,
+    backgroundColor: colors.line,
+  },
   panel: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.line,
+    /*
+     * A lighter line along the top edge only, which is what a raised surface
+     * does under a light source and what a border of one flat colour on all
+     * four sides never did. It is the difference between a panel that looks
+     * cut out of the background and one that looks laid on top of it, and it
+     * costs a colour rather than a shadow - shadows are still reserved for the
+     * two things genuinely lifted off the page.
+     */
+    borderTopColor: colors.lineStrong,
     paddingHorizontal: space.lg,
     paddingVertical: space.md,
     overflow: 'hidden',

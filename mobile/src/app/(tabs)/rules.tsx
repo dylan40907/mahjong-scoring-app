@@ -41,7 +41,7 @@ export default function RulesScreen() {
   }, [custom]);
 
   return (
-    <Screen scroll>
+    <Screen scroll motif="wall">
       <Body tone="muted" style={styles.intro}>
         Every table counts differently. Pick a preset, or build your own.
       </Body>

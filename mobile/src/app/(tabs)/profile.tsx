@@ -156,7 +156,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <Screen scroll>
+    <Screen scroll motif="rings">
       <View style={styles.head}>
         <Title>{account.displayName || 'Your table'}</Title>
         <Caption tone="faint">

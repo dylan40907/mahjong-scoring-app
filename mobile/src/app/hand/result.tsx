@@ -149,7 +149,7 @@ export default function ResultScreen() {
   const winner = session?.players.find((p) => p.id === draft.winnerId);
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} motif="zhong">
       <Confetti active={result.total > 0} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headline}>

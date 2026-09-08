@@ -125,7 +125,7 @@ export default function FriendsScreen() {
   }
 
   return (
-    <Screen scroll>
+    <Screen scroll motif="wall">
       <Section title="Add someone" icon={<FriendsIcon size={15} color={colors.inkFaint} />} first>
         <Panel style={styles.add}>
           <TextField
