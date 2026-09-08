@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Linking, StyleSheet, View } from 'react-native';
 import Constants from 'expo-constants';
 import {
   Button,
@@ -14,6 +14,7 @@ import { CheckIcon, RulesIcon } from '@/design/icons';
 import { colors, space } from '@/design/tokens';
 import { allRuleSets, updateSettings, useAppState } from '@/store/store';
 import { clearAll } from '@/store/persistence';
+import { LEGAL } from '@/lib/legal';
 
 /**
  * Settings.
@@ -109,6 +110,24 @@ export default function SettingsScreen() {
         <Caption tone="faint" style={styles.note}>
           Everything stays on this device. Nothing is uploaded.
         </Caption>
+      </Section>
+
+      {/*
+        * Both stores want these reachable from inside the app, not only from
+        * the listing, and somebody looking for them is looking for them here.
+        * They open in the browser rather than in a screen of their own: the
+        * text lives at a URL that has to exist anyway, and a second copy
+        * bundled into the app is a second copy to keep current.
+        */}
+      <Section title="Legal">
+        <Panel flush>
+          <Row
+            title="Privacy policy"
+            onPress={() => void Linking.openURL(LEGAL.privacy)}
+          />
+          <Divider inset={space.lg} />
+          <Row title="Terms of use" onPress={() => void Linking.openURL(LEGAL.terms)} />
+        </Panel>
       </Section>
 
       <Section title="Data">
