@@ -44,12 +44,7 @@ import { orderDetections } from '@/vision/ordering';
 import { fullFrame } from '@/vision/boundary';
 import { CAPTURE_ASPECT } from '@/vision/frame';
 import { cropToFrame } from '@/lib/photos';
-import {
-  detectTiles,
-  isVisionSupported,
-  visionUnavailableReason,
-  warmUp,
-} from '@/vision/detector';
+import { detectTiles, isVisionSupported, visionDiagnostics, visionUnavailableReason, warmUp } from '@/vision/detector';
 
 /**
  * Capture.
@@ -194,6 +189,16 @@ export default function CaptureScreen() {
         const ordered = orderDetections(result.detections);
 
         updateDraft({
+          /*
+           * A read that returns nothing is a failure with no error attached,
+           * and it is the most likely one: a dark photo, a hand at the far end
+           * of the table, a set the models have never seen. Saying so beats an
+           * empty grid that looks like the app did not try.
+           */
+          readNote:
+            result.detections.length === 0
+              ? 'No tiles were found in that photo. Try again with the hand filling more of the frame, or enter the tiles by hand.'
+              : null,
           tiles: ordered.groups.flat().map((tile) => tile.code),
           // Nothing is assumed melded. Which tiles were set down cannot be read
           // from a photograph - a player who tidies their hand before you take
@@ -206,13 +211,24 @@ export default function CaptureScreen() {
           imageHeight: result.imageHeight,
         });
       } catch (error) {
-        // Detection failing is not a dead end - it just means the hand gets
-        // typed in instead, which the review screen supports either way.
-        setMessage(
-          error instanceof Error && error.name === 'VisionUnavailableError'
-            ? 'Tiles will need to be entered by hand on this device.'
-            : 'The tiles could not be read from that photo. Enter them by hand.',
-        );
+        /*
+         * Detection failing is not a dead end - the hand gets typed in
+         * instead - but it has to be *said*, and it cannot be said here: the
+         * `finally` below replaces this screen immediately, so anything set on
+         * it is drawn for no frames. It goes onto the draft, which the review
+         * screen owns and can show.
+         *
+         * The diagnostics ride along when the module itself is missing.
+         * `visionDiagnostics` exists because each wrong guess about why native
+         * inference is absent costs a twenty-minute build, and it is worth
+         * nothing if it never reaches a screen.
+         */
+        const unsupported = error instanceof Error && error.name === 'VisionUnavailableError';
+        updateDraft({
+          readNote: unsupported
+            ? `Tiles cannot be read from photos in this build, so enter them by hand.\n\n${visionDiagnostics()}`
+            : `The tiles could not be read from that photo. Enter them by hand.\n\n${String(error)}`,
+        });
       } finally {
         setBusy(false);
         router.replace('/hand/review');

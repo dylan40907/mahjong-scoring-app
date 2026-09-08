@@ -9,6 +9,7 @@ import {
   Divider,
   EmptyState,
   Panel,
+  PageHeader,
   Screen,
   Section,
   Title,
@@ -63,9 +64,11 @@ export default function AwayGameScreen() {
   const totals = sessionTotals(session);
 
   return (
-    <Screen scroll motif="zhong">
-      <Stack.Screen options={{ title: '' }} />
-      <View style={styles.head}>
+    <Screen scroll motif="zhong" padded={false}>
+      {/* Same reason as the session screen: an empty navigation bar was
+          spending a row to show one chevron. */}
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageHeader>
         <Title>{session.name}</Title>
         <View style={styles.byline}>
           <AwayIcon size={14} color={colors.inkFaint} />
@@ -73,7 +76,8 @@ export default function AwayGameScreen() {
             Scored by {scorer} · {rules?.name ?? 'Unknown rules'}
           </Caption>
         </View>
-      </View>
+      </PageHeader>
+      <View style={styles.body}>
 
       <MahjongTable
         players={session.players}
@@ -119,10 +123,11 @@ export default function AwayGameScreen() {
         )}
       </Section>
 
-      <Caption tone="faint" style={styles.note}>
-        This is {scorer}&apos;s copy. It updates when you are both online, and disappears if they
-        take you out of the game.
-      </Caption>
+        <Caption tone="faint" style={styles.note}>
+          This is {scorer}&apos;s copy. It updates when you are both online, and disappears if they
+          take you out of the game.
+        </Caption>
+      </View>
     </Screen>
   );
 }
@@ -152,7 +157,7 @@ function AwayHand({ hand, session }: { hand: HandRecord; session: Session }) {
 }
 
 const styles = StyleSheet.create({
-  head: { paddingTop: space.md, paddingBottom: space.md, gap: 4 },
+  body: { paddingHorizontal: space.xl },
   byline: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   seat: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   seatBody: { flex: 1, gap: 2 },

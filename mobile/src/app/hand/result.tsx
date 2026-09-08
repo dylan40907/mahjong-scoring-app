@@ -350,8 +350,12 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: space.xl,
     paddingTop: space.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.line,
-    backgroundColor: colors.ground,
+    /*
+     * No rule and no fill. A hairline with an opaque band under it read as the
+     * page being cut off rather than as an action bar, and once the ground
+     * gained a wash the flat `ground` fill became a visible patch sitting on
+     * top of it. The button is a brass slab; it does not need a box drawn
+     * round it to be found.
+     */
   },
 });

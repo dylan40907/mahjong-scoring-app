@@ -17,6 +17,7 @@ import {
   Divider,
   EmptyState,
   Panel,
+  PageHeader,
   Screen,
   Section,
   Title,
@@ -138,11 +139,15 @@ export default function SessionScreen() {
   return (
     <Screen padded={false} motif="zhong">
       {/*
-        * The name lives in the page, not the bar: it is editable there, and
-        * showing it in both places said the same thing twice.
+        * No navigation bar at all.
+        *
+        * The name is editable in the page, so it could never live in the bar -
+        * which left the bar showing a chevron and nothing else, spending a
+        * whole row of a phone screen to do it. `PageHeader` puts the same
+        * chevron on the same line as the name. Swipe-back is unaffected.
         */}
-      <Stack.Screen options={{ title: '' }} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <PageHeader>
         {editingTitle ? (
           <TextInput
             value={titleText}
@@ -183,6 +188,9 @@ export default function SessionScreen() {
             {rules?.name ?? 'Unknown rules'} · change
           </Caption>
         </Pressable>
+      </PageHeader>
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {pickingRules ? (
           <View style={styles.ruleChips}>
@@ -429,8 +437,12 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: space.xl,
     paddingTop: space.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.line,
-    backgroundColor: colors.ground,
+    /*
+     * No rule and no fill. A hairline with an opaque band under it read as the
+     * page being cut off rather than as an action bar, and once the ground
+     * gained a wash the flat `ground` fill became a visible patch sitting on
+     * top of it. The button is a brass slab; it does not need a box drawn
+     * round it to be found.
+     */
   },
 });

@@ -1,5 +1,6 @@
 export * from './Text';
 export * from './Screen';
+export * from './PageHeader';
 export * from './Button';
 export * from './Surface';
 export * from './Tile';

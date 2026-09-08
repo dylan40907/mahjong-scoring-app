@@ -69,6 +69,20 @@ export interface HandDraft {
    */
   boundary: readonly [number, number, number, number] | null;
   /**
+   * Why the photograph could not be read, when it could not be.
+   *
+   * It lives on the draft rather than in the capture screen's state because
+   * the capture screen navigates away the instant it finishes - it set a
+   * message and then replaced itself, so the one sentence explaining what had
+   * gone wrong was drawn for no frames at all. What the player saw was a photo,
+   * no tiles, and nothing to suggest anything had happened.
+   *
+   * That silence is expensive on a platform we cannot debug directly: an
+   * unlinked native module, a model that would not load, and a hand the
+   * detector genuinely could not see all look identical from the sofa.
+   */
+  readNote: string | null;
+  /**
    * Set when an already-scored hand is open for correction.
    *
    * Its presence is the whole difference between saving and re-saving: with an
@@ -94,6 +108,7 @@ const EMPTY: HandDraft = {
   detections: [],
   handId: null,
   createdAt: null,
+  readNote: null,
   imageWidth: 0,
   imageHeight: 0,
   boundary: null,

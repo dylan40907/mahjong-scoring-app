@@ -11,7 +11,7 @@ import {
   TileFace,
   TileScanner,
 } from '@/design/components';
-import { CropIcon, FlowerIcon, KongIcon, MeldIcon, PlusIcon, TrophyIcon } from '@/design/icons';
+import { AlertIcon, CropIcon, FlowerIcon, KongIcon, MeldIcon, PlusIcon, TrophyIcon } from '@/design/icons';
 import { colors, radius, space, tileSize } from '@/design/tokens';
 import { TilePicker } from '@/components/TilePicker';
 import { HandBoundary } from '@/components/HandBoundary';
@@ -79,8 +79,10 @@ export default function ReviewScreen() {
         imageWidth: result.imageWidth,
         imageHeight: result.imageHeight,
       });
-    } catch {
-      // Keep the read we already have; the tiles are still editable by hand.
+    } catch (error) {
+      // The tiles already read stay put and are still editable by hand, but a
+      // second failure that says nothing is the same trap as the first.
+      updateDraft({ readNote: `Reading again did not work.\n\n${String(error)}` });
     } finally {
       setRereading(false);
     }
@@ -136,6 +138,31 @@ export default function ReviewScreen() {
   return (
     <Screen padded={false} footerSpace={0}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/*
+          * Why the photograph could not be read, when it could not be.
+          *
+          * This screen is where the answer has to appear, because the capture
+          * screen replaces itself the moment it finishes and anything it says
+          * is drawn for no frames. Without it the failure is a photograph with
+          * an empty grid under it, which reads as the app not having tried.
+          *
+          * Tappable to dismiss rather than automatic, because the diagnostics
+          * it can carry are the only evidence available about a device we
+          * cannot attach a debugger to.
+          */}
+        {draft.readNote ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss this message"
+            onPress={() => updateDraft({ readNote: null })}
+            style={styles.readNote}
+          >
+            <AlertIcon size={16} color={colors.brass} />
+            <Caption tone="muted" style={styles.readNoteText}>
+              {draft.readNote}
+            </Caption>
+          </Pressable>
+        ) : null}
         {!draft.photoUri ? (
           <Button
             label="Add a photo"
@@ -450,11 +477,28 @@ const styles = StyleSheet.create({
   bonus: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' },
   problems: { marginTop: space.xl, gap: space.xs, paddingHorizontal: space.xs },
   pressed: { opacity: 0.6 },
+  readNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: space.sm,
+    marginHorizontal: space.xl,
+    marginBottom: space.lg,
+    padding: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+  },
+  readNoteText: { flex: 1 },
   footer: {
     paddingHorizontal: space.xl,
     paddingTop: space.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.line,
-    backgroundColor: colors.ground,
+    /*
+     * No rule and no fill. A hairline with an opaque band under it read as the
+     * page being cut off rather than as an action bar, and once the ground
+     * gained a wash the flat `ground` fill became a visible patch sitting on
+     * top of it. The button is a brass slab; it does not need a box drawn
+     * round it to be found.
+     */
   },
 });
