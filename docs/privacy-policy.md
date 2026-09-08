@@ -162,14 +162,3 @@ it, the app will say so before the change takes effect.
 Tangent — **dylansken@gmail.com**
 
 ---
-
-<!--
-  Not yet published. This needs a public URL before either store will accept
-  the app, and the Google OAuth consent screen asks for one too. Once a domain
-  exists, publish this and the terms alongside it, and put both links on the
-  profile screen.
-
-  Two things to check before publishing: confirm the legal entity name, and
-  confirm the Supabase region actually is us-east-1 (the project says AWS
-  us-east-1 today).
--->

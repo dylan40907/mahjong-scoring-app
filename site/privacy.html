@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy — Tile Tally</title>
+<style>
+  :root {
+    --ground: #123a2e;
+    --surface: #1b4d3b;
+    --line: #357355;
+    --ink: #f4f2e8;
+    --muted: #b6d4c1;
+    --faint: #8ab29b;
+    --brass: #f5c63c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  main { max-width: 44rem; margin: 0 auto; padding: 3rem 1.4rem 6rem; }
+  nav { font-size: 0.85rem; margin-bottom: 2.5rem; color: var(--faint); }
+  nav a { color: var(--muted); margin-right: 1rem; }
+  h1 { font-size: 1.9rem; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 1.5rem; }
+  h2 { font-size: 1.25rem; margin: 2.5rem 0 0.75rem; letter-spacing: -0.01em; }
+  h3 { font-size: 1rem; margin: 1.75rem 0 0.5rem; color: var(--muted); }
+  p, li { color: var(--muted); }
+  strong { color: var(--ink); font-weight: 600; }
+  a { color: var(--brass); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  ul { padding-left: 1.15rem; }
+  li { margin-bottom: 0.5rem; }
+  hr { border: 0; border-top: 1px solid var(--line); margin: 2.5rem 0; }
+  code {
+    background: var(--surface);
+    padding: 0.1em 0.35em;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  footer { margin-top: 4rem; color: var(--faint); font-size: 0.85rem; }
+</style>
+</head>
+<body>
+<main>
+  <nav><a href="./">Tile Tally</a><a href="./privacy.html">Privacy</a><a href="./terms.html">Terms</a></nav>
+  <h1>Privacy Policy — Tile Tally</h1>
+<p><strong>Last updated: 3 September 2026</strong></p>
+<p>Tile Tally is made by Tangent. This policy explains what the app collects, why, and what you can do about it. It is written to be read rather than to be survived, and it describes what the app actually does — if the two ever disagree, the app is the bug.</p>
+<hr>
+<h2>The short version</h2>
+<ul><li>The app works entirely on your device. Scoring a hand never needs an account or a network connection.</li><li>An account is created for you automatically, with no name, email or password, so your data has an owner. You are never asked to register.</li><li>Photographs of your tiles stay on your phone unless you turn on photo backup, which is a paid feature.</li><li>Nothing is sold, shared with advertisers, or used to train anything.</li><li>You can delete everything, from inside the app, at any time.</li></ul>
+<hr>
+<h2>What the app stores on your device</h2>
+<p>Everything the app needs to work:</p>
+<ul><li><strong>Sessions and hands</strong> — players' names as you typed them, the tiles in each hand, what it scored, and the running totals.</li><li><strong>Rulesets</strong> you have created or edited.</li><li><strong>Photographs</strong> of hands you have scored, if you took any.</li><li><strong>One preference</strong>: which ruleset new sessions start on.</li></ul>
+<p>This data never leaves your device unless you are signed in and syncing.</p>
+<h2>What the app stores on our servers</h2>
+<p>The app uses <a href="https://supabase.com">Supabase</a> for accounts and storage.</p>
+<h3>Your account</h3>
+<p>On first launch the app creates an <strong>anonymous account</strong>. This is a random identifier and nothing else — no name, no email, no password, no device fingerprint, no advertising id. Its only purpose is to own your rows in the database so that nobody else can read them.</p>
+<p>If you later sign in with an email address, a Google account or an Apple account, that identifier stays the same and gains those credentials — nothing moves and nothing is lost. We then store:</p>
+<ul><li>your email address, if you signed in with one;</li><li>a display name and a handle, if you choose to set them.</li></ul>
+<p>If you use <strong>Sign in with Apple</strong>, Apple tells us an identifier for you and the email address you chose to share. If you chose to hide it, what we receive is Apple's private relay address, and that is the only address we ever have. Apple offers your name once, at the moment you first sign in; if it is there and you have not set one yourself, it becomes your display name.</p>
+<h3>Your games</h3>
+<p>When you are signed in, your sessions, hands and rulesets are copied to the server so you can reach them from another device. These contain the names you typed for the players at your table. <strong>Please only enter names other people would be comfortable with</strong> — a first name or a nickname is enough, and the app never asks for anything more.</p>
+<h3>Photographs</h3>
+<p>Photographs of your hands stay on your device by default.</p>
+<p>If you subscribe and turn on photo backup, they are uploaded to private storage that only your account can read. A photograph of a mahjong table may show other people's hands, drinks, and the room — please consider that before turning it on, and be aware that shared sessions never include photographs.</p>
+<h3>Payments</h3>
+<p>If you subscribe, the payment is handled by Apple or Google. We never see your card details. We receive a record from <a href="https://revenuecat.com">RevenueCat</a> saying whether your subscription is active, and store that against your account.</p>
+<hr>
+<h2>What the app does not do</h2>
+<ul><li>No advertising, and no advertising identifiers.</li><li>No analytics or tracking SDKs.</li><li>No selling or sharing of data with third parties.</li><li>No training of machine-learning models on your data. The tile recognition models ship with the app, are fixed, and never send your photographs anywhere.</li><li>No location, no contacts, no microphone.</li></ul>
+<h2>Permissions</h2>
+<ul><li><strong>Camera</strong> — to photograph a hand. Used only when you tap the camera.</li><li><strong>Photo library</strong> — only when you choose an existing photo.</li></ul>
+<p>Both are asked for at the moment they are first needed, and the app works without either: hands can always be entered by hand.</p>
+<hr>
+<h2>Sharing with other people</h2>
+<p>Nothing you record is visible to anyone else unless you put them in a game.</p>
+<ul><li><strong>Friends</strong> are added by handle — a short name you choose, never an email address, and the app has no directory to browse. A request has to be accepted, and either side can end the connection.</li></ul>
+<ul><li><strong>Being friends shares nothing on its own.</strong> No scores, no games, no history.</li></ul>
+<ul><li><strong>A game reaches somebody because you seat them in it.</strong> On a session screen you can say which of the four seats is a friend of yours. That, and only that, lets them open that one game: its hands, its scores, and the names of everyone at that table. It also means the game counts in their own history — their totals, and their best hand.</li></ul>
+<ul><li><strong>Taking them back out takes their copy with it.</strong> So does ending the friendship, which removes every seat either of you held in the other's games. Their device stops being able to load those games at all.</li></ul>
+<ul><li><strong>Photographs are never shared</strong>, in any of this, by any route.</li></ul>
+<hr>
+<h2>Deleting your data</h2>
+<p>Two ways, both complete:</p>
+<ul><li><strong>Erase all data</strong> in the app's Settings removes everything stored on the device.</li><li><strong>Delete account</strong> on your profile deletes your account and every row belonging to it on the server, including any photographs. This cannot be undone.</li></ul>
+<p>Deleted rows are removed from the live database immediately. Encrypted backups may retain them for up to 30 days before rotating out.</p>
+<p>If you cannot reach the app, email the address below and we will delete your account on request.</p>
+<h2>Children</h2>
+<p>Tile Tally is not directed at children under 13 and we do not knowingly collect data from them. There is nothing in the app that asks a child for information.</p>
+<h2>Where data is held</h2>
+<p>Servers are in the United States. If you use the app elsewhere, your data is transferred there.</p>
+<h2>Changes</h2>
+<p>If this policy changes in a way that affects what is collected or who can see it, the app will say so before the change takes effect.</p>
+<h2>Contact</h2>
+<p>Tangent — <strong>dylansken@gmail.com</strong></p>
+<hr>
+  <footer>Tile Tally is made by Tangent. Questions: <a href="mailto:dylansken@gmail.com">dylansken@gmail.com</a></footer>
+</main>
+</body>
+</html>
