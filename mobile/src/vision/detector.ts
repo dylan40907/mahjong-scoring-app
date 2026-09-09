@@ -5,6 +5,7 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { decode as decodeJpeg } from 'jpeg-js';
 import type { InferenceSession as OrtSession, Tensor as OrtTensor } from 'onnxruntime-react-native';
 import { CODES, type TileCode } from '@/tiles/tileset';
+import { assetPath } from './assetPath';
 import type { Detection } from './ordering';
 import {
   cropToTensor,
@@ -207,14 +208,10 @@ async function loadSessions() {
         executionMode: 'sequential',
       };
 
-      const detector = await ort.InferenceSession.create(
-        detectorAsset.localUri ?? detectorAsset.uri,
-        options,
-      );
-      const classifier = await ort.InferenceSession.create(
-        classifierAsset.localUri ?? classifierAsset.uri,
-        options,
-      );
+      // `assetPath` rather than the raw URI: ONNX Runtime wants a filesystem
+      // path and Expo hands back a `file://` URL on iOS. See `assetPath.ts`.
+      const detector = await ort.InferenceSession.create(assetPath(detectorAsset), options);
+      const classifier = await ort.InferenceSession.create(assetPath(classifierAsset), options);
 
       sessions = { detector, classifier };
       return sessions;

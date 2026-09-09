@@ -18,6 +18,7 @@ import {
   Toggle,
 } from '@/design/components';
 import {
+  AppleMark,
   AwayIcon,
   EditIcon,
   FriendsIcon,
@@ -404,6 +405,7 @@ function SignedOut() {
             <Button
               label="Continue with Apple"
               variant="apple"
+              icon={<AppleMark size={18} />}
               block
               disabled={busy}
               onPress={() => void run(signInWithApple)}

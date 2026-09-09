@@ -1,31 +1,8 @@
 import React from 'react';
-import { Pressable, StyleSheet } from 'react-native';
-import { Tabs, useRouter } from 'expo-router';
-import { FriendsIcon, GearIcon, PersonIcon, RulesIcon, SessionsIcon } from '@/design/icons';
-import { colors, space, type } from '@/design/tokens';
-
-/**
- * Settings, in the corner of the first screen.
- *
- * It used to be a quarter of the tab bar and was one preference, two legal
- * links and a destructive button - and its icon was a set of sliders sitting
- * beside Rules, also a set of sliders. A gear in the top corner is where every
- * other app keeps this, and it gives the fourth tab to something people open.
- */
-function SettingsButton() {
-  const router = useRouter();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Settings"
-      hitSlop={space.md}
-      onPress={() => router.push('/settings')}
-      style={({ pressed }) => [styles.gear, pressed && styles.pressed]}
-    >
-      <GearIcon size={22} color={colors.inkMuted} />
-    </Pressable>
-  );
-}
+import { Tabs } from 'expo-router';
+import { FriendsIcon, PersonIcon, RulesIcon, SessionsIcon } from '@/design/icons';
+import { colors, type } from '@/design/tokens';
+import { resetDraft } from '@/store/draft';
 
 /**
  * Four tabs, in the order the app is used.
@@ -63,12 +40,31 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="(sessions)"
         options={{
           title: 'Sessions',
           tabBarIcon: ({ color }) => <SessionsIcon size={22} color={color} />,
-          headerRight: () => <SettingsButton />,
+          // The tab holds a stack now, and every screen in it draws its own
+          // header, so the tab's own bar would be a second one.
+          headerShown: false,
         }}
+        listeners={({ navigation }) => ({
+          /*
+           * Tapping Sessions while already in Sessions abandons the hand.
+           *
+           * React Navigation already pops the stack to its root here; what it
+           * cannot know is that a half-entered hand is still sitting in the
+           * draft. Leaving it there means the next hand starts holding the
+           * tiles of the one somebody walked away from, which is the kind of
+           * bug that gets noticed as a wrong score rather than as stale state.
+           *
+           * Only on a second tap. The first is how you get *back* to a hand
+           * you stepped away from, and that has to stay lossless.
+           */
+          tabPress: () => {
+            if (navigation.isFocused()) resetDraft();
+          },
+        })}
       />
       <Tabs.Screen
         name="rules"
@@ -80,7 +76,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'You',
+          title: 'Profile',
           tabBarIcon: ({ color }) => <PersonIcon size={22} color={color} />,
         }}
       />
@@ -94,8 +90,3 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
-
-const styles = StyleSheet.create({
-  gear: { paddingHorizontal: space.lg, paddingVertical: space.xs },
-  pressed: { opacity: 0.6 },
-});

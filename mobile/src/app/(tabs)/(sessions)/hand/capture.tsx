@@ -44,7 +44,14 @@ import { orderDetections } from '@/vision/ordering';
 import { fullFrame } from '@/vision/boundary';
 import { CAPTURE_ASPECT } from '@/vision/frame';
 import { cropToFrame } from '@/lib/photos';
-import { detectTiles, isVisionSupported, visionDiagnostics, visionUnavailableReason, warmUp } from '@/vision/detector';
+import {
+  detectTiles,
+  isVisionSupported,
+  visionDiagnostics,
+  visionUnavailableReason,
+  warmUp,
+  VisionUnavailableError,
+} from '@/vision/detector';
 
 /**
  * Capture.
@@ -223,11 +230,28 @@ export default function CaptureScreen() {
          * inference is absent costs a twenty-minute build, and it is worth
          * nothing if it never reaches a screen.
          */
-        const unsupported = error instanceof Error && error.name === 'VisionUnavailableError';
+        /*
+         * Three different failures, and they used to produce two messages
+         * between them. Anything named `VisionUnavailableError` was reported
+         * as "not in this build" - including the case where the module was
+         * present and the *models* failed to open, which is a different
+         * problem with a different fix and whose actual error text was thrown
+         * away. That cost a whole TestFlight cycle: the diagnostics said the
+         * native side was fine and the message insisted it was missing.
+         *
+         * `kind` already knew the difference. Only 'unsupported' is about the
+         * build; everything else carries its own reason and has to show it.
+         */
+        const vision = error instanceof Error && error.name === 'VisionUnavailableError'
+          ? (error as VisionUnavailableError)
+          : null;
         updateDraft({
-          readNote: unsupported
-            ? `Tiles cannot be read from photos in this build, so enter them by hand.\n\n${visionDiagnostics()}`
-            : `The tiles could not be read from that photo. Enter them by hand.\n\n${String(error)}`,
+          readNote:
+            vision?.kind === 'unsupported'
+              ? `Tiles cannot be read from photos in this build, so enter them by hand.\n\n${visionDiagnostics()}`
+              : `The tiles could not be read from that photo. Enter them by hand.\n\n${
+                  vision ? vision.message : String(error)
+                }\n\n${visionDiagnostics()}`,
         });
       } finally {
         setBusy(false);

@@ -27,7 +27,7 @@ import type { TileCode } from '@/tiles/tileset';
 /**
  * Somebody else's profile.
  *
- * The same things the You screen shows about you, which is the point: a
+ * The same things the profile screen shows about you, which is the point: a
  * profile is public by default and what it shows is what its owner sees, so
  * there is no second idea of "the public version" to keep in step.
  *

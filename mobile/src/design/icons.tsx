@@ -326,6 +326,33 @@ export const GoogleMark = ({ size = 20 }: { size?: number }) => (
 );
 
 /**
+ * Apple's mark, for the button beside Google's.
+ *
+ * Solid black rather than tinted, and drawn at Apple's proportions, because
+ * the same reasoning applies as to the four-colour G: it is not our mark to
+ * restyle. It only ever appears on the white `apple` button, which is one of
+ * the two appearances Apple's guidelines allow.
+ *
+ * The button had no mark at all - Google's was there and Apple's was not,
+ * which read as a rendering fault rather than as a design. Guideline 4.8 asks
+ * for Sign in with Apple to be presented no less prominently than the
+ * alternatives, and a button missing its logo next to one that has its logo is
+ * exactly that.
+ */
+export const AppleMark = ({ size = 20 }: { size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path
+      fill="#000000"
+      d="M17.05 12.53c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.61-1.7-3.18-1.72-1.35-.14-2.64.79-3.33.79-.69 0-1.75-.77-2.87-.75-1.48.02-2.84.86-3.6 2.18-1.53 2.66-.39 6.6 1.1 8.76.73 1.06 1.6 2.25 2.74 2.2 1.1-.04 1.51-.71 2.84-.71 1.32 0 1.7.71 2.86.69 1.18-.02 1.93-1.08 2.65-2.14.83-1.22 1.18-2.41 1.2-2.47-.03-.01-2.29-.88-2.31-3.49z"
+    />
+    <Path
+      fill="#000000"
+      d="M14.94 5.93c.61-.74 1.02-1.76.91-2.78-.88.04-1.94.59-2.57 1.32-.56.65-1.05 1.69-.92 2.69.98.08 1.98-.5 2.58-1.23z"
+    />
+  </Svg>
+);
+
+/**
  * A person, for the tab that is about you.
  *
  * The four-seat table mark that used to label it says "players", which is what

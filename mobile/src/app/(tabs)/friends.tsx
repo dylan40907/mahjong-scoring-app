@@ -35,7 +35,7 @@ import { isCloudConfigured } from '@/lib/supabase';
  *
  * A tab rather than a section of the profile, because it is a place you go
  * rather than a setting you change: looking somebody up, answering a request,
- * opening a profile. As a panel on the You screen it was one row deep and gave
+ * opening a profile. As a panel on the profile screen it was one row deep and gave
  * no hint that any of that existed.
  *
  * People are found by exact username. Not by email address - that is a fact
@@ -80,7 +80,7 @@ export default function FriendsScreen() {
         <EmptyState
           icon={<FriendsIcon size={28} color={colors.inkFaint} />}
           title="Friends need an account"
-          body="Both ends of a friendship have to be somewhere. Make an account on the You tab and you can add people, put them in a game, and see the games they put you in."
+          body="Both ends of a friendship have to be somewhere. Make an account on the Profile tab and you can add people, put them in a game, and see the games they put you in."
           action={
             <Button
               label="Go to You"

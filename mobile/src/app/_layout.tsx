@@ -60,15 +60,10 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="session/[id]" options={{ title: '' }} />
-        <Stack.Screen name="hand/capture" options={{ title: 'Photograph the Hand' }} />
-        <Stack.Screen name="hand/review" options={{ title: 'Check the Tiles' }} />
-        <Stack.Screen name="hand/result" options={{ title: 'The Tally' }} />
         <Stack.Screen name="rules/[id]" options={{ title: '' }} />
         <Stack.Screen name="rules/edit" options={{ title: 'Custom Rules' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="profile/[handle]" options={{ title: '' }} />
-        <Stack.Screen name="away/[id]" options={{ title: '' }} />
       </Stack>
 
       {updateStatus === 'applying' ? (
