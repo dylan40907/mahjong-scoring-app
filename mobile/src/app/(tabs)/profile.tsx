@@ -347,11 +347,15 @@ function SignedOut() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
+  // Separate from `problem`, which is drawn in the loss tone. "Check your
+  // email" is an instruction, not a failure.
+  const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const run = async (action: () => Promise<string | null>) => {
     setBusy(true);
     setProblem(null);
+    setNotice(null);
     const failure = await action();
     if (failure) setProblem(failure);
     else await syncNow();
@@ -366,12 +370,25 @@ function SignedOut() {
    */
   const connect = () =>
     run(async () => {
-      const upgraded = await upgradeWithEmail(email, password);
+      const address = email.trim();
+      const upgraded = await upgradeWithEmail(address, password);
       if (!upgraded) {
         setPassword('');
+        /*
+         * Signing up is not finished here, and the screen used to imply it
+         * was. The project requires a confirmed address, so `updateUser`
+         * attaches nothing until a link is opened - and this returned null,
+         * which the caller reads as success and shows nothing at all.
+         * Somebody typed a password, watched the form do nothing, and still
+         * had an anonymous account.
+         *
+         * The provider buttons say none of this, correctly: Google and Apple
+         * have already established who the address belongs to.
+         */
+        setNotice(`Almost there. Open the link we sent to ${address} to finish.`);
         return null;
       }
-      const signedIn = await signInWithEmail(email, password);
+      const signedIn = await signInWithEmail(address, password);
       if (!signedIn) setPassword('');
       return signedIn;
     });
@@ -381,16 +398,15 @@ function SignedOut() {
       <View style={styles.pitch}>
         <Title>Make an account</Title>
         <Body tone="muted">
-          Scoring works without one and always will. An account is for the parts that need
-          somewhere to live.
+          It is free, and scoring keeps working without one.
         </Body>
       </View>
 
       <Panel style={styles.perks}>
         {[
-          ['Your games on any phone', 'Everything already scored here comes with you.'],
-          ['Friends', 'Put them in a game and it lands in their history too.'],
-          ['A profile', 'Your best hand, your totals, and a username people can find you by.'],
+          ['Your games follow you', 'Change phones and every night you have scored is still there.'],
+          ['Play with friends', 'Add the people at your table and they get the same scores you do.'],
+          ['A record worth showing', 'Your best hand and your running totals, on a page of your own.'],
         ].map(([title, body]) => (
           <View key={title} style={styles.perk}>
             <BodyStrong>{title}</BodyStrong>
@@ -452,6 +468,7 @@ function SignedOut() {
             A username is made for you from your email, and you can change it afterwards.
           </Caption>
           {problem ? <CaptionStrong tone="loss">{problem}</CaptionStrong> : null}
+          {notice ? <CaptionStrong tone="accent">{notice}</CaptionStrong> : null}
         </Panel>
       </Section>
     </Screen>

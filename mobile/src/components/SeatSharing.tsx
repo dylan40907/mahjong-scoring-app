@@ -84,7 +84,8 @@ export function SeatSharing({ session }: { session: Session }) {
                   {available.length === 0 ? (
                     <View style={styles.none}>
                       <Caption tone="faint">
-                        Nobody to add yet. A friend has to accept before they can be put in a game.
+                        You will need a friend first. Add someone, and once they say yes they can
+                        go in a game.
                       </Caption>
                       <Button
                         label="Find friends"
@@ -135,13 +136,13 @@ export function SeatSharing({ session }: { session: Session }) {
       <View style={styles.note}>
         <CaptionStrong tone="muted">
           {shared === 0
-            ? 'This game is on this phone only.'
-            : `${shared === 1 ? 'One person' : `${shared} people`} will see this game in their own history.`}
+            ? 'Only you can see this game.'
+            : `${shared === 1 ? 'One friend can' : `${shared} friends can`} see this game too.`}
         </CaptionStrong>
         <Caption tone="faint">
           {shared === 0
-            ? 'Name a seat as a friend and the game reaches them too, with their own running total worked out from that seat.'
-            : 'They see the scores and the hands, and nothing else of yours. Take them out and their copy goes with them.'}
+            ? 'Tap a seat to say who was sitting there. They get this game in their own history, with their own score.'
+            : 'They can see this game and nothing else of yours. Remove them and it goes from their phone too.'}
         </Caption>
       </View>
     </Section>

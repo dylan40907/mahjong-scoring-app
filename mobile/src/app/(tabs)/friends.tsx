@@ -80,7 +80,7 @@ export default function FriendsScreen() {
         <EmptyState
           icon={<FriendsIcon size={28} color={colors.inkFaint} />}
           title="Friends need an account"
-          body="Both ends of a friendship have to be somewhere. Make an account on the Profile tab and you can add people, put them in a game, and see the games they put you in."
+          body="Make an account and you can add the people you play with. Every game you are in shows up for both of you."
           action={
             <Button
               label="Go to Profile"
@@ -243,13 +243,18 @@ export default function FriendsScreen() {
         </Section>
       ) : null}
 
-      <Section title="What this shares">
+      {/*
+        * Still an explanation, because "what am I giving away" is a fair
+        * question and the honest answer is short. What it no longer does is
+        * describe how it works: nobody needs to know a game travels through a
+        * seat, only that they choose which games and can change their mind.
+        */}
+      <Section title="What friends can see">
         <Panel style={styles.explain}>
-          <BodyStrong>Nothing, until you put someone in a game.</BodyStrong>
+          <BodyStrong>Nothing, until you add them to a game.</BodyStrong>
           <Caption tone="muted">
-            Being friends on its own shares no scores. A game reaches a friend only when you seat
-            them at that particular table, one game at a time, and taking them back out takes their
-            copy with it.
+            Being friends does not share your scores. You pick which games they see, one at a
+            time, and you can take one back whenever you like.
           </Caption>
         </Panel>
       </Section>
