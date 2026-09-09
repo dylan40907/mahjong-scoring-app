@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
+  PageHeader,
   Body,
   Caption,
   CaptionStrong,
@@ -10,7 +11,7 @@ import {
   Heading,
   Screen,
 } from '@/design/components';
-import { AwayIcon, PlayersIcon, PlusIcon, SessionsIcon } from '@/design/icons';
+import { AwayIcon, GearIcon, PlayersIcon, PlusIcon, SessionsIcon } from '@/design/icons';
 import { colors, radius, space } from '@/design/tokens';
 import {
   createQuickSession,
@@ -74,7 +75,13 @@ export default function SessionsScreen() {
   }
 
   return (
-    <Screen padded={false} motif="rings">
+    <Screen
+      padded={false}
+      motif="rings"
+      header={
+        <PageHeader title="Sessions" back={false} trailing={<SettingsButton />} />
+      }
+    >
       <FlatList
         data={sessions}
         keyExtractor={(session) => session.id}
@@ -265,7 +272,32 @@ function SessionCard({
   );
 }
 
+/**
+ * Settings, in the corner of the first screen.
+ *
+ * It used to be a quarter of the tab bar, and it is one preference, two legal
+ * links and a destructive button - with an icon of sliders sitting next to
+ * Rules, also an icon of sliders. A gear in the corner is where every other
+ * app keeps this, and it gives the fourth tab to something people open.
+ */
+function SettingsButton() {
+  const router = useRouter();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Settings"
+      onPress={() => router.push('/settings')}
+      hitSlop={space.sm}
+      style={({ pressed }) => [styles.gear, pressed && styles.pressed]}
+    >
+      <GearIcon size={22} color={colors.inkMuted} />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
+  gear: { padding: space.xs },
+  pressed: { opacity: 0.6 },
   list: { paddingHorizontal: space.xl, paddingBottom: space.giant },
   header: { paddingTop: space.sm, paddingBottom: space.xl },
   card: {

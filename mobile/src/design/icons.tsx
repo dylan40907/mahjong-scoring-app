@@ -368,10 +368,23 @@ export const PersonIcon = (p: IconProps) => (
 );
 
 /** A gear, which is what everybody's settings look like. */
+/**
+ * A cog, which is what this is supposed to be.
+ *
+ * The first attempt was a circle with eight spokes radiating off it, and that
+ * is a sun: brightness, not settings. The difference is entirely in whether
+ * the marks are *outside* the ring or part of it, so this traces one closed
+ * outline - eight flat-topped teeth with a sloped flank down into each valley
+ * - rather than drawing a circle and decorating around it.
+ *
+ * Generated rather than hand-typed, because the failure mode of a toothed
+ * polygon is an outline that doubles back on itself, which looks like a knot
+ * at icon size and is not obvious in the numbers.
+ */
 export const GearIcon = (p: IconProps) => (
   <Icon {...p}>
-    <Circle cx={12} cy={12} r={3.1} />
-    <Path d="M12 2.6v2.6M12 18.8v2.6M21.4 12h-2.6M5.2 12H2.6M18.6 5.4l-1.8 1.8M7.2 16.8l-1.8 1.8M18.6 18.6l-1.8-1.8M7.2 7.2 5.4 5.4" />
+    <Path d="M10.32 2.45 L13.68 2.45 L13.99 5.50 L15.19 6.00 L17.56 4.05 L19.95 6.44 L18.00 8.81 L18.50 10.01 L21.55 10.32 L21.55 13.68 L18.50 13.99 L18.00 15.19 L19.95 17.56 L17.56 19.95 L15.19 18.00 L13.99 18.50 L13.68 21.55 L10.32 21.55 L10.01 18.50 L8.81 18.00 L6.44 19.95 L4.05 17.56 L6.00 15.19 L5.50 13.99 L2.45 13.68 L2.45 10.32 L5.50 10.01 L6.00 8.81 L4.05 6.44 L6.44 4.05 L8.81 6.00 L10.01 5.50 Z" />
+    <Circle cx={12} cy={12} r={3.2} />
   </Icon>
 );
 

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import {
+  PageHeader,
   Body,
   BodyStrong,
   Button,
@@ -297,7 +298,7 @@ export default function CaptureScreen() {
   };
 
   return (
-    <Screen>
+    <Screen header={<PageHeader title="Photograph the Hand" />}>
       {/*
         * Two lines and two drawings, where there used to be a heading and a
         * paragraph. Both rules matter and neither needs a sentence: a frame

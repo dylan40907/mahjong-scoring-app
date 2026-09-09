@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  PageHeader,
   Body,
   Button,
   Caption,
@@ -280,8 +281,10 @@ export default function RuleEditorScreen() {
   };
 
   return (
-    <Screen padded={false}>
-      <Stack.Screen options={{ title: existing ? 'Edit Ruleset' : 'New Ruleset' }} />
+    <Screen
+      padded={false}
+      header={<PageHeader title={existing ? 'Edit Ruleset' : 'New Ruleset'} />}
+    >
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Section title="Name" first>
           <TextField value={name} onChangeText={setName} placeholder="My table's rules" />

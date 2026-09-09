@@ -1,8 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { GearIcon } from '@/design/icons';
-import { colors, space, type } from '@/design/tokens';
+import { Stack } from 'expo-router';
+import { colors } from '@/design/tokens';
 
 /**
  * The Sessions tab's own stack.
@@ -29,50 +27,16 @@ export default function SessionsLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: colors.ground },
-        headerTintColor: colors.ink,
-        headerTitleStyle: { ...type.heading, color: colors.ink },
-        headerShadowVisible: false,
+        headerShown: false,
         contentStyle: { backgroundColor: colors.ground },
-        headerBackTitle: 'Back',
       }}
     >
       {/*
-        * The list keeps a real header, and it is the stack's rather than the
-        * tab's: a tab header plus a stack header is two bars stacked on the
-        * same screen. Settings lives in its corner because it is one
-        * preference, two legal links and a destructive button - not a quarter
-        * of the tab bar, and not an icon of sliders sitting beside Rules,
-        * which is also an icon of sliders.
+        * No bars. Every screen in here draws its own with `PageHeader`, so
+        * that a back arrow is the same arrow in the same place throughout the
+        * app rather than whatever the platform supplies on the phone in hand.
         */}
-      <Stack.Screen
-        name="index"
-        options={{ title: 'Sessions', headerRight: () => <SettingsButton /> }}
-      />
-      <Stack.Screen name="session/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="hand/capture" options={{ title: 'Photograph the Hand' }} />
-      <Stack.Screen name="hand/review" options={{ title: 'Check the Tiles' }} />
-      <Stack.Screen name="hand/result" options={{ title: 'The Tally' }} />
-      <Stack.Screen name="away/[id]" options={{ headerShown: false }} />
     </Stack>
   );
 }
 
-function SettingsButton() {
-  const router = useRouter();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Settings"
-      onPress={() => router.push('/settings')}
-      style={({ pressed }) => [styles.gear, pressed && styles.pressed]}
-    >
-      <GearIcon size={22} color={colors.inkMuted} />
-    </Pressable>
-  );
-}
-
-const styles = StyleSheet.create({
-  gear: { paddingHorizontal: space.lg, paddingVertical: space.xs },
-  pressed: { opacity: 0.6 },
-});

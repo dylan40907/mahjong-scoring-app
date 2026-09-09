@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { TileScanner } from '@/design/components';
-import { colors, type } from '@/design/tokens';
+import { colors } from '@/design/tokens';
 import { useOtaUpdates } from '@/lib/updates';
 import { initAccount } from '@/store/account';
 import { hydrateFriends } from '@/store/friends';
@@ -51,19 +51,14 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: colors.ground },
-          headerTintColor: colors.ink,
-          headerTitleStyle: { ...type.heading, color: colors.ink },
-          headerShadowVisible: false,
+          // Nothing on this stack draws a platform bar; every screen brings
+          // its own `PageHeader`, so the back arrow is the same arrow
+          // everywhere instead of whatever the phone supplies.
+          headerShown: false,
           contentStyle: { backgroundColor: colors.ground },
-          headerBackTitle: 'Back',
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="rules/[id]" options={{ title: '' }} />
-        <Stack.Screen name="rules/edit" options={{ title: 'Custom Rules' }} />
-        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-        <Stack.Screen name="profile/[handle]" options={{ title: '' }} />
       </Stack>
 
       {updateStatus === 'applying' ? (

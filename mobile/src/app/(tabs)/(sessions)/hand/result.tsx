@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
+  PageHeader,
   Body,
   BodyStrong,
   Button,
@@ -149,7 +150,7 @@ export default function ResultScreen() {
   const winner = session?.players.find((p) => p.id === draft.winnerId);
 
   return (
-    <Screen padded={false} motif="zhong">
+    <Screen padded={false} motif="zhong" header={<PageHeader title="The Tally" />}>
       <Confetti active={result.total > 0} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headline}>

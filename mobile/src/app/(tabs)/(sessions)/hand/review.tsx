@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
+  PageHeader,
   Body,
   Button,
   Caption,
@@ -136,7 +137,7 @@ export default function ReviewScreen() {
   const activeDetection = picker !== null && picker >= 0 ? draft.detections[picker] : undefined;
 
   return (
-    <Screen padded={false} footerSpace={0}>
+    <Screen padded={false} footerSpace={0} header={<PageHeader title="Check the Tiles" />}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/*
           * Why the photograph could not be read, when it could not be.

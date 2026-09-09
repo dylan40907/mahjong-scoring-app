@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { Alert, Linking, StyleSheet, View } from 'react-native';
 import Constants from 'expo-constants';
 import {
+  PageHeader,
   Button,
   Caption,
   Divider,
@@ -55,7 +56,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <Screen scroll motif="wall">
+    <Screen scroll motif="wall" header={<PageHeader title="Settings" />}>
       <Section title="Defaults" icon={<RulesIcon size={15} color={colors.inkFaint} />} first>
         <Panel flush>
           <Row

@@ -25,6 +25,16 @@ export interface ScreenProps extends ViewProps {
    * about a win.
    */
   motif?: Motif;
+  /**
+   * The screen's own header, drawn above the content and outside its
+   * horizontal padding.
+   *
+   * A slot rather than each screen laying one out, because the header has to
+   * sit edge-to-edge while the content is inset - and every screen that solved
+   * that itself solved it slightly differently. Pass a `PageHeader`; the
+   * safe-area inset is its business, not this one's.
+   */
+  header?: React.ReactNode;
 }
 
 export function Screen({
@@ -32,6 +42,7 @@ export function Screen({
   footerSpace = 0,
   padded = true,
   motif = 'none',
+  header,
   style,
   children,
   ...rest
@@ -46,6 +57,7 @@ export function Screen({
     return (
       <View style={[styles.root, style]} {...rest}>
         <Backdrop motif={motif} />
+        {header}
         <ScrollView
           contentContainerStyle={padding}
           showsVerticalScrollIndicator={false}
@@ -60,6 +72,7 @@ export function Screen({
   return (
     <View style={[styles.root, style]} {...rest}>
       <Backdrop motif={motif} />
+      {header}
       {/* The padding moves to an inner view so the backdrop can reach the
           edges while the content still sits inside the safe area. */}
       <View style={[styles.body, padding]}>{children}</View>

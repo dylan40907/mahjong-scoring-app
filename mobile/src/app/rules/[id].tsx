@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  PageHeader,
   Body,
   BodyStrong,
   Button,
@@ -74,8 +75,7 @@ export default function RuleSetScreen() {
   };
 
   return (
-    <Screen padded={false}>
-      <Stack.Screen options={{ title: rules.name }} />
+    <Screen padded={false} header={<PageHeader title={rules.name} />}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {rules.notes ? (
           <Body tone="muted" style={styles.notes}>
