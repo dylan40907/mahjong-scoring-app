@@ -221,3 +221,70 @@ export function friendById(
   if (!userId) return undefined;
   return friends.find((friend) => friend.id === userId);
 }
+
+/**
+ * Somebody's profile, by the username somebody typed.
+ *
+ * Goes through a function on the server rather than reading `profiles`
+ * directly, and that is the privacy design rather than an implementation
+ * detail: a read policy permissive enough to show a stranger's profile is also
+ * permissive enough to hand over every profile at once. An exact name answers
+ * the person looking for a friend and nothing to the person enumerating.
+ *
+ * A private profile answers as though it does not exist, which is what private
+ * means here - unfindable, and so unrequestable.
+ */
+export interface PublicProfile {
+  readonly id: string;
+  readonly displayName: string | null;
+  readonly handle: string | null;
+  readonly stats: ProfileStats;
+  readonly isPrivate: boolean;
+  readonly friendCount: number;
+  /** How we stand with them, so the screen knows which button to offer. */
+  readonly relation: 'self' | 'friend' | 'requested' | 'incoming' | 'none';
+}
+
+export interface ProfileStats {
+  readonly handsWon?: number;
+  readonly handsPlayed?: number;
+  readonly sessions?: number;
+  readonly net?: number;
+  readonly best?: {
+    readonly total: number;
+    readonly unit: string;
+    readonly patterns: string[];
+    readonly tiles: string[];
+    readonly ruleSetId: string;
+    readonly at: string;
+  } | null;
+}
+
+interface RawProfile {
+  id: string;
+  display_name: string | null;
+  handle: string | null;
+  stats: ProfileStats | null;
+  is_private: boolean;
+  friend_count: number;
+  relation: string;
+}
+
+function toProfile(row: RawProfile): PublicProfile {
+  return {
+    id: row.id,
+    displayName: row.display_name,
+    handle: row.handle,
+    stats: row.stats ?? {},
+    isPrivate: !!row.is_private,
+    friendCount: row.friend_count ?? 0,
+    relation: (row.relation ?? 'none') as PublicProfile['relation'],
+  };
+}
+
+export async function lookupProfile(handle: string): Promise<PublicProfile | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('view_profile', { lookup: handle.trim().toLowerCase() });
+  if (error || !Array.isArray(data) || data.length === 0) return null;
+  return toProfile(data[0] as RawProfile);
+}

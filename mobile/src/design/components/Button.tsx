@@ -11,7 +11,29 @@ import { BodyStrong } from './Text';
  * with a touch target. A fourth weight would only exist to avoid deciding
  * which of these a button is.
  */
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'ghost'
+  | 'danger'
+  /**
+   * Sign in with Apple, in the only shape Apple permits.
+   *
+   * White with a black wordmark, matched to the sheet it opens. Apple's
+   * Human Interface Guidelines are prescriptive about this button and a jade
+   * one with brass text would fail review.
+   */
+  | 'apple'
+  /**
+   * Sign in with somebody else, alongside Apple's.
+   *
+   * Also white, because a provider button has to look like the provider's
+   * rather than like ours. Brass is this app's primary action - it means
+   * "the thing this screen is for" - and putting Google on it made the button
+   * read as an advertisement for Tile Tally that happened to mention Google,
+   * sitting oddly beside Apple's white one directly above.
+   */
+  | 'provider';
 
 export interface ButtonProps {
   label: string;
@@ -52,7 +74,7 @@ export function Button({
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={variant === 'primary' ? colors.onBrass : colors.ink} />
+        <ActivityIndicator size="small" color={SPINNER[variant] ?? colors.ink} />
       ) : (
         <View style={styles.content}>
           {icon ? <View style={styles.icon}>{icon}</View> : null}
@@ -64,6 +86,13 @@ export function Button({
     </Pressable>
   );
 }
+
+/** The spinner has to be legible on whatever the button is filled with. */
+const SPINNER: Partial<Record<ButtonVariant, string>> = {
+  primary: colors.onBrass,
+  apple: '#000000',
+  provider: '#000000',
+};
 
 const variants = {
   primary: {
@@ -85,6 +114,16 @@ const variants = {
     container: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.line },
     pressed: { backgroundColor: colors.surface },
     tone: 'loss' as const,
+  },
+  apple: {
+    container: { backgroundColor: '#FFFFFF' },
+    pressed: { backgroundColor: '#E4E4E4' },
+    tone: 'onLight' as const,
+  },
+  provider: {
+    container: { backgroundColor: '#FFFFFF' },
+    pressed: { backgroundColor: '#E4E4E4' },
+    tone: 'onLight' as const,
   },
 };
 

@@ -10,7 +10,7 @@ import { colors, tabular, type } from '../tokens';
  * different sizes.
  */
 
-type Tone = 'default' | 'muted' | 'faint' | 'accent' | 'gain' | 'loss' | 'onAccent';
+type Tone = 'default' | 'muted' | 'faint' | 'accent' | 'gain' | 'loss' | 'onAccent' | 'onLight';
 
 const toneColor: Record<Tone, string> = {
   default: colors.ink,
@@ -20,6 +20,9 @@ const toneColor: Record<Tone, string> = {
   gain: colors.gain,
   loss: colors.loss,
   onAccent: colors.onBrass,
+  // The provider buttons, which are white because they have to be. The only
+  // place in the app anything sits on a light surface.
+  onLight: '#000000',
 };
 
 export interface TextProps extends RNTextProps {

@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import {
   Body,
   BodyStrong,
@@ -13,7 +14,7 @@ import {
   Section,
   TextField,
 } from '@/design/components';
-import { CheckIcon, FriendsIcon, PlayersIcon } from '@/design/icons';
+import { CheckIcon, FriendsIcon, PersonIcon } from '@/design/icons';
 import { colors, space } from '@/design/tokens';
 import {
   acceptFriend,
@@ -22,7 +23,6 @@ import {
   incomingRequests,
   outgoingRequests,
   removeFriend,
-  requestFriend,
   useFriends,
   type Friend,
 } from '@/store/friends';
@@ -33,39 +33,71 @@ import { isCloudConfigured } from '@/lib/supabase';
 /**
  * Friends.
  *
- * The whole point of the list is the two things it makes possible: seating
- * somebody at tonight's table so the game lands in their history too, and
- * seeing the games they seated you in. Everything here exists to serve those,
- * which is why there is no feed, no activity, and nothing to scroll.
+ * A tab rather than a section of the profile, because it is a place you go
+ * rather than a setting you change: looking somebody up, answering a request,
+ * opening a profile. As a panel on the You screen it was one row deep and gave
+ * no hint that any of that existed.
  *
- * People are found by handle. Not by email address - that is a fact about
- * somebody this app has no business being a directory of - and not by
- * browsing, because a list of everyone who uses the app is not a feature, it
- * is a leak. A handle is the thing you can read off a phone across a table.
- *
- * Every action takes effect here and now and is sent later. Mahjong is played
- * in basements, and "add Wei to this game" has to work in one.
+ * People are found by exact username. Not by email address - that is a fact
+ * about somebody this app has no business being a directory of - and not by
+ * browsing, because a list of everyone who uses the app is not a feature. The
+ * lookup goes through a function on the server for the same reason: a read
+ * policy saying "public profiles are readable" is also one saying every user
+ * can be downloaded at once.
  */
 export default function FriendsScreen() {
+  const router = useRouter();
   const friends = useFriends(useCallback((state) => state.friends, []));
-  const handle = useAccount(useCallback((account) => account.handle, []));
+  const status = useAccount(useCallback((account) => account.status, []));
   const [lookup, setLookup] = useState('');
-  const [note, setNote] = useState<string | null>(null);
 
   const accepted = acceptedFriends(friends);
   const incoming = incomingRequests(friends);
   const outgoing = outgoingRequests(friends);
 
-  const add = () => {
+  if (!isCloudConfigured()) {
+    return (
+      <Screen motif="wall">
+        <EmptyState
+          icon={<FriendsIcon size={28} color={colors.inkFaint} />}
+          title="No account server"
+          body="This build cannot reach one, so there is nobody to add."
+        />
+      </Screen>
+    );
+  }
+
+  /*
+   * Signed out, this tab is a signpost and nothing else.
+   *
+   * Not a lookup field that fails after you type a name into it: a friend list
+   * needs an account at both ends, and the honest version says so before the
+   * typing rather than after.
+   */
+  if (status !== 'identified') {
+    return (
+      <Screen motif="wall">
+        <EmptyState
+          icon={<FriendsIcon size={28} color={colors.inkFaint} />}
+          title="Friends need an account"
+          body="Both ends of a friendship have to be somewhere. Make an account on the You tab and you can add people, put them in a game, and see the games they put you in."
+          action={
+            <Button
+              label="Go to You"
+              variant="primary"
+              onPress={() => router.push('/(tabs)/profile')}
+            />
+          }
+        />
+      </Screen>
+    );
+  }
+
+  const search = () => {
     const wanted = lookup.trim().toLowerCase();
     if (!wanted) return;
-    requestFriend(wanted);
     setLookup('');
-    // Said before anything has been sent, because nothing has: the request is
-    // on this device and will leave when there is a signal. Promising that it
-    // arrived would be the lie.
-    setNote(`Asked for ${wanted}. They will see it when you are both online.`);
-    void syncNow();
+    router.push(`/profile/${wanted}`);
   };
 
   const confirmRemove = (friend: Friend) => {
@@ -86,24 +118,19 @@ export default function FriendsScreen() {
     );
   };
 
-  /**
-   * What a friend's row does when tapped.
-   *
-   * A row of red Remove buttons was the first version and it was wrong twice
-   * over: three destructive controls sitting permanently on a list is a
-   * mistap waiting to happen, and it made the loudest thing on the screen the
-   * one action nobody opens this screen to take. It also left blocking with
-   * nowhere to live.
-   */
   const openFriend = (friend: Friend) => {
     Alert.alert(nameOf(friend), friend.handle ?? undefined, [
       { text: 'Cancel', style: 'cancel' },
       {
+        text: 'View profile',
+        onPress: () => {
+          if (friend.handle) router.push(`/profile/${friend.handle}`);
+        },
+      },
+      {
         text: 'Block',
         style: 'destructive',
         onPress: () => {
-          // Quieter than removing: they see a friendship that is simply not
-          // there, rather than a notice that they were blocked.
           blockUser(friend.id);
           void syncNow();
         },
@@ -112,37 +139,22 @@ export default function FriendsScreen() {
     ]);
   };
 
-  if (!isCloudConfigured()) {
-    return (
-      <Screen>
-        <EmptyState
-          icon={<FriendsIcon size={28} color={colors.inkFaint} />}
-          title="No account server"
-          body="This build cannot reach one, so there is nobody to add."
-        />
-      </Screen>
-    );
-  }
-
   return (
     <Screen scroll motif="wall">
-      <Section title="Add someone" icon={<FriendsIcon size={15} color={colors.inkFaint} />} first>
+      <Section title="Find someone" icon={<FriendsIcon size={15} color={colors.inkFaint} />} first>
         <Panel style={styles.add}>
           <TextField
             value={lookup}
             onChangeText={setLookup}
-            onSubmitEditing={add}
-            placeholder="Their name, e.g. wei_88"
+            onSubmitEditing={search}
+            placeholder="Their username, e.g. wei_88"
             autoCapitalize="none"
             autoCorrect={false}
             maxLength={20}
           />
-          <Button label="Ask to be friends" block disabled={!lookup.trim()} onPress={add} />
-          {note ? <Caption tone="muted">{note}</Caption> : null}
+          <Button label="Look up" block disabled={!lookup.trim()} onPress={search} />
           <Caption tone="faint">
-            {handle
-              ? `Yours is ${handle}. Read it out and they can find you the same way.`
-              : 'Pick a name of your own on the You tab so people can find you back.'}
+            Usernames only. Open their profile to send a request.
           </Caption>
         </Panel>
       </Section>
@@ -177,7 +189,7 @@ export default function FriendsScreen() {
         </Section>
       ) : null}
 
-      <Section title="Friends" icon={<PlayersIcon size={15} color={colors.inkFaint} />}>
+      <Section title="Friends" icon={<PersonIcon size={15} color={colors.inkFaint} />}>
         {accepted.length === 0 ? (
           <Panel style={styles.empty}>
             <Body tone="muted">Nobody yet.</Body>

@@ -295,6 +295,59 @@ export const AwayIcon = (p: IconProps) => (
   </Icon>
 );
 
+/**
+ * Google's mark, in Google's colours.
+ *
+ * The one icon in this file not drawn to the 24-unit grid and not tinted by
+ * its `color` prop, because it is not ours. Google's identity guidelines
+ * require the four-colour G unmodified, and a monochrome version tinted brass
+ * would be both against the terms and the reason the button looked like an
+ * advert for us rather than a way to sign in.
+ */
+export const GoogleMark = ({ size = 20 }: { size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 48 48">
+    <Path
+      fill="#4285F4"
+      d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"
+    />
+    <Path
+      fill="#34A853"
+      d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"
+    />
+    <Path
+      fill="#FBBC05"
+      d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"
+    />
+    <Path
+      fill="#EA4335"
+      d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"
+    />
+  </Svg>
+);
+
+/**
+ * A person, for the tab that is about you.
+ *
+ * The four-seat table mark that used to label it says "players", which is what
+ * a session has; this tab is one person's own record. A silhouette is the one
+ * place a generic glyph beats a game-drawn one, because every app on the phone
+ * has taught the same thing with it.
+ */
+export const PersonIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Circle cx={12} cy={8} r={3.6} />
+    <Path d="M4.8 20a7.2 7.2 0 0 1 14.4 0" />
+  </Icon>
+);
+
+/** A gear, which is what everybody's settings look like. */
+export const GearIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <Circle cx={12} cy={12} r={3.1} />
+    <Path d="M12 2.6v2.6M12 18.8v2.6M21.4 12h-2.6M5.2 12H2.6M18.6 5.4l-1.8 1.8M7.2 16.8l-1.8 1.8M18.6 18.6l-1.8-1.8M7.2 7.2 5.4 5.4" />
+  </Icon>
+);
+
 // ---------------------------------------------------------------------------
 // Situations
 //

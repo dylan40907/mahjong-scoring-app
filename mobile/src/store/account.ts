@@ -68,7 +68,18 @@ export interface Account {
   readonly userId: string | null;
   readonly email: string | null;
   readonly displayName: string | null;
+  /**
+   * The username. What other people type to find you.
+   *
+   * Claimed automatically the first time an account becomes a real one - from
+   * the email's local part, or the display name if there is no usable address,
+   * with digits appended until it is free. Nobody is asked to invent one at
+   * the moment they are trying to sign in, and it can be changed afterwards
+   * from the profile screen.
+   */
   readonly handle: string | null;
+  /** Unfindable, and so unrequestable. Set by the person themselves. */
+  readonly isPrivate: boolean;
   /** True while a sign-in or profile load is in flight. */
   readonly busy: boolean;
 }
@@ -79,6 +90,7 @@ const EMPTY: Account = {
   email: null,
   displayName: null,
   handle: null,
+  isPrivate: false,
   busy: false,
 };
 
@@ -144,7 +156,7 @@ export async function initAccount(): Promise<void> {
     }
 
     set({ status: statusFor(user), userId: user.id, email: user.email ?? null });
-    await loadProfile();
+    await refreshIdentity();
   } finally {
     set({ busy: false });
   }
@@ -164,11 +176,104 @@ async function loadProfile(): Promise<void> {
   if (!supabase || !account.userId) return;
   const { data } = await supabase
     .from('profiles')
-    .select('display_name, handle')
+    .select('display_name, handle, is_private')
     .eq('id', account.userId)
     .maybeSingle();
 
-  if (data) set({ displayName: data.display_name ?? null, handle: data.handle ?? null });
+  if (data) {
+    set({
+      displayName: data.display_name ?? null,
+      handle: data.handle ?? null,
+      isPrivate: !!data.is_private,
+    });
+  }
+}
+
+/**
+ * Give a new account a username and a name without asking for either.
+ *
+ * Only ever runs for an identified account: an anonymous one has nothing to be
+ * found by and no profile anybody can see, so naming it would be inventing a
+ * person. Both are the person's to change afterwards; these are starting
+ * points, not decisions.
+ *
+ * The email's local part rather than a generated word, because it is almost
+ * always what somebody would have picked and it is what they will recognise
+ * when a friend reads it back to them. Apple's private relay defeats that -
+ * the address is a random string - so the name is tried first when there is
+ * one, and the server falls back to `player` when neither is usable.
+ */
+async function ensureIdentity(user: {
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+}): Promise<void> {
+  if (!supabase || account.status !== 'identified') return;
+
+  if (!account.handle) {
+    const local = user.email?.split('@')[0] ?? '';
+    // A relay address is not a name anybody chose, so prefer the real one.
+    const relay = user.email?.endsWith('privaterelay.appleid.com') ?? false;
+    const fromName = typeof user.user_metadata?.full_name === 'string'
+      ? user.user_metadata.full_name
+      : '';
+    const preferred = relay || local.length < 3 ? fromName || local : local;
+
+    const { data } = await supabase.rpc('claim_handle', { preferred });
+    if (typeof data === 'string') set({ handle: data });
+  }
+
+  if (!account.displayName) {
+    const given = typeof user.user_metadata?.full_name === 'string'
+      ? user.user_metadata.full_name.trim()
+      : '';
+    const fallback = given || account.handle;
+    if (fallback) await setDisplayName(fallback);
+  }
+}
+
+/**
+ * Read the profile, then fill in whatever a new account is missing.
+ *
+ * Both halves every time: `loadProfile` is what tells `ensureIdentity` there
+ * is already a username, so running them apart would hand a second one to
+ * somebody who signed in on a second device.
+ */
+async function refreshIdentity(): Promise<void> {
+  if (!supabase) return;
+  await loadProfile();
+  const { data } = await supabase.auth.getUser();
+  if (data.user) await ensureIdentity(data.user);
+}
+
+/** Findable, or not. Everything else about a profile stays as it is. */
+export async function setPrivate(isPrivate: boolean): Promise<boolean> {
+  set({ isPrivate });
+  if (!supabase || !account.userId) return false;
+  const { error } = await supabase
+    .from('profiles')
+    .update({ is_private: isPrivate, updated_at: new Date().toISOString() })
+    .eq('id', account.userId);
+  return !error;
+}
+
+/**
+ * Publish the numbers a profile shows.
+ *
+ * Written by this device because the hands they come from are readable only by
+ * their owner - working a stranger's totals out on the server would mean
+ * opening those up, which is a far bigger hole than copying five numbers and
+ * one hand's tile codes.
+ *
+ * Only for identified accounts, and quietly: it is a cache of something the
+ * player can already see on their own screen, and a failure means a profile is
+ * a little out of date rather than anything being lost.
+ */
+export async function publishStats(stats: unknown): Promise<void> {
+  if (!supabase || !account.userId || account.status !== 'identified') return;
+  await supabase
+    .from('profiles')
+    .update({ stats, updated_at: new Date().toISOString() })
+    .eq('id', account.userId);
 }
 
 /**
@@ -220,6 +325,8 @@ export async function upgradeWithEmail(email: string, password: string): Promise
   if (!supabase) return 'Accounts are unavailable in this build.';
   const { error } = await supabase.auth.updateUser({ email, password });
   if (error) return error.message;
+  set({ status: 'identified', email });
+  await refreshIdentity();
   return null;
 }
 
@@ -230,7 +337,9 @@ export async function signInWithEmail(email: string, password: string): Promise<
     email: email.trim(),
     password,
   });
-  return error ? error.message : null;
+  if (error) return error.message;
+  await refreshIdentity();
+  return null;
 }
 
 /**
@@ -296,7 +405,7 @@ export async function signInWithGoogle(): Promise<string | null> {
   if (failure?.retryAsSignIn) return (await googleFlow(false))?.message ?? null;
   if (failure) return failure.message;
 
-  await loadProfile();
+  await refreshIdentity();
   return null;
 }
 
@@ -397,7 +506,7 @@ export async function signInWithApple(): Promise<string | null> {
   const given = credential.fullName?.givenName?.trim();
   if (given && !account.displayName) await setDisplayName(given);
 
-  await loadProfile();
+  await refreshIdentity();
   return null;
 }
 

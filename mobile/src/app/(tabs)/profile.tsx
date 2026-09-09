@@ -1,7 +1,5 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import * as AppleAuthentication from 'expo-apple-authentication';
-import { useRouter } from 'expo-router';
 import {
   Body,
   BodyStrong,
@@ -9,6 +7,7 @@ import {
   Caption,
   CaptionStrong,
   Divider,
+  Overline,
   Panel,
   Row,
   Screen,
@@ -16,213 +15,122 @@ import {
   TextField,
   TileFace,
   Title,
+  Toggle,
 } from '@/design/components';
-import { AwayIcon, FriendsIcon, PlayersIcon, SparkIcon, TrophyIcon } from '@/design/icons';
-import { colors, radius, space, tileSize } from '@/design/tokens';
+import {
+  AwayIcon,
+  EditIcon,
+  FriendsIcon,
+  GoogleMark,
+  PersonIcon,
+  SparkIcon,
+  TrophyIcon,
+} from '@/design/icons';
+import { colors, space, tileSize } from '@/design/tokens';
 import { findRuleSet, useAppState } from '@/store/store';
 import { bestHandFor, playedGames, playerStats } from '@/store/stats';
-import { incomingRequests, useFriends } from '@/store/friends';
 import {
   deleteAccount,
   isAppleSignInAvailable,
+  publishStats,
   setDisplayName,
   setHandle,
+  setPrivate,
   signInWithApple,
   signInWithEmail,
   signInWithGoogle,
   signOut,
   upgradeWithEmail,
   useAccount,
+  type Account,
 } from '@/store/account';
 import { syncNow } from '@/store/sync/engine';
 import { isCloudConfigured } from '@/lib/supabase';
 import { relativeDate } from '@/lib/format';
 
 /**
- * The profile.
+ * You.
  *
- * It exists from first launch and for everybody, because everybody has an
- * account from first launch - an anonymous one until they choose otherwise.
- * There is nothing to sign up for and nothing gated behind having done so.
+ * Two entirely different screens sharing a tab, and which one you get is the
+ * whole design. Signed out, this is the account screen and nothing else -
+ * there is no name to set, no username to be found by, no best hand and no
+ * totals, because none of those mean anything without somewhere to keep them.
+ * Showing them anyway, greyed or half-working, would be four dead controls
+ * around the one live one.
  *
- * The name earns its place immediately: it fills seat one of every new
- * session, which is the one piece of setup starting a game could never skip.
+ * That is a gate on *account* features and not on the app. Scoring, sessions,
+ * rulesets and the whole camera path work untouched without an account, which
+ * is both the point and what Apple's guideline 5.1.1(v) requires: registration
+ * may only be demanded for things that genuinely need an account, and keeping
+ * score does not.
+ *
+ * Signed in, the top of the screen is the two names - the username people type
+ * to find you, and the name that goes on a seat - because those are the two
+ * things somebody comes here to change.
  */
 export default function ProfileScreen() {
-  const router = useRouter();
   const sessions = useAppState(useCallback((state) => state.sessions, []));
   const awayGames = useAppState(useCallback((state) => state.awayGames, []));
   const account = useAccount(useCallback((a) => a, []));
-  const friends = useFriends(useCallback((state) => state.friends, []));
-  const [draftName, setDraftName] = useState<string | null>(null);
-  const [draftHandle, setDraftHandle] = useState<string | null>(null);
-  const [handleProblem, setHandleProblem] = useState<string | null>(null);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [problem, setProblem] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+
+  const signedIn = account.status === 'identified';
 
   const me = useMemo(
     () => ({ userId: account.userId, displayName: account.displayName }),
     [account.userId, account.displayName],
   );
-  // Every table this person sat at, whoever was holding the phone.
   const games = useMemo(() => playedGames(sessions, awayGames), [sessions, awayGames]);
   const best = useMemo(() => bestHandFor(games, me), [games, me]);
   const stats = useMemo(() => playerStats(games, me), [games, me]);
-  const waiting = incomingRequests(friends).length;
 
-  const commitName = () => {
-    if (draftName !== null) void setDisplayName(draftName);
-    setDraftName(null);
-  };
-
-  /**
-   * The name friends look you up by.
+  /*
+   * Push the numbers a profile shows whenever they change.
    *
-   * Separate from the display name because they answer different questions.
-   * The display name is what goes on a seat, changes whenever you like, and
-   * two people may share one. The handle is unique, is typed by somebody else
-   * to find you, and is the only thing this app will look anybody up by - an
-   * email address is a fact about a person it has no business being a
-   * directory of.
+   * They are a cache of something already on this screen, so this is quiet and
+   * allowed to fail; a profile a little out of date is the cost, and nothing
+   * is lost. Only for a real account - an anonymous one has no profile anybody
+   * can look at.
    */
-  const commitHandle = () => {
-    const wanted = draftHandle;
-    setDraftHandle(null);
-    if (wanted === null || wanted.trim().toLowerCase() === (account.handle ?? '')) return;
-    void setHandle(wanted).then(setHandleProblem);
-  };
+  useEffect(() => {
+    if (!signedIn) return;
+    void publishStats({
+      handsWon: stats.handsWon,
+      handsPlayed: stats.handsPlayed,
+      sessions: stats.sessions,
+      net: stats.net,
+      best: best
+        ? {
+            total: best.record.summary.total,
+            unit: best.record.summary.unit,
+            patterns: best.record.summary.topPatterns,
+            tiles: best.tiles.slice(0, 18),
+            ruleSetId: best.ruleSetId,
+            at: best.record.createdAt,
+          }
+        : null,
+    });
+  }, [signedIn, stats, best]);
 
-  /**
-   * One form for both, because from here they are the same action.
-   *
-   * An anonymous account is upgraded in place - `updateUser` attaches the
-   * credentials to the *same* user id, so every session already stored against
-   * it stays put. Only if that fails because the address is already taken does
-   * this become a sign-in, which is the case where the games on this device
-   * belong to somebody who already has an account elsewhere.
-   */
-  const connect = async () => {
-    setBusy(true);
-    setProblem(null);
-    const upgraded = await upgradeWithEmail(email, password);
-    if (upgraded) {
-      const signedIn = await signInWithEmail(email, password);
-      if (signedIn) {
-        setProblem(signedIn);
-        setBusy(false);
-        return;
-      }
-    }
-    setPassword('');
-    await syncNow();
-    setBusy(false);
-  };
-
-  const withGoogle = async () => {
-    setBusy(true);
-    setProblem(null);
-    const failure = await signInWithGoogle();
-    if (failure) setProblem(failure);
-    else await syncNow();
-    setBusy(false);
-  };
-
-  const withApple = async () => {
-    setBusy(true);
-    setProblem(null);
-    const failure = await signInWithApple();
-    if (failure) setProblem(failure);
-    else await syncNow();
-    setBusy(false);
-  };
-
-  const confirmDelete = () => {
-    Alert.alert(
-      'Delete your account?',
-      'Your account and everything stored with it are removed for good. Games on this device stay where they are.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            void deleteAccount().then((error) => setProblem(error));
-          },
-        },
-      ],
+  if (!isCloudConfigured()) {
+    return (
+      <Screen scroll motif="rings">
+        <Section title="Account" icon={<PersonIcon size={15} color={colors.inkFaint} />} first>
+          <Panel>
+            <Body tone="muted">
+              This build has no account server, so everything stays on this device.
+            </Body>
+          </Panel>
+        </Section>
+      </Screen>
     );
-  };
+  }
+
+  if (!signedIn) return <SignedOut />;
 
   return (
     <Screen scroll motif="rings">
-      <View style={styles.head}>
-        <Title>{account.displayName || 'Your table'}</Title>
-        <Caption tone="faint">
-          {account.status === 'identified'
-            ? (account.email ?? 'Signed in')
-            : account.status === 'anonymous'
-              ? 'On this device only'
-              : 'Offline'}
-        </Caption>
-      </View>
+      <Identity account={account} />
 
-      <Section title="Your name" icon={<PlayersIcon size={15} color={colors.inkFaint} />} first>
-        <TextField
-          value={draftName ?? account.displayName ?? ''}
-          onChangeText={setDraftName}
-          onBlur={commitName}
-          onSubmitEditing={commitName}
-          placeholder="What people call you"
-          maxLength={18}
-        />
-        <Caption tone="faint" style={styles.note}>
-          Fills your seat when you start a session. Hold a seat to change it there.
-        </Caption>
-      </Section>
-
-      {isCloudConfigured() ? (
-        <Section title="Friends" icon={<FriendsIcon size={15} color={colors.inkFaint} />}>
-          <Panel flush>
-            <Row
-              title="Your friends"
-              subtitle="Put them in a game and it lands in their history too"
-              value={waiting > 0 ? `${waiting} waiting` : undefined}
-              onPress={() => router.push('/friends')}
-            />
-          </Panel>
-          <View style={styles.handle}>
-            <TextField
-              label="How people find you"
-              value={draftHandle ?? account.handle ?? ''}
-              onChangeText={(text) => setDraftHandle(text.toLowerCase())}
-              onBlur={commitHandle}
-              onSubmitEditing={commitHandle}
-              placeholder="a short name, e.g. wei_88"
-              autoCapitalize="none"
-              autoCorrect={false}
-              maxLength={20}
-            />
-            {handleProblem ? (
-              <CaptionStrong tone="loss">{handleProblem}</CaptionStrong>
-            ) : (
-              <Caption tone="faint">
-                Letters, numbers and underscores. Yours alone, and the only thing anyone can look
-                you up by.
-              </Caption>
-            )}
-          </View>
-        </Section>
-      ) : null}
-
-      {/*
-        * Highest score for now, which is the obvious pick and a bit boring:
-        * for anyone who has ever had a limit hand it is that hand forever.
-        * Rarity - how uncommon a hand's best pattern is across this player's
-        * own history - makes the better story and is the intended default once
-        * there is enough history to measure it against.
-        */}
       <Section title="Best hand" icon={<TrophyIcon size={15} color={colors.brass} />}>
         {best ? (
           <Panel style={styles.best}>
@@ -247,7 +155,7 @@ export default function ProfileScreen() {
             <SparkIcon size={24} color={colors.inkFaint} />
             <Caption tone="faint" center>
               {stats.unidentified && stats.handsPlayed > 0
-                ? 'None of these games say which player you were. Set your name above, or take a seat in one from its Who’s here list.'
+                ? 'None of these games say which player you were. Take a seat in one from its Who’s here list.'
                 : 'Win a hand and it will show up here.'}
             </Caption>
           </Panel>
@@ -266,7 +174,6 @@ export default function ProfileScreen() {
               <Divider inset={space.lg} />
               <Row
                 title="Scored by a friend"
-                subtitle="Games you were seated in on somebody else’s phone"
                 leading={<AwayIcon size={18} color={colors.inkFaint} />}
                 value={String(stats.awaySessions)}
               />
@@ -275,101 +182,297 @@ export default function ProfileScreen() {
         </Panel>
       </Section>
 
-      <Section title="Account">
-        {account.status === 'identified' ? (
-          <>
-            <Panel flush>
-              <Row title="Signed in as" value={account.email ?? '—'} />
-            </Panel>
-            <View style={styles.accountActions}>
-              <Button label="Sign out" block onPress={() => void signOut()} />
-              {/* Required in the app by both stores, not merely polite. */}
-              <Button label="Delete account" variant="danger" block onPress={confirmDelete} />
-            </View>
-          </>
-        ) : !isCloudConfigured() ? (
-          <Panel>
-            <Body tone="muted">
-              This build has no account server, so everything stays on this device.
-            </Body>
-          </Panel>
-        ) : (
-          <Panel style={styles.upgrade}>
-            <Body tone="muted">
-              Your games are on this device. Add an email to reach them from another one —
-              nothing you have already scored is lost.
-            </Body>
-            {/*
-              * Apple first, and drawn by Apple.
-              *
-              * Guideline 4.8 requires this button wherever a third-party
-              * sign-in is offered, and its own guidelines govern the shape,
-              * the wording and the corner radius - so this is their component
-              * rather than ours. It is the one place in the app that does not
-              * use the house button, and matching the height of the one below
-              * is what keeps the two reading as equal choices, which is also
-              * something the guideline asks for.
-              */}
-            {isAppleSignInAvailable() ? (
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.WHITE}
-                cornerRadius={radius.md}
-                style={styles.appleButton}
-                onPress={() => void withApple()}
-              />
-            ) : null}
+      <Visibility account={account} />
+      <AccountActions email={account.email} />
+    </Screen>
+  );
+}
+
+/**
+ * The two names, and the one that other people type.
+ *
+ * The username sits at the top with the display name under it because that is
+ * the order somebody reads a profile in: who this is, then what to call them.
+ * Editing is behind a pencil rather than an always-open field - a username is
+ * changed once a year and a text box invites changing it by accident.
+ */
+function Identity({ account }: { account: Account }) {
+  const [editingHandle, setEditingHandle] = useState(false);
+  const [draftHandle, setDraftHandle] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState<string | null>(null);
+
+  const commitHandle = () => {
+    const wanted = draftHandle.trim().toLowerCase();
+    setProblem(null);
+    if (!wanted || wanted === account.handle) {
+      setEditingHandle(false);
+      return;
+    }
+    void setHandle(wanted).then((failure) => {
+      setProblem(failure);
+      if (!failure) setEditingHandle(false);
+    });
+  };
+
+  const commitName = () => {
+    if (draftName !== null) void setDisplayName(draftName);
+    setDraftName(null);
+  };
+
+  return (
+    <View style={styles.identity}>
+      {editingHandle ? (
+        <View style={styles.handleEdit}>
+          <TextField
+            label="Username"
+            value={draftHandle}
+            onChangeText={(text) => setDraftHandle(text.toLowerCase())}
+            onSubmitEditing={commitHandle}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoFocus
+            maxLength={20}
+          />
+          <View style={styles.handleActions}>
+            <Button label="Save" variant="primary" onPress={commitHandle} />
+            <Button label="Cancel" onPress={() => setEditingHandle(false)} />
+          </View>
+          {problem ? (
+            <CaptionStrong tone="loss">{problem}</CaptionStrong>
+          ) : (
+            <Caption tone="faint">
+              Three to twenty characters: letters, numbers and underscores.
+            </Caption>
+          )}
+        </View>
+      ) : (
+        <View style={styles.handleRow}>
+          <Title>{account.handle ?? 'Choose a username'}</Title>
+          <Button
+            label="Edit"
+            icon={<EditIcon size={15} color={colors.inkMuted} />}
+            onPress={() => {
+              setDraftHandle(account.handle ?? '');
+              setProblem(null);
+              setEditingHandle(true);
+            }}
+          />
+        </View>
+      )}
+
+      <View style={styles.nameField}>
+        <TextField
+          label="Display name"
+          value={draftName ?? account.displayName ?? ''}
+          onChangeText={setDraftName}
+          onBlur={commitName}
+          onSubmitEditing={commitName}
+          placeholder="What people call you"
+          maxLength={18}
+        />
+        <Caption tone="faint">
+          Shown on your profile, and filled into your seat when you start a session.
+        </Caption>
+      </View>
+    </View>
+  );
+}
+
+/** Findable, or not. */
+function Visibility({ account }: { account: Account }) {
+  return (
+    <Section title="Who can find you" icon={<FriendsIcon size={15} color={colors.inkFaint} />}>
+      <Panel>
+        <Toggle
+          label="Private profile"
+          hint={
+            account.isPrivate
+              ? 'Nobody can look you up or send you a request. You can still add other people, and anyone you add sees your profile once they accept.'
+              : 'Anyone who knows your username can look you up and ask to be friends.'
+          }
+          value={account.isPrivate}
+          onChange={(next) => void setPrivate(next)}
+        />
+      </Panel>
+    </Section>
+  );
+}
+
+function AccountActions({ email }: { email: string | null }) {
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const confirmDelete = () => {
+    Alert.alert(
+      'Delete your account?',
+      'Your account and everything stored with it are removed for good. Games on this device stay where they are.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void deleteAccount().then((error) => setProblem(error));
+          },
+        },
+      ],
+    );
+  };
+
+  return (
+    <Section title="Account">
+      <Panel flush>
+        <Row title="Signed in as" value={email ?? '—'} />
+      </Panel>
+      <View style={styles.accountActions}>
+        <Button label="Sign out" block onPress={() => void signOut()} />
+        {/* Required in the app by both stores, not merely polite. */}
+        <Button label="Delete account" variant="danger" block onPress={confirmDelete} />
+      </View>
+      {problem ? <CaptionStrong tone="loss">{problem}</CaptionStrong> : null}
+    </Section>
+  );
+}
+
+/**
+ * What the tab is before there is an account.
+ *
+ * One thing to do, and an honest list of what doing it buys. The games already
+ * on the phone are the thing people are most likely to worry about, so that is
+ * said first and plainly: nothing here is a migration, and signing in adds a
+ * home for what is already scored rather than moving it.
+ */
+function SignedOut() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const run = async (action: () => Promise<string | null>) => {
+    setBusy(true);
+    setProblem(null);
+    const failure = await action();
+    if (failure) setProblem(failure);
+    else await syncNow();
+    setBusy(false);
+  };
+
+  /*
+   * One form for both. An anonymous account is upgraded in place, keeping
+   * every game already on this device; only if that fails because the address
+   * is taken does it become a sign-in, which is the case where the games here
+   * belong to somebody who already has an account elsewhere.
+   */
+  const connect = () =>
+    run(async () => {
+      const upgraded = await upgradeWithEmail(email, password);
+      if (!upgraded) {
+        setPassword('');
+        return null;
+      }
+      const signedIn = await signInWithEmail(email, password);
+      if (!signedIn) setPassword('');
+      return signedIn;
+    });
+
+  return (
+    <Screen scroll motif="rings">
+      <View style={styles.pitch}>
+        <Title>Make an account</Title>
+        <Body tone="muted">
+          Scoring works without one and always will. An account is for the parts that need
+          somewhere to live.
+        </Body>
+      </View>
+
+      <Panel style={styles.perks}>
+        {[
+          ['Your games on any phone', 'Everything already scored here comes with you.'],
+          ['Friends', 'Put them in a game and it lands in their history too.'],
+          ['A profile', 'Your best hand, your totals, and a username people can find you by.'],
+        ].map(([title, body]) => (
+          <View key={title} style={styles.perk}>
+            <BodyStrong>{title}</BodyStrong>
+            <Caption tone="muted">{body}</Caption>
+          </View>
+        ))}
+      </Panel>
+
+      <Section title="Continue with">
+        <View style={styles.providers}>
+          {isAppleSignInAvailable() ? (
             <Button
-              label="Continue with Google"
-              variant="primary"
+              label="Continue with Apple"
+              variant="apple"
               block
               disabled={busy}
-              onPress={() => void withGoogle()}
+              onPress={() => void run(signInWithApple)}
             />
-            <View style={styles.or}>
-              <View style={styles.orLine} />
-              <Caption tone="faint">or</Caption>
-              <View style={styles.orLine} />
-            </View>
-            <TextField
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Email"
-              keyboardType="email-address"
-            />
-            <TextField
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Password"
-              secureTextEntry
-            />
-            <Button
-              label="Save my games"
-              block
-              loading={busy}
-              disabled={busy || email.trim().length < 3 || password.length < 6}
-              onPress={() => void connect()}
-            />
-            {problem ? <CaptionStrong tone="loss">{problem}</CaptionStrong> : null}
-          </Panel>
-        )}
+          ) : null}
+          <Button
+            label="Continue with Google"
+            variant="provider"
+            icon={<GoogleMark size={18} />}
+            block
+            disabled={busy}
+            onPress={() => void run(signInWithGoogle)}
+          />
+        </View>
+
+        <View style={styles.or}>
+          <View style={styles.orLine} />
+          <Overline>or</Overline>
+          <View style={styles.orLine} />
+        </View>
+
+        <Panel style={styles.emailForm}>
+          <TextField
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Email"
+            keyboardType="email-address"
+            autoCorrect={false}
+          />
+          <TextField
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Password"
+            secureTextEntry
+          />
+          <Button
+            label="Create account"
+            block
+            loading={busy}
+            disabled={busy || email.trim().length < 3 || password.length < 6}
+            onPress={() => void connect()}
+          />
+          <Caption tone="faint">
+            A username is made for you from your email, and you can change it afterwards.
+          </Caption>
+          {problem ? <CaptionStrong tone="loss">{problem}</CaptionStrong> : null}
+        </Panel>
       </Section>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  head: { paddingTop: space.md, paddingBottom: space.xs, gap: 2 },
-  note: { marginTop: space.sm, paddingHorizontal: space.xs },
+  identity: { paddingTop: space.md, gap: space.lg },
+  handleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md },
+  handleEdit: { gap: space.sm },
+  handleActions: { flexDirection: 'row', gap: space.sm },
+  nameField: { gap: space.sm },
   best: { gap: space.sm },
   bestTiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 3 },
   bestLine: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   empty: { alignItems: 'center', gap: space.sm, paddingVertical: space.lg },
-  upgrade: { gap: space.md },
-  or: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  orLine: { flex: 1, height: 1, backgroundColor: colors.line },
   accountActions: { gap: space.sm, marginTop: space.md },
-  handle: { marginTop: space.md, gap: space.sm },
-  /** 44 is Apple's minimum for their button, and the height of ours. */
-  appleButton: { height: 44, width: '100%' },
+
+  pitch: { paddingTop: space.md, paddingBottom: space.lg, gap: space.sm },
+  perks: { gap: space.lg },
+  perk: { gap: 2 },
+  providers: { gap: space.sm },
+  emailForm: { gap: space.md },
+  or: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginVertical: space.lg },
+  orLine: { flex: 1, height: 1, backgroundColor: colors.line },
 });
