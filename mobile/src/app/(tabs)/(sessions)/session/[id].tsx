@@ -137,7 +137,7 @@ export default function SessionScreen() {
   };
 
   return (
-    <Screen padded={false} motif="zhong">
+    <Screen padded={false} insetBottom={false} motif="zhong">
       {/*
         * No navigation bar at all.
         *

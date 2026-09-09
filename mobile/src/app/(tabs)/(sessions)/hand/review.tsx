@@ -137,7 +137,7 @@ export default function ReviewScreen() {
   const activeDetection = picker !== null && picker >= 0 ? draft.detections[picker] : undefined;
 
   return (
-    <Screen padded={false} footerSpace={0} header={<PageHeader title="Check the Tiles" />}>
+    <Screen padded={false} insetBottom={false} header={<PageHeader title="Check the Tiles" />}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/*
           * Why the photograph could not be read, when it could not be.
@@ -494,6 +494,10 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: space.xl,
     paddingTop: space.md,
+    // Its own gap above the tab bar. `Screen` used to pad the container, which
+    // is what clipped the scroll view above it; the action bar keeps the part
+    // of that padding it actually wanted.
+    paddingBottom: space.md,
     /*
      * No rule and no fill. A hairline with an opaque band under it read as the
      * page being cut off rather than as an action bar, and once the ground

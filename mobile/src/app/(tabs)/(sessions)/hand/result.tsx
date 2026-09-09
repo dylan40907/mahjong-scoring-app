@@ -150,7 +150,7 @@ export default function ResultScreen() {
   const winner = session?.players.find((p) => p.id === draft.winnerId);
 
   return (
-    <Screen padded={false} motif="zhong" header={<PageHeader title="The Tally" />}>
+    <Screen padded={false} insetBottom={false} motif="zhong" header={<PageHeader title="The Tally" />}>
       <Confetti active={result.total > 0} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.headline}>
@@ -351,6 +351,10 @@ const styles = StyleSheet.create({
   footer: {
     paddingHorizontal: space.xl,
     paddingTop: space.md,
+    // Its own gap above the tab bar. `Screen` used to pad the container, which
+    // is what clipped the scroll view above it; the action bar keeps the part
+    // of that padding it actually wanted.
+    paddingBottom: space.md,
     /*
      * No rule and no fill. A hairline with an opaque band under it read as the
      * page being cut off rather than as an action bar, and once the ground

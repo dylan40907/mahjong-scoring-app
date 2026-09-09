@@ -83,7 +83,7 @@ export default function FriendsScreen() {
           body="Both ends of a friendship have to be somewhere. Make an account on the Profile tab and you can add people, put them in a game, and see the games they put you in."
           action={
             <Button
-              label="Go to You"
+              label="Go to Profile"
               variant="primary"
               onPress={() => router.push('/(tabs)/profile')}
             />

@@ -75,7 +75,7 @@ export default function RuleSetScreen() {
   };
 
   return (
-    <Screen padded={false} header={<PageHeader title={rules.name} />}>
+    <Screen padded={false} insetBottom={false} header={<PageHeader title={rules.name} />}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {rules.notes ? (
           <Body tone="muted" style={styles.notes}>

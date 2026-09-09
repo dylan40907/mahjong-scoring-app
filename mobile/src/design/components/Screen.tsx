@@ -35,6 +35,21 @@ export interface ScreenProps extends ViewProps {
    * safe-area inset is its business, not this one's.
    */
   header?: React.ReactNode;
+  /**
+   * Off for a screen that puts its own `ScrollView` inside this one.
+   *
+   * The bottom padding lands on the *container*, which is right for a fixed
+   * layout and actively wrong for a nested scroll view: padding a scroll
+   * view's parent makes the scroll view shorter, so its content is clipped
+   * before it reaches the bottom of the screen and no amount of scrolling
+   * reveals the rest. On a phone that reads as an invisible bar floating above
+   * the tab bar, cutting off whatever was unlucky enough to be there.
+   *
+   * Those screens already put their own `paddingBottom` in
+   * `contentContainerStyle`, which is where it belongs, because that is the
+   * one place it adds scrollable room instead of taking it away.
+   */
+  insetBottom?: boolean;
 }
 
 export function Screen({
@@ -43,6 +58,7 @@ export function Screen({
   padded = true,
   motif = 'none',
   header,
+  insetBottom = true,
   style,
   children,
   ...rest
@@ -50,7 +66,7 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const padding = {
     paddingHorizontal: padded ? space.xl : 0,
-    paddingBottom: insets.bottom + footerSpace + space.xl,
+    paddingBottom: insetBottom ? insets.bottom + footerSpace + space.xl : 0,
   };
 
   if (scroll) {
