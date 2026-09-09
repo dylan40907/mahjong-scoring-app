@@ -312,6 +312,117 @@ check(
 const bothGone = await rpc(asB)('friend_list');
 check('unfriending clears both directions', !list(bothGone.body).some((row) => row.id === a.id));
 
+// ---------------------------------------------------------------------------
+// Profiles: usernames, privacy, and what a stranger can reach
+//
+// The failure mode here is the opposite of the one above. A friendship that
+// does not work is obvious the first time somebody tries it; a profile that is
+// readable when it should not be is invisible forever, and so is a `profiles`
+// table that can be downloaded whole.
+// ---------------------------------------------------------------------------
+
+console.log('');
+
+// A username is claimed rather than typed. Two accounts asking for the same
+// one must both end up with something.
+const wantedA = `dup_${stamp}`;
+const claimedC = await rpc(asC)('claim_handle', { preferred: wantedA });
+check('a username can be claimed', claimedC.body === wantedA, `got ${claimedC.body}`);
+
+const claimedB2 = await rpc(asB)('claim_handle', { preferred: wantedA });
+check(
+  'a taken username yields a variant rather than an error',
+  typeof claimedB2.body === 'string' && claimedB2.body !== wantedA && claimedB2.body.startsWith(wantedA),
+  `got ${claimedB2.body}`,
+);
+
+// The sanitiser has to hold the column's own constraint, or claiming throws
+// where it should be quietly tidying up.
+const messy = await rpc(asA)('claim_handle', { preferred: '  Jane.Doe+mahjong@Example.COM  ' });
+check(
+  'a messy preference is reduced to a legal username',
+  typeof messy.body === 'string' && /^[a-z0-9_]{3,20}$/.test(messy.body),
+  `got ${messy.body}`,
+);
+
+// A public profile answers to anyone who knows the exact name.
+const publicView = await rpc(asC)('view_profile', { lookup: messy.body });
+check('a public profile is visible to a stranger', publicView.body?.length === 1);
+check(
+  'and says how they are related',
+  publicView.body?.[0]?.relation === 'none',
+  `relation ${publicView.body?.[0]?.relation}`,
+);
+
+// The whole point of a function instead of a read policy: no directory.
+const directory = await asC('profiles?select=id,handle');
+check(
+  'the profiles table cannot be listed',
+  (directory.body?.length ?? 0) <= 1,
+  `saw ${directory.body?.length ?? '?'} rows`,
+);
+
+// Going private takes the profile out of reach of people who are not friends.
+await asA(`profiles?id=eq.${a.id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ is_private: true }),
+});
+const hidden = await rpc(asC)('view_profile', { lookup: messy.body });
+check('a private profile is not findable', hidden.body?.length === 0);
+
+// And cannot be sent a request - answered as though the name were unused, so
+// that the setting is not itself detectable.
+const blockedRequest = await rpc(asC)('request_friend', { lookup: messy.body });
+check(
+  'a private profile cannot be sent a request',
+  blockedRequest.body === 'unknown',
+  `said ${blockedRequest.body}`,
+);
+
+// Their own profile stays visible to them.
+const ownView = await rpc(asA)('view_profile', { lookup: messy.body });
+check('a private profile is still visible to its owner', ownView.body?.[0]?.relation === 'self');
+
+// Private is about being found, not about being unable to look: A can still
+// reach out, and C can answer.
+const outboundWhilePrivate = await rpc(asA)('request_friend', { lookup: claimedC.body });
+check(
+  'a private profile can still send requests',
+  outboundWhilePrivate.body === 'sent',
+  `said ${outboundWhilePrivate.body}`,
+);
+
+const seesRequester = await rpc(asC)('friend_list');
+check(
+  'the person asked can see who is asking, private or not',
+  list(seesRequester.body).some((row) => row.id === a.id),
+);
+
+await rpc(asC)('accept_friend', { other: a.id });
+const friendView = await rpc(asC)('view_profile', { lookup: messy.body });
+check(
+  'once accepted, a private profile opens to that friend',
+  friendView.body?.[0]?.relation === 'friend',
+  `relation ${friendView.body?.[0]?.relation}`,
+);
+
+// Stats travel with the profile, which is what makes them visible to somebody
+// who has no right to read the hands underneath.
+await asA(`profiles?id=eq.${a.id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ stats: { handsWon: 7, handsPlayed: 20 } }),
+});
+const withStats = await rpc(asC)('view_profile', { lookup: messy.body });
+check('a profile carries the stats its owner published', withStats.body?.[0]?.stats?.handsWon === 7);
+
+// But the hands themselves stay shut.
+const peekHands = await asC(`hands?select=id&owner_id=eq.${a.id}`);
+check(
+  'a friend still cannot read hands they were not seated in',
+  peekHands.body?.length === 0,
+  `saw ${peekHands.body?.length ?? '?'} rows`,
+);
+
 // Tidy up what we can; the anonymous users themselves are harmless.
 await asA(`sessions?id=eq.${sessionId}`, { method: 'DELETE' });
 await asA(`sessions?id=eq.${gameId}`, { method: 'DELETE' });
