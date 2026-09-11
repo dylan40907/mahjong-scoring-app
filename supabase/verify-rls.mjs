@@ -423,6 +423,39 @@ check(
   `saw ${peekHands.body?.length ?? '?'} rows`,
 );
 
+// Search is the one read that answers a partial name, so it is the one that
+// could become a directory. Everything it returns is proven in
+// `verify-search.sql`, as real accounts; what can be proven from here is who
+// it refuses, and an anonymous account - free to make, and so a way to
+// multiply any per-account limit - is exactly who.
+const anonSearch = await rpc(asC)('search_profiles', { query: claimedC.body.slice(0, 6) });
+check(
+  'an anonymous account cannot search for people',
+  Array.isArray(anonSearch.body) && anonSearch.body.length === 0,
+  `saw ${JSON.stringify(anonSearch.body)?.slice(0, 80)}`,
+);
+
+// And a signed-out caller cannot call the social functions at all. Revoking
+// these from `anon` once did nothing, because `anon` still held them through
+// PUBLIC; the status is the proof rather than the empty body.
+const signedOut = async (fn, args) => {
+  const res = await fetch(`${URL_}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: { apikey: KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(args ?? {}),
+  });
+  return res.status;
+};
+for (const [fn, args] of [
+  ['search_profiles', { query: 'dy' }],
+  ['view_profile', { lookup: claimedC.body }],
+  ['friend_list', {}],
+  ['request_friend', { lookup: claimedC.body }],
+]) {
+  const status = await signedOut(fn, args);
+  check(`${fn} is not callable signed out`, status === 401 || status === 403 || status === 404, `status ${status}`);
+}
+
 // Tidy up what we can; the anonymous users themselves are harmless.
 await asA(`sessions?id=eq.${sessionId}`, { method: 'DELETE' });
 await asA(`sessions?id=eq.${gameId}`, { method: 'DELETE' });

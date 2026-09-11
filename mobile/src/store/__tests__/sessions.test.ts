@@ -5,8 +5,14 @@ import {
   deleteSession,
   getSession,
   getState,
+  leaveSeat,
+  linkSeat,
   sessionTotals,
+  setLocalIdentity,
+  takeSeat,
+  unlinkSeat,
 } from '../store';
+import { mySeat } from '../stats';
 import type { HandRecord, Session } from '../types';
 
 /**
@@ -134,5 +140,95 @@ describe('deleting a session', () => {
     expect(stone).toBeDefined();
     // Never pushed yet, so it is still owed to the server.
     expect(stone!.syncedAt ?? null).toBeNull();
+  });
+});
+
+describe('who is sitting where', () => {
+  const ME = { userId: 'u_me', displayName: 'Dylan' };
+
+  function table(names: string[]): Session {
+    return createSession({ name: 'Seats', ruleSetId: 'taiwanese-common', playerNames: names });
+  }
+
+  const names = (id: string) => reload(id).players.map((player) => player.name);
+
+  afterEach(() => setLocalIdentity(null, null));
+
+  it('lets you claim a seat in a game scored before you had an account', () => {
+    // Every seat a placeholder, and nothing on the record says which was us.
+    const session = table(['', '', '', '']);
+    setLocalIdentity(ME.displayName, ME.userId);
+
+    takeSeat(session.id, session.players[2].id);
+
+    const after = reload(session.id);
+    expect(after.players[2]).toMatchObject({ accountId: 'u_me', name: 'Dylan' });
+    expect(mySeat(after, ME)?.id).toBe(session.players[2].id);
+  });
+
+  it('moves you and your name together', () => {
+    setLocalIdentity(ME.displayName, ME.userId);
+    const session = table(['Dylan', '', '', '']);
+    expect(session.players[0].accountId).toBe('u_me');
+
+    takeSeat(session.id, session.players[2].id);
+
+    expect(names(session.id)).toEqual(['Player 1', 'Player 2', 'Dylan', 'Player 4']);
+    expect(reload(session.id).players[0].accountId).toBeUndefined();
+  });
+
+  it('clears a seat that was only yours by name', () => {
+    // Written before seats carried an account, so only the name says it is us.
+    const session = table(['Dylan', '', '', '']);
+    setLocalIdentity(ME.displayName, ME.userId);
+    expect(mySeat(reload(session.id), ME)?.id).toBe(session.players[0].id);
+
+    takeSeat(session.id, session.players[1].id);
+
+    expect(names(session.id)).toEqual(['Player 1', 'Dylan', 'Player 3', 'Player 4']);
+    expect(mySeat(reload(session.id), ME)?.id).toBe(session.players[1].id);
+  });
+
+  it('takes you out of a game you were not in, and keeps you out', () => {
+    setLocalIdentity(ME.displayName, ME.userId);
+    const session = table(['Dylan', 'Bo', '', '']);
+
+    leaveSeat(session.id, session.players[0].id);
+
+    const after = reload(session.id);
+    expect(after.players[0].name).toBe('Player 1');
+    expect(after.players[0].accountId).toBeUndefined();
+    // The name fallback is what would have put us straight back in.
+    expect(mySeat(after, ME)).toBeUndefined();
+  });
+
+  it('leaves a typed name where it was when a friend moves', () => {
+    const session = table(['Ada', 'Dad', '', '']);
+
+    linkSeat(session.id, session.players[1].id, 'u_dad', 'Wei');
+    expect(names(session.id)).toEqual(['Ada', 'Dad', 'Player 3', 'Player 4']);
+
+    linkSeat(session.id, session.players[3].id, 'u_dad', 'Wei');
+    expect(names(session.id)).toEqual(['Ada', 'Dad', 'Player 3', 'Wei']);
+    expect(reload(session.id).players[1].accountId).toBeUndefined();
+  });
+
+  it('moves a friend and their name together', () => {
+    const session = table(['Ada', '', '', '']);
+
+    linkSeat(session.id, session.players[1].id, 'u_wei', 'Wei');
+    linkSeat(session.id, session.players[2].id, 'u_wei', 'Wei');
+
+    expect(names(session.id)).toEqual(['Ada', 'Player 2', 'Wei', 'Player 4']);
+  });
+
+  it('keeps a friend in the seat, by name, when the game stops being shared with them', () => {
+    const session = table(['Ada', '', '', '']);
+    linkSeat(session.id, session.players[1].id, 'u_wei', 'Wei');
+
+    unlinkSeat(session.id, session.players[1].id);
+
+    expect(names(session.id)).toEqual(['Ada', 'Wei', 'Player 3', 'Player 4']);
+    expect(reload(session.id).players[1].accountId).toBeUndefined();
   });
 });

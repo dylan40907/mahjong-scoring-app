@@ -288,3 +288,64 @@ export async function lookupProfile(handle: string): Promise<PublicProfile | nul
   if (error || !Array.isArray(data) || data.length === 0) return null;
   return toProfile(data[0] as RawProfile);
 }
+
+/** One person a search turned up. Deliberately thin - see `search_profiles`. */
+export interface SearchResult {
+  readonly handle: string;
+  readonly displayName: string | null;
+  readonly relation: 'friend' | 'requested' | 'incoming' | 'none';
+}
+
+export type SearchOutcome =
+  | { readonly kind: 'results'; readonly results: SearchResult[] }
+  /** The hourly allowance is spent. A person almost never sees this. */
+  | { readonly kind: 'limited' }
+  | { readonly kind: 'offline' };
+
+/** The shortest query the server will answer. One letter is browsing. */
+export const MIN_SEARCH = 2;
+
+/**
+ * People whose username, or any word of whose name, starts with `query`.
+ *
+ * Search replaced exact lookup as the way in because usernames here are made
+ * for people from the front of an email address, so the friend you are looking
+ * for does not know theirs either. What keeps it from being a directory lives
+ * on the server: real accounts only, private profiles never, eight results,
+ * and an hourly quota. The app does not repeat those rules; it would only be
+ * a second copy to fall out of step.
+ */
+export async function searchProfiles(query: string): Promise<SearchOutcome> {
+  if (!supabase) return { kind: 'offline' };
+  const { data, error } = await supabase.rpc('search_profiles', { query });
+  if (error) {
+    // `PT429` is the quota; anything else is the network or a server that is
+    // behind, and neither is worth more words than "try again".
+    return error.code === 'PT429' ? { kind: 'limited' } : { kind: 'offline' };
+  }
+  const rows = Array.isArray(data)
+    ? (data as { handle: string; display_name: string | null; relation: string }[])
+    : [];
+  return {
+    kind: 'results',
+    results: rows.map((row) => ({
+      handle: row.handle,
+      displayName: row.display_name,
+      relation: (row.relation ?? 'none') as SearchResult['relation'],
+    })),
+  };
+}
+
+/**
+ * Would the server still return this result for a longer query?
+ *
+ * The same rule `search_profiles` applies, so that results already on screen
+ * can be narrowed as somebody keeps typing instead of blanking until the next
+ * answer arrives. Only ever narrows: anything new still has to come from the
+ * server.
+ */
+export function stillMatches(result: SearchResult, query: string): boolean {
+  const q = query.trim().toLowerCase().replace(/^@/, '');
+  if (result.handle.startsWith(q)) return true;
+  return ` ${(result.displayName ?? '').toLowerCase()}`.includes(` ${q}`);
+}

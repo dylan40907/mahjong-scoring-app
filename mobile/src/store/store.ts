@@ -12,6 +12,7 @@ import {
   saveSessions,
   saveSettings,
 } from './persistence';
+import { mySeat } from './stats';
 import { pruneTombstones, type Tombstone } from './sync/meta';
 import { enqueue, type Intent, type QueuedIntent } from './sync/outbox';
 import {
@@ -134,7 +135,7 @@ export function createSession(input: {
   playerNames: string[];
 }): Session {
   const players: SessionPlayer[] = input.playerNames.map((name, index) => {
-    const settled = name.trim() || `Player ${index + 1}`;
+    const settled = name.trim() || placeholderFor(index);
     return {
       id: makeId('p'),
       name: settled,
@@ -363,7 +364,7 @@ export function createQuickSession(): Session {
     // Seat one is whoever is holding the phone, when the app knows who that
     // is. It is the one name in four it can already answer, and four names are
     // the only setup starting a session cannot skip.
-    playerNames: [localPlayerName || 'Player 1', 'Player 2', 'Player 3', 'Player 4'],
+    playerNames: [localPlayerName || placeholderFor(0), placeholderFor(1), placeholderFor(2), placeholderFor(3)],
   });
 }
 
@@ -417,20 +418,75 @@ export function linkSeat(
   accountId: string,
   name?: string,
 ): void {
+  replaceSession(sessionId, (session) => {
+    const target = session.players.find((player) => player.id === playerId);
+    // Adopt their name only over a placeholder. Somebody who typed "Dad"
+    // meant "Dad", and having the app quietly replace it with the name on an
+    // account is a correction nobody asked for.
+    const adopted = name && target && isPlaceholder(target.name) ? name : undefined;
+
+    return {
+      ...session,
+      players: session.players.map((player, index) => {
+        if (player.id === playerId) {
+          return { ...player, accountId, name: adopted ?? player.name };
+        }
+        if (player.accountId !== accountId) return player;
+        // Moving somebody to another chair takes their name with them. Left
+        // behind, the table shows the same person twice - once in the seat
+        // they are in and once in the seat they are not - and the empty one
+        // reads as a second player called Wei. Only when the name actually
+        // moved, though: a seat whose name was typed keeps it.
+        const moved = adopted !== undefined && player.name.trim() === adopted.trim();
+        return { ...player, accountId: undefined, name: moved ? placeholderFor(index) : player.name };
+      }),
+    };
+  });
+}
+
+/**
+ * Say which seat is ours.
+ *
+ * The same as seating a friend, with one extra seat to clear. Sessions from
+ * before seats could be linked identify us by name alone - `mySeat` falls back
+ * to the seat carrying our display name - and that seat has no account on it
+ * for `linkSeat` to move. Left alone, it would go on saying our name after we
+ * had said we were somewhere else.
+ *
+ * This is also the only way to claim a seat in a game scored before there was
+ * an account at all, where every seat is still "Player 1" to "Player 4" and
+ * nothing on the record can say which one was us.
+ */
+export function takeSeat(sessionId: string, playerId: string): void {
+  const session = getSession(sessionId);
+  if (!session || !localAccountId) return;
+
+  const byName = mySeat(session, localIdentity());
+  if (byName && byName.id !== playerId && !byName.accountId) {
+    leaveSeat(sessionId, byName.id);
+  }
+  linkSeat(sessionId, playerId, localAccountId, localPlayerName ?? undefined);
+}
+
+/**
+ * Say that a seat is not us after all.
+ *
+ * For the game somebody scored for a table they were not sitting at - the app
+ * puts us in seat one of every session it starts, which is right almost every
+ * time and wrong for exactly this. The seat goes back to being a placeholder
+ * when it carries our name, because otherwise the name fallback in `mySeat`
+ * would find it again on the next render and put us straight back in.
+ *
+ * A friend taken out of a seat keeps their name (`unlinkSeat`): that is about
+ * who can see the game, not about who was sitting there.
+ */
+export function leaveSeat(sessionId: string, playerId: string): void {
   replaceSession(sessionId, (session) => ({
     ...session,
-    players: session.players.map((player) => {
-      if (player.id === playerId) {
-        return {
-          ...player,
-          accountId,
-          // Adopt their name only over a placeholder. Somebody who typed
-          // "Dad" meant "Dad", and having the app quietly replace it with the
-          // name on an account is a correction nobody asked for.
-          name: name && isPlaceholder(player.name) ? name : player.name,
-        };
-      }
-      return player.accountId === accountId ? { ...player, accountId: undefined } : player;
+    players: session.players.map((player, index) => {
+      if (player.id !== playerId) return player;
+      const ours = !!localPlayerName && player.name.trim() === localPlayerName;
+      return { ...player, accountId: undefined, name: ours ? placeholderFor(index) : player.name };
     }),
   }));
 }
@@ -464,6 +520,11 @@ export function unlinkSeat(sessionId: string, playerId: string): void {
 /** A seat nobody has bothered to name yet. */
 function isPlaceholder(name: string): boolean {
   return /^player\s*\d+$/i.test(name.trim());
+}
+
+/** What a seat is called until somebody names it, by its place at the table. */
+function placeholderFor(index: number): string {
+  return `Player ${index + 1}`;
 }
 
 // ---------------------------------------------------------------------------

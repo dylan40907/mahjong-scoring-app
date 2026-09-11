@@ -309,7 +309,7 @@ export async function setHandle(handle: string): Promise<string | null> {
     .eq('id', account.userId);
 
   // 23505 is the unique violation, which here can only mean the handle is taken.
-  if (error) return error.code === '23505' ? 'That name is taken.' : 'Could not save that name.';
+  if (error) return error.code === '23505' ? 'That username is taken.' : 'Could not save that username.';
   set({ handle: wanted });
   return null;
 }

@@ -1,9 +1,8 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Body,
-  BodyStrong,
   Button,
   Caption,
   Divider,
@@ -17,14 +16,19 @@ import {
 import { CheckIcon, FriendsIcon, PersonIcon } from '@/design/icons';
 import { colors, space } from '@/design/tokens';
 import {
+  MIN_SEARCH,
   acceptFriend,
   acceptedFriends,
   blockUser,
   incomingRequests,
   outgoingRequests,
   removeFriend,
+  searchProfiles,
+  stillMatches,
   useFriends,
   type Friend,
+  type SearchOutcome,
+  type SearchResult,
 } from '@/store/friends';
 import { useAccount } from '@/store/account';
 import { syncNow } from '@/store/sync/engine';
@@ -34,22 +38,20 @@ import { isCloudConfigured } from '@/lib/supabase';
  * Friends.
  *
  * A tab rather than a section of the profile, because it is a place you go
- * rather than a setting you change: looking somebody up, answering a request,
- * opening a profile. As a panel on the profile screen it was one row deep and gave
- * no hint that any of that existed.
+ * rather than a setting you change: finding somebody, answering a request,
+ * opening a profile. As a panel on the profile screen it was one row deep and
+ * gave no hint that any of that existed.
  *
- * People are found by exact username. Not by email address - that is a fact
- * about somebody this app has no business being a directory of - and not by
- * browsing, because a list of everyone who uses the app is not a feature. The
- * lookup goes through a function on the server for the same reason: a read
- * policy saying "public profiles are readable" is also one saying every user
- * can be downloaded at once.
+ * People are found by searching, which is what every other app does and what
+ * this one needed: usernames here are made from the front of an email address,
+ * so the person you are looking for does not know theirs either. The limits
+ * that stop a search box turning into a directory are on the server, in
+ * `search_profiles`, and are not repeated here.
  */
 export default function FriendsScreen() {
   const router = useRouter();
   const friends = useFriends(useCallback((state) => state.friends, []));
   const status = useAccount(useCallback((account) => account.status, []));
-  const [lookup, setLookup] = useState('');
 
   const accepted = acceptedFriends(friends);
   const incoming = incomingRequests(friends);
@@ -70,7 +72,7 @@ export default function FriendsScreen() {
   /*
    * Signed out, this tab is a signpost and nothing else.
    *
-   * Not a lookup field that fails after you type a name into it: a friend list
+   * Not a search field that fails after you type a name into it: a friend list
    * needs an account at both ends, and the honest version says so before the
    * typing rather than after.
    */
@@ -92,13 +94,6 @@ export default function FriendsScreen() {
       </Screen>
     );
   }
-
-  const search = () => {
-    const wanted = lookup.trim().toLowerCase();
-    if (!wanted) return;
-    setLookup('');
-    router.push(`/profile/${wanted}`);
-  };
 
   const confirmRemove = (friend: Friend) => {
     Alert.alert(
@@ -141,26 +136,10 @@ export default function FriendsScreen() {
 
   return (
     <Screen scroll motif="wall">
-      <Section title="Find someone" icon={<FriendsIcon size={15} color={colors.inkFaint} />} first>
-        <Panel style={styles.add}>
-          <TextField
-            value={lookup}
-            onChangeText={setLookup}
-            onSubmitEditing={search}
-            placeholder="Their username, e.g. wei_88"
-            autoCapitalize="none"
-            autoCorrect={false}
-            maxLength={20}
-          />
-          <Button label="Look up" block disabled={!lookup.trim()} onPress={search} />
-          <Caption tone="faint">
-            Usernames only. Open their profile to send a request.
-          </Caption>
-        </Panel>
-      </Section>
+      <FindSomeone />
 
       {incoming.length > 0 ? (
-        <Section title="Waiting on you" note={String(incoming.length)}>
+        <Section title="Friend requests" note={String(incoming.length)}>
           <Panel flush>
             {incoming.map((friend, index) => (
               <View key={friend.id}>
@@ -171,14 +150,22 @@ export default function FriendsScreen() {
                   trailing={
                     <View style={styles.answer}>
                       <Button
-                        label="Yes"
+                        label="Accept"
                         variant="primary"
                         onPress={() => {
                           acceptFriend(friend.id);
                           void syncNow();
                         }}
                       />
-                      <Button label="No" onPress={() => confirmRemove(friend)} />
+                      {/* No confirmation: turning down a request takes
+                          nothing away from anybody, and they can ask again. */}
+                      <Button
+                        label="Decline"
+                        onPress={() => {
+                          removeFriend(friend.id);
+                          void syncNow();
+                        }}
+                      />
                     </View>
                   }
                   chevron={false}
@@ -193,10 +180,7 @@ export default function FriendsScreen() {
         {accepted.length === 0 ? (
           <Panel style={styles.empty}>
             <Body tone="muted">Nobody yet.</Body>
-            <Caption tone="faint">
-              Add someone and you can put them in a game. It lands in their history as well as
-              yours, with their own totals worked out from their seat.
-            </Caption>
+            <Caption tone="faint">Search for someone above and send them a friend request.</Caption>
           </Panel>
         ) : (
           <Panel flush>
@@ -218,17 +202,17 @@ export default function FriendsScreen() {
       </Section>
 
       {outgoing.length > 0 ? (
-        <Section title="Asked, no answer yet">
+        <Section title="Requests you sent">
           <Panel flush>
             {outgoing.map((friend, index) => (
               <View key={friend.id}>
                 {index > 0 ? <Divider inset={space.lg} /> : null}
                 <Row
                   title={nameOf(friend)}
-                  subtitle={friend.local ? 'On this device until you are online' : undefined}
+                  subtitle={friend.local ? 'Sends when you are back online' : undefined}
                   trailing={
                     <Button
-                      label="Take back"
+                      label="Cancel"
                       onPress={() => {
                         removeFriend(friend.id);
                         void syncNow();
@@ -242,33 +226,130 @@ export default function FriendsScreen() {
           </Panel>
         </Section>
       ) : null}
-
-      {/*
-        * Still an explanation, because "what am I giving away" is a fair
-        * question and the honest answer is short. What it no longer does is
-        * describe how it works: nobody needs to know a game travels through a
-        * seat, only that they choose which games and can change their mind.
-        */}
-      <Section title="What friends can see">
-        <Panel style={styles.explain}>
-          <BodyStrong>Nothing, until you add them to a game.</BodyStrong>
-          <Caption tone="muted">
-            Being friends does not share your scores. You pick which games they see, one at a
-            time, and you can take one back whenever you like.
-          </Caption>
-        </Panel>
-      </Section>
     </Screen>
   );
 }
+
+/**
+ * The search box, and whoever it has found so far.
+ *
+ * Asks a quarter of a second after the last key rather than on every one:
+ * each question spends a little of an hourly allowance, and a fast typist
+ * would otherwise spend six of them on one name. While an answer is on its
+ * way, the last one stays up narrowed to what still matches, so typing a
+ * letter never blanks the list and then refills it.
+ */
+function FindSomeone() {
+  const router = useRouter();
+  const [query, setQuery] = useState('');
+  const [answer, setAnswer] = useState<{ query: string; outcome: SearchOutcome } | null>(null);
+
+  const wanted = query.trim().toLowerCase().replace(/^@/, '');
+  const searching = wanted.length >= MIN_SEARCH;
+
+  /*
+   * State is only ever set when a reply lands, never synchronously here: a
+   * reply for a query that has since changed is thrown away by `alive`, which
+   * is what stops a slow answer for "we" overwriting a fast one for "wei".
+   */
+  useEffect(() => {
+    if (wanted.length < MIN_SEARCH) return;
+    let alive = true;
+    const timer = setTimeout(() => {
+      void searchProfiles(wanted).then((outcome) => {
+        if (alive) setAnswer({ query: wanted, outcome });
+      });
+    }, 250);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [wanted]);
+
+  const current = answer?.query === wanted ? answer.outcome : null;
+  const results: SearchResult[] = !searching
+    ? []
+    : current?.kind === 'results'
+      ? current.results
+      : answer?.outcome.kind === 'results' && wanted.startsWith(answer.query)
+        ? answer.outcome.results.filter((result) => stillMatches(result, wanted))
+        : [];
+
+  const note = !searching
+    ? null
+    : current === null
+      ? results.length === 0
+        ? 'Searching…'
+        : null
+      : current.kind === 'limited'
+        ? 'That is a lot of searching. Try again in a little while.'
+        : current.kind === 'offline'
+          ? 'Search needs a connection.'
+          : results.length === 0
+            ? 'Nobody by that name.'
+            : null;
+
+  /*
+   * Return opens an exact username even when search could not answer -
+   * offline, or out of allowance - which is how this screen worked before
+   * search existed, and still the quickest path for somebody reading a
+   * username off a friend's phone.
+   */
+  const submit = () => {
+    if (!wanted) return;
+    router.push(`/profile/${results.find((result) => result.handle === wanted)?.handle ?? wanted}`);
+  };
+
+  return (
+    <Section title="Find someone" icon={<FriendsIcon size={15} color={colors.inkFaint} />} first>
+      <TextField
+        value={query}
+        onChangeText={setQuery}
+        onSubmitEditing={submit}
+        placeholder="Their name or username"
+        autoCapitalize="none"
+        autoCorrect={false}
+        maxLength={40}
+      />
+      {results.length > 0 ? (
+        <Panel flush style={styles.results}>
+          {results.map((result, index) => (
+            <View key={result.handle}>
+              {index > 0 ? <Divider inset={space.lg} /> : null}
+              <Row
+                title={result.handle}
+                subtitle={result.displayName ?? undefined}
+                value={RELATION[result.relation]}
+                onPress={() => router.push(`/profile/${result.handle}`)}
+              />
+            </View>
+          ))}
+        </Panel>
+      ) : null}
+      {note ? (
+        <Caption tone="faint" style={styles.note}>
+          {note}
+        </Caption>
+      ) : null}
+    </Section>
+  );
+}
+
+/** Where you already stand, so a result does not have to be opened to find out. */
+const RELATION: Record<SearchResult['relation'], string | undefined> = {
+  friend: 'Friend',
+  requested: 'Request sent',
+  incoming: 'Sent you a request',
+  none: undefined,
+};
 
 function nameOf(friend: Friend): string {
   return friend.displayName || friend.handle || 'Someone';
 }
 
 const styles = StyleSheet.create({
-  add: { gap: space.md },
+  results: { marginTop: space.sm },
+  note: { marginTop: space.sm, paddingHorizontal: space.xs },
   answer: { flexDirection: 'row', gap: space.xs },
   empty: { gap: space.sm },
-  explain: { gap: space.sm },
 });

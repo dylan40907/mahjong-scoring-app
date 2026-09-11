@@ -3,6 +3,7 @@ import { Image, Platform, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import {
   PageHeader,
   Body,
@@ -88,6 +89,26 @@ export default function CaptureScreen() {
   /** The frame being read, shown frozen in place of the live feed. */
   const [captured, setCaptured] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  /*
+   * The shutter, drawn over the frame and nowhere else.
+   *
+   * It covers the gap between pressing the button and having a picture to
+   * show, which is most of a second - the sensor, then the crop to the frame.
+   * The live feed used to carry on through it, so the preview went on
+   * following the camera around after the photograph had already been taken
+   * and only then jumped to a still, which read as the app having taken a
+   * different picture from the one on screen. Now the frame goes white on the
+   * press and stays white until the still has loaded, and fades into it.
+   *
+   * The camera's own flash is switched off (`animateShutter`). On Android it
+   * whites out the whole window, not the preview, which put the flash
+   * everywhere except the one place the photograph was being taken.
+   */
+  const flash = useSharedValue(0);
+  const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }));
+  const flashOn = () => flash.set(withTiming(1, { duration: 70 }));
+  const flashOff = () => flash.set(withTiming(0, { duration: 260 }));
 
   const draft = useDraft(useCallback((d) => d, []));
   const session = useAppState(
@@ -265,14 +286,18 @@ export default function CaptureScreen() {
   const takePhoto = async () => {
     if (!camera.current) return;
     setBusy(true);
+    flashOn();
     try {
       const photo = await camera.current.takePictureAsync({ quality: 0.9, skipProcessing: false });
-      if (!photo?.uri) return;
+      // Thrown rather than returned, so the shutter reopens and the button
+      // comes back; returning here used to leave both stuck.
+      if (!photo?.uri) throw new Error('No photograph came back');
       // Cropped here rather than anywhere later: this is the only moment the
       // frame the user was looking at is still known.
       const framed = await cropToFrame(photo.uri, photo.width, photo.height);
       await process(framed.uri);
     } catch {
+      flashOff();
       setMessage('The camera could not take that photo.');
       setBusy(false);
     }
@@ -399,9 +424,21 @@ export default function CaptureScreen() {
              cropped to this frame, and showing it filled would crop it on
              screen only - claiming the tiles at the edges were not read when
              they were. */
-          <Image source={{ uri: captured }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+          <Image
+            source={{ uri: captured }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="contain"
+            // The still is on screen, so the shutter can open onto it.
+            onLoad={flashOff}
+            onError={flashOff}
+          />
         ) : cameraReady ? (
-          <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" />
+          <CameraView
+            ref={camera}
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            animateShutter={false}
+          />
         ) : (
           <View style={styles.placeholder}>
             <TileIcon size={34} color={colors.inkFaint} />
@@ -412,6 +449,7 @@ export default function CaptureScreen() {
             </Caption>
           </View>
         )}
+        <Animated.View pointerEvents="none" style={[styles.flash, flashStyle]} />
       </View>
 
       <View style={styles.status}>
@@ -501,6 +539,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   placeholder: { ...FILL, alignItems: 'center', justifyContent: 'center', gap: space.md },
+  // Bone rather than pure white: the colour of a tile face, and a touch
+  // warmer than a flash, which on a dark green screen is the difference
+  // between a shutter and a glare.
+  flash: { ...FILL, backgroundColor: colors.bone },
   placeholderText: { maxWidth: 240 },
   status: { paddingVertical: space.lg, minHeight: 48, justifyContent: 'center' },
   actions: { gap: space.sm },

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Modal, Pressable, StyleSheet, View } from 'react-native';
 import {
   Body,
   BodyStrong,
@@ -15,19 +15,18 @@ import {
   TextField,
   TileFace,
   Title,
-  Toggle,
 } from '@/design/components';
 import {
   AppleMark,
   AwayIcon,
+  CheckIcon,
   EditIcon,
-  FriendsIcon,
   GoogleMark,
   PersonIcon,
   SparkIcon,
   TrophyIcon,
 } from '@/design/icons';
-import { colors, space, tileSize } from '@/design/tokens';
+import { colors, radius, space, tileSize } from '@/design/tokens';
 import { findRuleSet, useAppState } from '@/store/store';
 import { bestHandFor, playedGames, playerStats } from '@/store/stats';
 import {
@@ -156,7 +155,7 @@ export default function ProfileScreen() {
             <SparkIcon size={24} color={colors.inkFaint} />
             <Caption tone="faint" center>
               {stats.unidentified && stats.handsPlayed > 0
-                ? 'None of these games say which player you were. Take a seat in one from its Who’s here list.'
+                ? 'None of these games say which player you were. Open one and tap your seat under Who’s here.'
                 : 'Win a hand and it will show up here.'}
             </Caption>
           </Panel>
@@ -183,8 +182,7 @@ export default function ProfileScreen() {
         </Panel>
       </Section>
 
-      <Visibility account={account} />
-      <AccountActions email={account.email} />
+      <AccountActions account={account} />
     </Screen>
   );
 }
@@ -249,9 +247,9 @@ function Identity({ account }: { account: Account }) {
         </View>
       ) : (
         <View style={styles.handleRow}>
-          <Title>{account.handle ?? 'Choose a username'}</Title>
+          <Title style={styles.handle}>{account.handle ?? 'Choose a username'}</Title>
           <Button
-            label="Edit"
+            label="Change username"
             icon={<EditIcon size={15} color={colors.inkMuted} />}
             onPress={() => {
               setDraftHandle(account.handle ?? '');
@@ -280,28 +278,86 @@ function Identity({ account }: { account: Account }) {
   );
 }
 
-/** Findable, or not. */
-function Visibility({ account }: { account: Account }) {
+/**
+ * Public or private, as a choice between two described options.
+ *
+ * It used to be a checkbox labelled "Private profile", which read backwards
+ * both ways: unticked, the label named the mode you were not in while the hint
+ * under it described the one you were; ticked, the same label sat over a
+ * different paragraph. Two named options, each carrying its own description,
+ * cannot say one thing and mean the other.
+ *
+ * It is also no longer a section of its own. It is set once, and a heading
+ * with a paragraph under it gave it the same weight as the stats.
+ */
+const VISIBILITY = [
+  {
+    isPrivate: false,
+    title: 'Public',
+    body: 'Anyone can find you by searching your name or username, and send you a friend request.',
+  },
+  {
+    isPrivate: true,
+    title: 'Private',
+    body: 'You do not show up in search, and nobody can send you a friend request. You can still send them, and anyone who accepts can see your profile.',
+  },
+] as const;
+
+function VisibilityPicker({
+  visible,
+  isPrivate,
+  onClose,
+}: {
+  visible: boolean;
+  isPrivate: boolean;
+  onClose: () => void;
+}) {
   return (
-    <Section title="Who can find you" icon={<FriendsIcon size={15} color={colors.inkFaint} />}>
-      <Panel>
-        <Toggle
-          label="Private profile"
-          hint={
-            account.isPrivate
-              ? 'Nobody can look you up or send you a request. You can still add other people, and anyone you add sees your profile once they accept.'
-              : 'Anyone who knows your username can look you up and ask to be friends.'
-          }
-          value={account.isPrivate}
-          onChange={(next) => void setPrivate(next)}
-        />
-      </Panel>
-    </Section>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={styles.popupRoot}>
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
+        <View style={styles.popup}>
+          <BodyStrong>Profile visibility</BodyStrong>
+          {VISIBILITY.map((option) => {
+            const selected = option.isPrivate === isPrivate;
+            return (
+              <Pressable
+                key={option.title}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                onPress={() => {
+                  if (!selected) void setPrivate(option.isPrivate);
+                  onClose();
+                }}
+                style={({ pressed }) => [
+                  styles.option,
+                  selected && styles.optionOn,
+                  pressed && styles.optionPressed,
+                ]}
+              >
+                <View style={styles.optionHead}>
+                  <BodyStrong tone={selected ? 'accent' : 'default'}>{option.title}</BodyStrong>
+                  {selected ? <CheckIcon size={16} color={colors.brass} /> : null}
+                </View>
+                <Caption tone="muted">{option.body}</Caption>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
-function AccountActions({ email }: { email: string | null }) {
+function AccountActions({ account }: { account: Account }) {
   const [problem, setProblem] = useState<string | null>(null);
+  const [picking, setPicking] = useState(false);
 
   const confirmDelete = () => {
     Alert.alert(
@@ -323,8 +379,19 @@ function AccountActions({ email }: { email: string | null }) {
   return (
     <Section title="Account">
       <Panel flush>
-        <Row title="Signed in as" value={email ?? '—'} />
+        <Row title="Signed in as" value={account.email ?? '—'} />
+        <Divider inset={space.lg} />
+        <Row
+          title="Profile visibility"
+          value={account.isPrivate ? 'Private' : 'Public'}
+          onPress={() => setPicking(true)}
+        />
       </Panel>
+      <VisibilityPicker
+        visible={picking}
+        isPrivate={account.isPrivate}
+        onClose={() => setPicking(false)}
+      />
       <View style={styles.accountActions}>
         <Button label="Sign out" block onPress={() => void signOut()} />
         {/* Required in the app by both stores, not merely polite. */}
@@ -478,6 +545,7 @@ function SignedOut() {
 const styles = StyleSheet.create({
   identity: { paddingTop: space.md, gap: space.lg },
   handleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md },
+  handle: { flex: 1 },
   handleEdit: { gap: space.sm },
   handleActions: { flexDirection: 'row', gap: space.sm },
   nameField: { gap: space.sm },
@@ -486,6 +554,29 @@ const styles = StyleSheet.create({
   bestLine: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   empty: { alignItems: 'center', gap: space.sm, paddingVertical: space.lg },
   accountActions: { gap: space.sm, marginTop: space.md },
+
+  popupRoot: { flex: 1, justifyContent: 'center', padding: space.xl },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: colors.overlay },
+  popup: {
+    gap: space.md,
+    padding: space.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderTopColor: colors.lineStrong,
+    backgroundColor: colors.surface,
+  },
+  option: {
+    gap: space.xs,
+    padding: space.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.ground,
+  },
+  optionOn: { borderColor: colors.brass, backgroundColor: colors.brassWash },
+  optionPressed: { opacity: 0.7 },
+  optionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 
   pitch: { paddingTop: space.md, paddingBottom: space.lg, gap: space.sm },
   perks: { gap: space.lg },

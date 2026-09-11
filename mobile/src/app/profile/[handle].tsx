@@ -86,7 +86,7 @@ export default function PublicProfileScreen() {
         <EmptyState
           icon={<PersonIcon size={28} color={colors.inkFaint} />}
           title="Nobody by that name"
-          body="Check the spelling. Usernames are exact, and somebody who has made their profile private cannot be looked up."
+          body="Check the spelling. Somebody with a private profile cannot be found."
         />
       </Screen>
     );
@@ -180,10 +180,10 @@ function Relation({
       {profile.relation === 'friend' ? (
         <CaptionStrong tone="accent">You are friends.</CaptionStrong>
       ) : profile.relation === 'requested' ? (
-        <CaptionStrong tone="muted">Asked. Waiting for them to answer.</CaptionStrong>
+        <CaptionStrong tone="muted">Friend request sent.</CaptionStrong>
       ) : profile.relation === 'incoming' ? (
         <>
-          <CaptionStrong tone="muted">They asked to be your friend.</CaptionStrong>
+          <CaptionStrong tone="muted">They sent you a friend request.</CaptionStrong>
           <Button
             label="Accept"
             variant="primary"
@@ -193,13 +193,13 @@ function Relation({
         </>
       ) : (
         <Button
-          label="Ask to be friends"
+          label="Send friend request"
           variant="primary"
           block
           onPress={() =>
             act(
               () => requestFriend(profile.handle ?? ''),
-              'Asked. They will see it when you are both online.',
+              'Sent. They will see it next time you are both online.',
             )
           }
         />
