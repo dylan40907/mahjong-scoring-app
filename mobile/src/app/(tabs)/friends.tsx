@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Body,
@@ -7,6 +7,7 @@ import {
   Caption,
   Divider,
   EmptyState,
+  Expander,
   Panel,
   Row,
   Screen,
@@ -19,11 +20,13 @@ import {
   MIN_SEARCH,
   acceptFriend,
   acceptedFriends,
+  blockedUsers,
   incomingRequests,
   outgoingRequests,
   removeFriend,
   searchProfiles,
   stillMatches,
+  unblockUser,
   useFriends,
   type Friend,
   type SearchOutcome,
@@ -55,6 +58,7 @@ export default function FriendsScreen() {
   const accepted = acceptedFriends(friends);
   const incoming = incomingRequests(friends);
   const outgoing = outgoingRequests(friends);
+  const blocked = blockedUsers(friends);
 
   if (!isCloudConfigured()) {
     return (
@@ -205,7 +209,50 @@ export default function FriendsScreen() {
           </Panel>
         </Section>
       ) : null}
+
+      {/*
+        * Last, and shut. Nobody opens this tab to look at who they have
+        * blocked, so it should not be the first thing on it - but a block
+        * that cannot be seen cannot be undone, and one tapped by mistake
+        * used to be permanent. Absent entirely until there is somebody in it.
+        */}
+      {blocked.length > 0 ? (
+        <View style={styles.blocked}>
+          <Expander title="Blocked" note={String(blocked.length)}>
+            {blocked.map((person) => (
+              <View key={person.id} style={styles.blockedRow}>
+                <View style={styles.blockedName}>
+                  <Body numberOfLines={1}>{nameOf(person)}</Body>
+                  {person.handle ? (
+                    <Caption tone="faint" numberOfLines={1}>
+                      {person.handle}
+                    </Caption>
+                  ) : null}
+                </View>
+                <Button label="Unblock" onPress={() => confirmUnblock(person)} />
+              </View>
+            ))}
+          </Expander>
+        </View>
+      ) : null}
     </Screen>
+  );
+}
+
+function confirmUnblock(person: Friend) {
+  Alert.alert(
+    `Unblock ${nameOf(person)}?`,
+    'You will be able to find each other and send friend requests again. It does not make you friends.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Unblock',
+        onPress: () => {
+          unblockUser(person.id);
+          void syncNow();
+        },
+      },
+    ],
   );
 }
 
@@ -331,4 +378,7 @@ const styles = StyleSheet.create({
   note: { marginTop: space.sm, paddingHorizontal: space.xs },
   answer: { flexDirection: 'row', gap: space.xs },
   empty: { gap: space.sm },
+  blocked: { marginTop: space.xxxl },
+  blockedRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  blockedName: { flex: 1, gap: 1 },
 });

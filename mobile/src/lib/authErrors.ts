@@ -60,3 +60,25 @@ export function signInProblem(message: string): string {
   if (text.includes('rate limit')) return 'Too many tries. Wait a minute and try again.';
   return message;
 }
+
+/**
+ * A failed password reset, at either end - asking for the email, or setting
+ * the new password once its link is open.
+ *
+ * The email limit gets its own wording because it is not a minute: the
+ * project's sender allows a handful of emails an hour across everybody, and
+ * "wait a minute" would send somebody back to the same refusal.
+ */
+export function resetProblem(message: string): string {
+  const text = message.toLowerCase();
+  if (text.includes('rate limit')) {
+    return 'Too many emails have gone out in the last hour. Try again later.';
+  }
+  if (text.includes('should be different') || text.includes('same password')) {
+    return 'That is already your password. Choose a different one.';
+  }
+  if (text.includes('at least') && text.includes('characters')) {
+    return 'Use at least six characters.';
+  }
+  return message;
+}

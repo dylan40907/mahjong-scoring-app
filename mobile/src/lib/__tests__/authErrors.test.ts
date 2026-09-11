@@ -1,4 +1,4 @@
-import { emailTaken, identityTaken, signInProblem } from '../authErrors';
+import { emailTaken, identityTaken, resetProblem, signInProblem } from '../authErrors';
 
 /**
  * The check that decides whether somebody can reach their own account.
@@ -54,5 +54,23 @@ describe('a failed sign-in', () => {
 
   it('passes through anything it does not recognise', () => {
     expect(signInProblem('Something new')).toBe('Something new');
+  });
+});
+
+describe('a failed password reset', () => {
+  it('does not promise the email limit clears in a minute', () => {
+    expect(resetProblem('email rate limit exceeded')).toMatch(/last hour/);
+  });
+
+  it('says when the new password is the old one', () => {
+    expect(resetProblem('New password should be different from the old password.')).toMatch(
+      /already your password/,
+    );
+  });
+
+  it('says how long a password has to be', () => {
+    expect(resetProblem('Password should be at least 6 characters.')).toBe(
+      'Use at least six characters.',
+    );
   });
 });

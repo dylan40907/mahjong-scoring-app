@@ -39,7 +39,8 @@ export type Intent =
     }
   | { readonly kind: 'friend:accept'; readonly userId: string }
   | { readonly kind: 'friend:remove'; readonly userId: string }
-  | { readonly kind: 'friend:block'; readonly userId: string };
+  | { readonly kind: 'friend:block'; readonly userId: string }
+  | { readonly kind: 'friend:unblock'; readonly userId: string };
 
 export interface QueuedIntent {
   readonly id: string;
@@ -89,6 +90,15 @@ export function subjectOf(intent: Intent): string {
     case 'friend:remove':
     case 'friend:block':
       return `user:${intent.userId}`;
+    /*
+     * Its own subject, so it never collapses onto the block it undoes. A block
+     * does two things - ends the friendship and bars the person - and an
+     * unblock undoes only the second. Collapsed, "block then unblock" while
+     * offline would send just the unblock, and the friendship the block ended
+     * would come back on the next refresh as though nothing had happened.
+     */
+    case 'friend:unblock':
+      return `unblock:${intent.userId}`;
   }
 }
 

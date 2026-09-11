@@ -26,7 +26,11 @@ import { queueIntent } from './store';
  * that will not load is not choosing anything.
  */
 
-export type FriendStatus = 'accepted' | 'pending';
+/**
+ * `blocked` is only ever a block *we* made. The server never says when
+ * somebody has blocked us, so there is no status for it.
+ */
+export type FriendStatus = 'accepted' | 'pending' | 'blocked';
 export type FriendDirection = 'in' | 'out';
 
 export interface Friend {
@@ -101,6 +105,11 @@ export function outgoingRequests(friends: readonly Friend[]): Friend[] {
   return friends.filter((f) => f.status === 'pending' && f.direction === 'out').sort(byName);
 }
 
+/** People we have blocked, for the one place a block can be undone. */
+export function blockedUsers(friends: readonly Friend[]): Friend[] {
+  return friends.filter((f) => f.status === 'blocked').sort(byName);
+}
+
 /** Read the cached list, so the first paint has something in it. */
 export async function hydrateFriends(): Promise<void> {
   if (state.loaded) return;
@@ -133,7 +142,14 @@ export async function refreshFriends(): Promise<void> {
     if (error || !data) return;
     commit(
       (data as RawFriend[])
-        .filter((row) => row.status === 'accepted' || row.status === 'pending')
+        .filter(
+          (row) =>
+            row.status === 'accepted' ||
+            row.status === 'pending' ||
+            // Ours only; an inbound block is never sent, and this is belt and
+            // braces against a server that one day does.
+            (row.status === 'blocked' && row.direction === 'out'),
+        )
         .map((row) => ({
           id: row.id,
           displayName: row.display_name,
@@ -204,10 +220,34 @@ export function removeFriend(userId: string): void {
   queueIntent({ kind: 'friend:remove', userId });
 }
 
+/**
+ * Block somebody: the friendship ends, and they can no longer find you.
+ *
+ * Kept in the list marked blocked rather than dropped, which is what it used
+ * to do - so the block went on working and could never be seen again, let
+ * alone undone. It now waits at the bottom of the friends screen with an
+ * Unblock beside it.
+ */
 export function blockUser(userId: string): void {
-  commit(state.friends.filter((friend) => friend.id !== userId));
-  if (userId.startsWith('pending:')) return;
+  if (userId.startsWith('pending:')) {
+    commit(state.friends.filter((friend) => friend.id !== userId));
+    return;
+  }
+  commit(
+    state.friends.map((friend) =>
+      friend.id === userId ? { ...friend, status: 'blocked', local: true } : friend,
+    ),
+  );
   queueIntent({ kind: 'friend:block', userId });
+}
+
+/**
+ * Lift a block. Not a restore: the friendship stays ended, and either of you
+ * can send a new request now that you can find each other again.
+ */
+export function unblockUser(userId: string): void {
+  commit(state.friends.filter((friend) => friend.id !== userId));
+  queueIntent({ kind: 'friend:unblock', userId });
 }
 
 /**

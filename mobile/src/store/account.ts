@@ -343,6 +343,50 @@ export async function signInWithEmail(email: string, password: string): Promise<
 }
 
 /**
+ * Email a link for choosing a new password.
+ *
+ * The link lands back in the app at `auth/reset` carrying a one-time code,
+ * which `openRecoveryLink` trades for a session. It is PKCE, like Google: the
+ * code is worthless without the verifier this client kept when the link was
+ * asked for, so a link forwarded to anyone else, or opened on a laptop, does
+ * nothing. That is the price of a redirect onto a custom scheme any app could
+ * claim, and the reset screen says so rather than failing mysteriously.
+ *
+ * The server answers the same whether or not the address has an account, so
+ * this cannot be used to find out who is signed up - and the screen does not
+ * pretend to know either.
+ */
+export async function requestPasswordReset(email: string): Promise<string | null> {
+  if (!supabase) return 'Accounts are unavailable in this build.';
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: Linking.createURL('auth/reset'),
+  });
+  return error ? error.message : null;
+}
+
+/**
+ * Open a reset link: sign in to the account it was sent for.
+ *
+ * Replaces whatever session this device had, which is almost always the
+ * anonymous one - the same thing signing in with a password does, and for the
+ * same reason: this is somebody reaching an account they already have.
+ */
+export async function openRecoveryLink(code: string): Promise<string | null> {
+  if (!supabase) return 'Accounts are unavailable in this build.';
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  if (error) return error.message;
+  await refreshIdentity();
+  return null;
+}
+
+/** Set a new password on the account the reset link signed in to. */
+export async function setNewPassword(password: string): Promise<string | null> {
+  if (!supabase) return 'Accounts are unavailable in this build.';
+  const { error } = await supabase.auth.updateUser({ password });
+  return error ? error.message : null;
+}
+
+/**
  * Delete the account and everything belonging to it.
  *
  * Both stores require this to exist inside the app - Play also wants a public

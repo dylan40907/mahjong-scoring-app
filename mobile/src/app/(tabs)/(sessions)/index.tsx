@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
@@ -20,7 +20,7 @@ import {
   sessionTotals,
   useAppState,
 } from '@/store/store';
-import { useFriends } from '@/store/friends';
+import { useFriends, type Friend } from '@/store/friends';
 import type { AwayGame, Session } from '@/store/types';
 import { plural, relativeDate, signed } from '@/lib/format';
 
@@ -51,6 +51,28 @@ export default function SessionsScreen() {
   const awayGames = useAppState(useCallback((state) => state.awayGames, []));
   const friends = useFriends(useCallback((state) => state.friends, []));
   const ready = useAppState(useCallback((state) => state.ready, []));
+
+  /*
+   * Every game you were at, as one list, most recently played first.
+   *
+   * Friends' games used to sit in their own section below yours, as a
+   * quieter card showing only your own line - so a night somebody else scored
+   * looked like a lesser kind of night, and the question the list exists to
+   * answer, how everybody finished, needed a tap to find out. They are the same
+   * thing from where you sit: a table you were at, and how it went. What is
+   * different is who can change it, and that is what the byline says.
+   *
+   * Sorted by `updatedAt` because that is the date each card shows, so the
+   * list reads in order down the page.
+   */
+  const entries = useMemo(
+    () =>
+      [
+        ...sessions.map((session) => ({ session, away: null as AwayGame | null })),
+        ...awayGames.map((game) => ({ session: game.session, away: game as AwayGame | null })),
+      ].sort((a, b) => b.session.updatedAt.localeCompare(a.session.updatedAt)),
+    [sessions, awayGames],
+  );
 
   // Somebody whose friends do all the scoring still has a history, and it
   // would be an odd first screen that told them they had none.
@@ -83,8 +105,8 @@ export default function SessionsScreen() {
       }
     >
       <FlatList
-        data={sessions}
-        keyExtractor={(session) => session.id}
+        data={entries}
+        keyExtractor={(entry) => `${entry.away ? 'away' : 'own'}:${entry.session.id}`}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
@@ -100,105 +122,46 @@ export default function SessionsScreen() {
         }
         renderItem={({ item }) => (
           <SessionCard
-            session={item}
-            onPress={() => router.push(`/session/${item.id}`)}
+            session={item.session}
+            scoredBy={item.away ? scorerName(friends, item.away) : undefined}
+            onPress={() =>
+              router.push(item.away ? `/away/${item.session.id}` : `/session/${item.session.id}`)
+            }
             onPlayAgain={() => {
-              const session = createSessionLike(item);
+              // A new session of your own either way. Playing again after a
+              // night somebody else scored is how you become the one scoring.
+              const session = createSessionLike(item.session);
               router.push(`/session/${session.id}`);
             }}
           />
         )}
-        ListFooterComponent={
-          /*
-           * Below your own, in their own section, rather than mixed in by
-           * date. These are read-only and belong to somebody else, and a list
-           * where two thirds of the cards silently refuse to be edited would
-           * be worse than one that says which is which.
-           */
-          awayGames.length > 0 ? (
-            <View style={styles.away}>
-              <View style={styles.awayHead}>
-                <AwayIcon size={15} color={colors.inkFaint} />
-                <CaptionStrong tone="muted">Scored by a friend</CaptionStrong>
-              </View>
-              {awayGames.map((game) => {
-                const owner = friends.find((friend) => friend.id === game.ownerId);
-                return (
-                  <AwayCard
-                    key={game.session.id}
-                    game={game}
-                    scorer={owner?.displayName || owner?.handle || 'A friend'}
-                    onPress={() => router.push(`/away/${game.session.id}`)}
-                  />
-                );
-              })}
-            </View>
-          ) : null
-        }
       />
     </Screen>
   );
 }
 
-/**
- * A game somebody else scored, on the list beside your own.
- *
- * Same shape as a session card and deliberately quieter: no play-again, no
- * standings ordering games it does not own, and a byline saying whose it is.
- * The seat highlighted is yours, because on somebody else's scoresheet the
- * first thing anybody looks for is their own line.
- */
-function AwayCard({
-  game,
-  scorer,
-  onPress,
-}: {
-  game: AwayGame;
-  scorer: string;
-  onPress: () => void;
-}) {
-  const totals = sessionTotals(game.session);
-  const mine = game.session.players.find((player) => player.id === game.playerId);
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`Open ${game.session.name}, scored by ${scorer}`}
-      onPress={onPress}
-      style={({ pressed }) => [styles.card, styles.cardBody, pressed && styles.cardPressed]}
-    >
-      <View style={styles.cardHeader}>
-        <Heading numberOfLines={2} style={styles.cardTitle}>
-          {game.session.name}
-        </Heading>
-        <Caption tone="faint">{relativeDate(game.session.updatedAt)}</Caption>
-      </View>
-      <Caption tone="faint">
-        {scorer} · {plural(game.session.hands.length, 'hand')}
-      </Caption>
-      {mine ? (
-        <View style={styles.awayLine}>
-          <CaptionStrong tone="muted">{mine.name}</CaptionStrong>
-          <CaptionStrong
-            numeric
-            tone={
-              (totals[mine.id] ?? 0) > 0 ? 'gain' : (totals[mine.id] ?? 0) < 0 ? 'loss' : 'muted'
-            }
-          >
-            {signed(totals[mine.id] ?? 0)}
-          </CaptionStrong>
-        </View>
-      ) : null}
-    </Pressable>
-  );
+/** Whose phone kept score, by the name you know them by. */
+function scorerName(friends: readonly Friend[], game: AwayGame): string {
+  const owner = friends.find((friend) => friend.id === game.ownerId);
+  return owner?.displayName || owner?.handle || 'a friend';
 }
 
+/**
+ * One game on the list, yours or a friend's - the same card either way.
+ *
+ * `scoredBy` is the only difference, and it is a line rather than a different
+ * shape: the standings, the rules and the hand count are what anybody opens
+ * the list to see, and they mean the same whoever kept score.
+ */
 function SessionCard({
   session,
+  scoredBy,
   onPress,
   onPlayAgain,
 }: {
   session: Session;
+  /** Set for a game somebody else scored: their name. */
+  scoredBy?: string;
   onPress: () => void;
   onPlayAgain: () => void;
 }) {
@@ -215,7 +178,9 @@ function SessionCard({
     <View style={styles.card}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Open ${session.name}`}
+        accessibilityLabel={
+          scoredBy ? `Open ${session.name}, scored by ${scoredBy}` : `Open ${session.name}`
+        }
         onPress={onPress}
         style={({ pressed }) => [styles.cardBody, pressed && styles.cardPressed]}
       >
@@ -248,6 +213,13 @@ function SessionCard({
           );
         })}
       </View>
+
+      {scoredBy ? (
+        <View style={styles.scoredBy}>
+          <AwayIcon size={13} color={colors.inkFaint} />
+          <Caption tone="faint">Scored by {scoredBy}</Caption>
+        </View>
+      ) : null}
       </Pressable>
 
       {/*
@@ -320,20 +292,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.line,
   },
   againPressed: { backgroundColor: colors.surfaceHigh },
-  away: { marginTop: space.lg, gap: space.xs },
-  awayHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.xs,
-    paddingHorizontal: space.xs,
-    paddingBottom: space.xs,
-  },
-  awayLine: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginTop: space.xs,
-  },
+  scoredBy: { flexDirection: 'row', alignItems: 'center', gap: space.xs, marginTop: space.sm },
   cardHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space.md },
   cardTitle: { flex: 1 },
   standings: { marginTop: space.md, gap: space.xs },

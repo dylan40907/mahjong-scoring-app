@@ -64,6 +64,28 @@ describe('collapsing', () => {
     );
   });
 
+  it('never lets an unblock swallow the block it undoes', () => {
+    // A block ends the friendship as well as barring the person, and an
+    // unblock undoes only the second half. Both have to reach the server, in
+    // order, or the friendship comes back.
+    const queue = queueOf(
+      { kind: 'friend:block', userId: 'u2' },
+      { kind: 'friend:unblock', userId: 'u2' },
+    );
+    expect(queue.map((q) => q.intent.kind)).toEqual(['friend:block', 'friend:unblock']);
+  });
+
+  it('keeps only the latest of a block and unblock and block again', () => {
+    const queue = queueOf(
+      { kind: 'friend:block', userId: 'u2' },
+      { kind: 'friend:unblock', userId: 'u2' },
+      { kind: 'friend:block', userId: 'u2' },
+    );
+    // The unblock is sent, then the block that followed it: blocked, as the
+    // last tap said.
+    expect(queue.map((q) => q.intent.kind)).toEqual(['friend:unblock', 'friend:block']);
+  });
+
   it('treats a handle and an account id as different ways to name someone', () => {
     // An unsent request has never had an id to collapse against, which is why
     // requests key on what was typed.

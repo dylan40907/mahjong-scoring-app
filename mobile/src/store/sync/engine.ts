@@ -184,6 +184,11 @@ async function send(intent: Intent): Promise<Outcome> {
       const { error } = await supabase.rpc('block_user', { other: intent.userId });
       return error ? classify(error) : 'done';
     }
+    case 'friend:unblock': {
+      // False means there was no block to lift, which is where we wanted to be.
+      const { error } = await supabase.rpc('unblock_user', { other: intent.userId });
+      return error ? classify(error) : 'done';
+    }
   }
 }
 

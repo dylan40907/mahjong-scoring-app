@@ -33,6 +33,7 @@ import {
   deleteAccount,
   isAppleSignInAvailable,
   publishStats,
+  requestPasswordReset,
   setDisplayName,
   setHandle,
   setPrivate,
@@ -46,7 +47,7 @@ import {
 } from '@/store/account';
 import { syncNow } from '@/store/sync/engine';
 import { isCloudConfigured } from '@/lib/supabase';
-import { emailTaken, signInProblem } from '@/lib/authErrors';
+import { emailTaken, resetProblem, signInProblem } from '@/lib/authErrors';
 import { relativeDate } from '@/lib/format';
 
 /**
@@ -425,7 +426,7 @@ function AccountActions({ account }: { account: Account }) {
  * account is for.
  */
 function SignedOut() {
-  const [mode, setMode] = useState<'create' | 'signin'>('create');
+  const [mode, setMode] = useState<'create' | 'signin' | 'reset'>('create');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
@@ -435,6 +436,7 @@ function SignedOut() {
   const [busy, setBusy] = useState(false);
 
   const signingIn = mode === 'signin';
+  const resetting = mode === 'reset';
 
   const run = async (action: () => Promise<string | null>) => {
     setBusy(true);
@@ -446,12 +448,28 @@ function SignedOut() {
     setBusy(false);
   };
 
-  const switchMode = () => {
-    setMode(signingIn ? 'create' : 'signin');
+  // The email survives every switch: it is the same person, and retyping an
+  // address to go from "sign in" to "forgot password" is the classic way to
+  // lose somebody at that step.
+  const switchTo = (next: typeof mode) => {
+    setMode(next);
     setProblem(null);
     setNotice(null);
     setPassword('');
   };
+
+  const sendReset = () =>
+    run(async () => {
+      const address = email.trim();
+      const failure = await requestPasswordReset(address);
+      if (failure) return resetProblem(failure);
+      // "If", because the server will not say whether the address has an
+      // account, and it would be wrong for this to claim to know.
+      setNotice(
+        `If ${address} has an account, a link to choose a new password is on its way. Open it on this phone.`,
+      );
+      return null;
+    });
 
   /*
    * The anonymous account is upgraded in place, keeping every game already on
@@ -498,15 +516,51 @@ function SignedOut() {
   return (
     <Screen scroll motif="rings">
       <View style={styles.pitch}>
-        <Title>{signingIn ? 'Welcome back' : 'Make an account'}</Title>
+        <Title>
+          {resetting ? 'Reset your password' : signingIn ? 'Welcome back' : 'Make an account'}
+        </Title>
         <Body tone="muted">
-          {signingIn
-            ? 'Sign in and your games and friends are right where you left them.'
-            : 'It is free, and scoring keeps working without one.'}
+          {resetting
+            ? 'Enter the email you signed up with and we will send you a link to choose a new password.'
+            : signingIn
+              ? 'Sign in and your games and friends are right where you left them.'
+              : 'It is free, and scoring keeps working without one.'}
         </Body>
       </View>
 
-      {signingIn ? null : (
+      {resetting ? (
+        <Panel style={styles.emailForm}>
+          <TextField
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {problem ? <CaptionStrong tone="loss">{problem}</CaptionStrong> : null}
+          {notice ? <CaptionStrong tone="accent">{notice}</CaptionStrong> : null}
+          <Button
+            label="Send reset link"
+            block
+            loading={busy}
+            disabled={busy || email.trim().length < 3}
+            onPress={() => void sendReset()}
+          />
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => switchTo('signin')}
+            hitSlop={8}
+            style={({ pressed }) => [styles.switch, pressed && styles.switchPressed]}
+          >
+            <CaptionStrong tone="accent" center>
+              Back to sign in
+            </CaptionStrong>
+          </Pressable>
+        </Panel>
+      ) : null}
+
+      {signingIn || resetting ? null : (
         <Panel style={styles.perks}>
           {[
             ['Your games follow you', 'Change phones and every night you have scored is still there.'],
@@ -521,74 +575,86 @@ function SignedOut() {
         </Panel>
       )}
 
-      <Section title="Continue with">
-        <View style={styles.providers}>
-          {isAppleSignInAvailable() ? (
+      {resetting ? null : (
+        <Section title="Continue with">
+          <View style={styles.providers}>
+            {isAppleSignInAvailable() ? (
+              <Button
+                label="Continue with Apple"
+                variant="apple"
+                icon={<AppleMark size={18} />}
+                block
+                disabled={busy}
+                onPress={() => void run(signInWithApple)}
+              />
+            ) : null}
             <Button
-              label="Continue with Apple"
-              variant="apple"
-              icon={<AppleMark size={18} />}
+              label="Continue with Google"
+              variant="provider"
+              icon={<GoogleMark size={18} />}
               block
               disabled={busy}
-              onPress={() => void run(signInWithApple)}
+              onPress={() => void run(signInWithGoogle)}
             />
-          ) : null}
-          <Button
-            label="Continue with Google"
-            variant="provider"
-            icon={<GoogleMark size={18} />}
-            block
-            disabled={busy}
-            onPress={() => void run(signInWithGoogle)}
-          />
-        </View>
+          </View>
 
-        <View style={styles.or}>
-          <View style={styles.orLine} />
-          <Overline>or</Overline>
-          <View style={styles.orLine} />
-        </View>
+          <View style={styles.or}>
+            <View style={styles.orLine} />
+            <Overline>or</Overline>
+            <View style={styles.orLine} />
+          </View>
 
-        <Panel style={styles.emailForm}>
-          <TextField
-            value={email}
-            onChangeText={setEmail}
-            placeholder="Email"
-            keyboardType="email-address"
-            autoCorrect={false}
-          />
-          <TextField
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Password"
-            secureTextEntry
-          />
-          {problem ? <CaptionStrong tone="loss">{problem}</CaptionStrong> : null}
-          {notice ? <CaptionStrong tone="accent">{notice}</CaptionStrong> : null}
-          <Button
-            label={signingIn ? 'Sign in' : 'Create account'}
-            block
-            loading={busy}
-            disabled={
-              busy || email.trim().length < 3 || password.length < (signingIn ? 1 : 6)
-            }
-            onPress={() => void (signingIn ? signIn() : create())}
-          />
-          <Pressable
-            accessibilityRole="link"
-            onPress={switchMode}
-            hitSlop={8}
-            style={({ pressed }) => [styles.switch, pressed && styles.switchPressed]}
-          >
-            <Caption tone="muted" center>
-              {signingIn ? 'New here? ' : 'Already have an account? '}
-              <CaptionStrong tone="accent">
-                {signingIn ? 'Create an account' : 'Sign in'}
-              </CaptionStrong>
-            </Caption>
-          </Pressable>
-        </Panel>
-      </Section>
+          <Panel style={styles.emailForm}>
+            <TextField
+              value={email}
+              onChangeText={setEmail}
+              placeholder="Email"
+              keyboardType="email-address"
+              autoCorrect={false}
+            />
+            <TextField
+              value={password}
+              onChangeText={setPassword}
+              placeholder="Password"
+              secureTextEntry
+            />
+            {signingIn ? (
+              <Pressable
+                accessibilityRole="link"
+                onPress={() => switchTo('reset')}
+                hitSlop={8}
+                style={({ pressed }) => [styles.forgot, pressed && styles.switchPressed]}
+              >
+                <Caption tone="muted">Forgot password?</Caption>
+              </Pressable>
+            ) : null}
+            {problem ? <CaptionStrong tone="loss">{problem}</CaptionStrong> : null}
+            {notice ? <CaptionStrong tone="accent">{notice}</CaptionStrong> : null}
+            <Button
+              label={signingIn ? 'Sign in' : 'Create account'}
+              block
+              loading={busy}
+              disabled={
+                busy || email.trim().length < 3 || password.length < (signingIn ? 1 : 6)
+              }
+              onPress={() => void (signingIn ? signIn() : create())}
+            />
+            <Pressable
+              accessibilityRole="link"
+              onPress={() => switchTo(signingIn ? 'create' : 'signin')}
+              hitSlop={8}
+              style={({ pressed }) => [styles.switch, pressed && styles.switchPressed]}
+            >
+              <Caption tone="muted" center>
+                {signingIn ? 'New here? ' : 'Already have an account? '}
+                <CaptionStrong tone="accent">
+                  {signingIn ? 'Create an account' : 'Sign in'}
+                </CaptionStrong>
+              </Caption>
+            </Pressable>
+          </Panel>
+        </Section>
+      )}
     </Screen>
   );
 }
@@ -634,6 +700,9 @@ const styles = StyleSheet.create({
   providers: { gap: space.sm },
   emailForm: { gap: space.md },
   switch: { alignSelf: 'center', paddingVertical: space.xs },
+  // Tucked under the field it is about, right-aligned, where every other app
+  // keeps it - so it is found by the person looking and missed by nobody else.
+  forgot: { alignSelf: 'flex-end', marginTop: -space.xs },
   switchPressed: { opacity: 0.6 },
   or: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginVertical: space.lg },
   orLine: { flex: 1, height: 1, backgroundColor: colors.line },

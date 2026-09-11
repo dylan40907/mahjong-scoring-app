@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import {
-  BodyStrong,
   Button,
   Caption,
   CaptionStrong,
@@ -37,12 +36,13 @@ import {
   setSessionRuleSet,
   useAppState,
 } from '@/store/store';
+import { HandSummary } from '@/components/HandSummary';
 import { MahjongTable } from '@/components/MahjongTable';
 import { SeatSharing } from '@/components/SeatSharing';
 import type { HandRecord, Session } from '@/store/types';
 import { editHand, resetDraft } from '@/store/draft';
 import { discardPhoto } from '@/lib/photos';
-import { plural, relativeDate, scoreLabel } from '@/lib/format';
+import { plural } from '@/lib/format';
 
 /**
  * A session in progress.
@@ -328,11 +328,6 @@ function HandRow({
   onEdit: () => void;
 }) {
   const winner = session.players.find((p) => p.id === hand.winnerId);
-  const discarder = session.players.find((p) => p.id === hand.discarderId);
-
-  const how = hand.discarderId === null
-    ? 'Self-drawn'
-    : `Discarded by ${discarder?.name ?? 'someone'}`;
 
   const confirm = () => {
     Alert.alert('Remove this hand?', 'The standings will be recalculated.', [
@@ -354,24 +349,7 @@ function HandRow({
         onPress={onEdit}
         style={({ pressed }) => [styles.handBody, pressed && styles.pressedChip]}
       >
-        <View style={styles.handHeader}>
-          <BodyStrong numberOfLines={1} style={styles.handWinner}>
-            {winner?.name ?? 'Unknown'}
-          </BodyStrong>
-          <CaptionStrong tone="accent" numeric>
-            {hand.summary.limitName ?? scoreLabel(hand.summary.total, hand.summary.unit)}
-          </CaptionStrong>
-        </View>
-        <Caption tone="faint" numberOfLines={1}>
-          {how} · {relativeDate(hand.createdAt)}
-        </Caption>
-        {hand.summary.topPatterns.length > 0 ? (
-          /* Wraps. This is the one line that says *why* the hand was worth
-             what it was worth, and it was reliably the line that got cut. */
-          <Caption tone="muted" style={styles.patterns}>
-            {hand.summary.topPatterns.join(' · ')}
-          </Caption>
-        ) : null}
+        <HandSummary hand={hand} session={session} />
       </Pressable>
       <Button label="" variant="ghost" onPress={confirm} icon={<TrashIcon size={18} color={colors.inkFaint} />} style={styles.handDelete} />
     </View>
@@ -430,9 +408,6 @@ const styles = StyleSheet.create({
   emptyNote: { marginTop: space.xs },
   hand: { flexDirection: 'row', alignItems: 'center', paddingLeft: space.lg, paddingRight: space.xs },
   handBody: { flex: 1, gap: 2, paddingVertical: space.md },
-  handHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: space.md },
-  handWinner: { flex: 1 },
-  patterns: { marginTop: 1 },
   handDelete: { minHeight: 40, paddingHorizontal: space.md },
   footer: {
     paddingHorizontal: space.xl,

@@ -463,6 +463,34 @@ check('the blocker does not keep seeing them by id', blockerById.body?.length ==
 const retry = await rpc(asB)('request_friend_by_id', { target: c.id });
 check('and cannot send another request', retry.body === 'unknown', `said ${retry.body}`);
 
+// The blocked list: yours to see, and never theirs.
+const blockerList = await rpc(asC)('friend_list');
+check(
+  'your own blocks come back in your list, marked as blocks',
+  list(blockerList.body).some((row) => row.id === b.id && row.status === 'blocked' && row.direction === 'out'),
+);
+const blockedList = await rpc(asB)('friend_list');
+check(
+  'a block against you is never reported to you',
+  !list(blockedList.body).some((row) => row.id === c.id),
+);
+
+// Only the person who blocked can lift it.
+const notTheirs = await rpc(asB)('unblock_user', { other: c.id });
+check('a block cannot be lifted by the person blocked', notTheirs.body === false, `said ${notTheirs.body}`);
+const stillHidden = await rpc(asB)('view_profile', { lookup: claimedC.body });
+check('and it stays in force', stillHidden.body?.length === 0);
+
+const lifted = await rpc(asC)('unblock_user', { other: b.id });
+check('a block can be lifted', lifted.body === true, `said ${lifted.body}`);
+const foundAgain = await rpc(asB)('view_profile', { lookup: claimedC.body });
+check('once lifted, the two can find each other again', foundAgain.body?.length === 1);
+const nothingBack = await rpc(asC)('friend_list');
+check(
+  'lifting a block restores nothing - no friendship, no request',
+  !list(nothingBack.body).some((row) => row.id === b.id),
+);
+
 // Search is the one read that answers a partial name, so it is the one that
 // could become a directory. Everything it returns is proven in
 // `verify-search.sql`, as real accounts; what can be proven from here is who
@@ -491,6 +519,8 @@ for (const [fn, args] of [
   ['view_profile', { lookup: claimedC.body }],
   ['friend_list', {}],
   ['request_friend', { lookup: claimedC.body }],
+  ['request_friend_by_id', { target: c.id }],
+  ['unblock_user', { other: c.id }],
 ]) {
   const status = await signedOut(fn, args);
   check(`${fn} is not callable signed out`, status === 401 || status === 403 || status === 404, `status ${status}`);
