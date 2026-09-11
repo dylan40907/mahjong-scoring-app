@@ -13,7 +13,6 @@ import {
   Screen,
   Section,
   TextField,
-  TileFace,
   Title,
 } from '@/design/components';
 import {
@@ -26,9 +25,10 @@ import {
   SparkIcon,
   TrophyIcon,
 } from '@/design/icons';
-import { colors, radius, space, tileSize } from '@/design/tokens';
+import { colors, radius, space } from '@/design/tokens';
+import { BestHandTiles } from '@/components/BestHandTiles';
 import { findRuleSet, useAppState } from '@/store/store';
-import { bestHandFor, playedGames, playerStats } from '@/store/stats';
+import { bestHandFor, handGroups, playedGames, playerStats } from '@/store/stats';
 import {
   deleteAccount,
   isAppleSignInAvailable,
@@ -46,6 +46,7 @@ import {
 } from '@/store/account';
 import { syncNow } from '@/store/sync/engine';
 import { isCloudConfigured } from '@/lib/supabase';
+import { emailTaken, signInProblem } from '@/lib/authErrors';
 import { relativeDate } from '@/lib/format';
 
 /**
@@ -82,6 +83,14 @@ export default function ProfileScreen() {
   const games = useMemo(() => playedGames(sessions, awayGames), [sessions, awayGames]);
   const best = useMemo(() => bestHandFor(games, me), [games, me]);
   const stats = useMemo(() => playerStats(games, me), [games, me]);
+  const bestGroups = useMemo(
+    () => (best ? handGroups(best.record.hand, findRuleSet(best.ruleSetId)) : null),
+    [best],
+  );
+  const bestTiles = useMemo(
+    () => (best ? [...best.tiles, ...(best.record.hand.bonus ?? [])] : []),
+    [best],
+  );
 
   /*
    * Push the numbers a profile shows whenever they change.
@@ -103,13 +112,16 @@ export default function ProfileScreen() {
             total: best.record.summary.total,
             unit: best.record.summary.unit,
             patterns: best.record.summary.topPatterns,
-            tiles: best.tiles.slice(0, 18),
+            // All of it. This used to be cut at eighteen, which is short of a
+            // Taiwanese hand with a kong and its flowers.
+            tiles: bestTiles,
+            groups: bestGroups,
             ruleSetId: best.ruleSetId,
             at: best.record.createdAt,
           }
         : null,
     });
-  }, [signedIn, stats, best]);
+  }, [signedIn, stats, best, bestTiles, bestGroups]);
 
   if (!isCloudConfigured()) {
     return (
@@ -134,11 +146,7 @@ export default function ProfileScreen() {
       <Section title="Best hand" icon={<TrophyIcon size={15} color={colors.brass} />}>
         {best ? (
           <Panel style={styles.best}>
-            <View style={styles.bestTiles}>
-              {best.tiles.slice(0, 9).map((code, index) => (
-                <TileFace key={`${code}-${index}`} code={code} width={tileSize.sm} />
-              ))}
-            </View>
+            <BestHandTiles groups={bestGroups} tiles={bestTiles} />
             <View style={styles.bestLine}>
               <BodyStrong tone="accent" numeric>
                 {best.record.summary.total} {best.record.summary.unit}
@@ -405,12 +413,19 @@ function AccountActions({ account }: { account: Account }) {
 /**
  * What the tab is before there is an account.
  *
- * One thing to do, and an honest list of what doing it buys. The games already
- * on the phone are the thing people are most likely to worry about, so that is
- * said first and plainly: nothing here is a migration, and signing in adds a
- * home for what is already scored rather than moving it.
+ * Two ways in on one screen: making an account, and signing in to one made on
+ * another phone. They were one button, "Create account", which quietly signed
+ * you in if the address was already taken - so somebody coming back had to
+ * press a button that said the opposite of what they wanted, and a wrong
+ * password came back as an error about logging in from a form about signing
+ * up. The providers above the form serve both already; only the email half
+ * needs to know which one you meant.
+ *
+ * Signing in drops the pitch. Somebody returning already knows what an
+ * account is for.
  */
 function SignedOut() {
+  const [mode, setMode] = useState<'create' | 'signin'>('create');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
@@ -418,6 +433,8 @@ function SignedOut() {
   // email" is an instruction, not a failure.
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const signingIn = mode === 'signin';
 
   const run = async (action: () => Promise<string | null>) => {
     setBusy(true);
@@ -429,17 +446,24 @@ function SignedOut() {
     setBusy(false);
   };
 
+  const switchMode = () => {
+    setMode(signingIn ? 'create' : 'signin');
+    setProblem(null);
+    setNotice(null);
+    setPassword('');
+  };
+
   /*
-   * One form for both. An anonymous account is upgraded in place, keeping
-   * every game already on this device; only if that fails because the address
-   * is taken does it become a sign-in, which is the case where the games here
-   * belong to somebody who already has an account elsewhere.
+   * The anonymous account is upgraded in place, keeping every game already on
+   * this device. If the address already has an account, the same password is
+   * tried as a sign-in - that is nearly always somebody who meant the other
+   * half of the form - and only if that fails too are they sent there.
    */
-  const connect = () =>
+  const create = () =>
     run(async () => {
       const address = email.trim();
-      const upgraded = await upgradeWithEmail(address, password);
-      if (!upgraded) {
+      const failure = await upgradeWithEmail(address, password);
+      if (!failure) {
         setPassword('');
         /*
          * Signing up is not finished here, and the screen used to imply it
@@ -455,32 +479,47 @@ function SignedOut() {
         setNotice(`Almost there. Open the link we sent to ${address} to finish.`);
         return null;
       }
-      const signedIn = await signInWithEmail(address, password);
-      if (!signedIn) setPassword('');
-      return signedIn;
+      if (!emailTaken(failure)) return failure;
+      const refused = await signInWithEmail(address, password);
+      if (!refused) return null;
+      setPassword('');
+      setMode('signin');
+      return 'That email already has an account. Enter its password to sign in.';
+    });
+
+  const signIn = () =>
+    run(async () => {
+      const failure = await signInWithEmail(email.trim(), password);
+      if (!failure) return null;
+      setPassword('');
+      return signInProblem(failure);
     });
 
   return (
     <Screen scroll motif="rings">
       <View style={styles.pitch}>
-        <Title>Make an account</Title>
+        <Title>{signingIn ? 'Welcome back' : 'Make an account'}</Title>
         <Body tone="muted">
-          It is free, and scoring keeps working without one.
+          {signingIn
+            ? 'Sign in and your games and friends are right where you left them.'
+            : 'It is free, and scoring keeps working without one.'}
         </Body>
       </View>
 
-      <Panel style={styles.perks}>
-        {[
-          ['Your games follow you', 'Change phones and every night you have scored is still there.'],
-          ['Play with friends', 'Add the people at your table and they get the same scores you do.'],
-          ['A record worth showing', 'Your best hand and your running totals, on a page of your own.'],
-        ].map(([title, body]) => (
-          <View key={title} style={styles.perk}>
-            <BodyStrong>{title}</BodyStrong>
-            <Caption tone="muted">{body}</Caption>
-          </View>
-        ))}
-      </Panel>
+      {signingIn ? null : (
+        <Panel style={styles.perks}>
+          {[
+            ['Your games follow you', 'Change phones and every night you have scored is still there.'],
+            ['Play with friends', 'Add the people at your table and they get the same scores you do.'],
+            ['A record worth showing', 'Your best hand and your running totals, on a page of your own.'],
+          ].map(([title, body]) => (
+            <View key={title} style={styles.perk}>
+              <BodyStrong>{title}</BodyStrong>
+              <Caption tone="muted">{body}</Caption>
+            </View>
+          ))}
+        </Panel>
+      )}
 
       <Section title="Continue with">
         <View style={styles.providers}>
@@ -524,18 +563,30 @@ function SignedOut() {
             placeholder="Password"
             secureTextEntry
           />
-          <Button
-            label="Create account"
-            block
-            loading={busy}
-            disabled={busy || email.trim().length < 3 || password.length < 6}
-            onPress={() => void connect()}
-          />
-          <Caption tone="faint">
-            A username is made for you from your email, and you can change it afterwards.
-          </Caption>
           {problem ? <CaptionStrong tone="loss">{problem}</CaptionStrong> : null}
           {notice ? <CaptionStrong tone="accent">{notice}</CaptionStrong> : null}
+          <Button
+            label={signingIn ? 'Sign in' : 'Create account'}
+            block
+            loading={busy}
+            disabled={
+              busy || email.trim().length < 3 || password.length < (signingIn ? 1 : 6)
+            }
+            onPress={() => void (signingIn ? signIn() : create())}
+          />
+          <Pressable
+            accessibilityRole="link"
+            onPress={switchMode}
+            hitSlop={8}
+            style={({ pressed }) => [styles.switch, pressed && styles.switchPressed]}
+          >
+            <Caption tone="muted" center>
+              {signingIn ? 'New here? ' : 'Already have an account? '}
+              <CaptionStrong tone="accent">
+                {signingIn ? 'Create an account' : 'Sign in'}
+              </CaptionStrong>
+            </Caption>
+          </Pressable>
         </Panel>
       </Section>
     </Screen>
@@ -550,7 +601,6 @@ const styles = StyleSheet.create({
   handleActions: { flexDirection: 'row', gap: space.sm },
   nameField: { gap: space.sm },
   best: { gap: space.sm },
-  bestTiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 3 },
   bestLine: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   empty: { alignItems: 'center', gap: space.sm, paddingVertical: space.lg },
   accountActions: { gap: space.sm, marginTop: space.md },
@@ -583,6 +633,8 @@ const styles = StyleSheet.create({
   perk: { gap: 2 },
   providers: { gap: space.sm },
   emailForm: { gap: space.md },
+  switch: { alignSelf: 'center', paddingVertical: space.xs },
+  switchPressed: { opacity: 0.6 },
   or: { flexDirection: 'row', alignItems: 'center', gap: space.md, marginVertical: space.lg },
   orLine: { flex: 1, height: 1, backgroundColor: colors.line },
 });

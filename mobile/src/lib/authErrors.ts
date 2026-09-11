@@ -26,3 +26,37 @@ export function identityTaken(error: { code?: string | null; message?: string | 
   const message = error.message?.toLowerCase() ?? '';
   return message.includes('already') && (message.includes('linked') || message.includes('exists'));
 }
+
+/**
+ * Whether attaching an email to this account failed because the address
+ * already has an account of its own.
+ *
+ * Almost always the same person, on the wrong half of the form - they made an
+ * account on another phone and tapped "Create account" here. Knowing that is
+ * what lets the screen try signing them in instead of showing them the
+ * server's sentence about registrations.
+ */
+export function emailTaken(message: string | null | undefined): boolean {
+  const text = message?.toLowerCase() ?? '';
+  return text.includes('already') && (text.includes('registered') || text.includes('exists'));
+}
+
+/**
+ * A failed sign-in, in the words somebody signing in would use.
+ *
+ * The server's messages are written for developers - "Invalid login
+ * credentials" - and the common ones have a plainer version. Anything not
+ * recognised is passed through rather than hidden, since an unclear reason is
+ * still better than none.
+ */
+export function signInProblem(message: string): string {
+  const text = message.toLowerCase();
+  if (text.includes('invalid login credentials') || text.includes('invalid credentials')) {
+    return 'That email and password do not match.';
+  }
+  if (text.includes('email not confirmed')) {
+    return 'Open the link we emailed you first, then sign in.';
+  }
+  if (text.includes('rate limit')) return 'Too many tries. Wait a minute and try again.';
+  return message;
+}

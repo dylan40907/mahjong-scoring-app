@@ -161,7 +161,9 @@ async function send(intent: Intent): Promise<Outcome> {
   if (!supabase) return 'unreachable';
   switch (intent.kind) {
     case 'friend:request': {
-      const { data, error } = await supabase.rpc('request_friend', { lookup: intent.handle });
+      const { data, error } = intent.userId
+        ? await supabase.rpc('request_friend_by_id', { target: intent.userId })
+        : await supabase.rpc('request_friend', { lookup: intent.handle });
       if (error) return classify(error);
       // 'sent', 'accepted' and 'friends' have all arrived somewhere useful.
       // 'unknown' and 'self' never will, however many times we try.

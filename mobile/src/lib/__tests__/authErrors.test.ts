@@ -1,4 +1,4 @@
-import { identityTaken } from '../authErrors';
+import { emailTaken, identityTaken, signInProblem } from '../authErrors';
 
 /**
  * The check that decides whether somebody can reach their own account.
@@ -27,5 +27,32 @@ describe('an identity that already belongs to somebody', () => {
     expect(identityTaken({ code: 'validation_failed', message: 'Missing token' })).toBe(false);
     expect(identityTaken({ message: 'User already registered' })).toBe(false);
     expect(identityTaken({})).toBe(false);
+  });
+});
+
+describe('an email that already has an account', () => {
+  it('is recognised from the server sentence', () => {
+    expect(emailTaken('A user with this email address has already been registered')).toBe(true);
+    expect(emailTaken('Email address already exists')).toBe(true);
+  });
+
+  it('is not confused with a weak password or a bad address', () => {
+    expect(emailTaken('Password should be at least 6 characters')).toBe(false);
+    expect(emailTaken('Unable to validate email address: invalid format')).toBe(false);
+    expect(emailTaken(null)).toBe(false);
+  });
+});
+
+describe('a failed sign-in', () => {
+  it('says a wrong password plainly', () => {
+    expect(signInProblem('Invalid login credentials')).toBe('That email and password do not match.');
+  });
+
+  it('points an unconfirmed address at its email', () => {
+    expect(signInProblem('Email not confirmed')).toMatch(/link we emailed/);
+  });
+
+  it('passes through anything it does not recognise', () => {
+    expect(signInProblem('Something new')).toBe('Something new');
   });
 });

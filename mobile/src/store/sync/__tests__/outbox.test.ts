@@ -45,6 +45,25 @@ describe('collapsing', () => {
     expect(queue).toHaveLength(1);
   });
 
+  it('names a request by account when it has one', () => {
+    // A request sent from a profile carries the id, so a later removal of the
+    // same person - taking it back while still offline - collapses onto it
+    // instead of both being sent.
+    const queue = queueOf(
+      { kind: 'friend:request', handle: 'ada', userId: 'u_ada' },
+      { kind: 'friend:remove', userId: 'u_ada' },
+    );
+    expect(queue).toHaveLength(1);
+    expect(queue[0].intent.kind).toBe('friend:remove');
+  });
+
+  it('is not fooled by a username changing', () => {
+    // Same person, renamed between two taps: still one subject.
+    expect(subjectOf({ kind: 'friend:request', handle: 'ada', userId: 'u_ada' })).toBe(
+      subjectOf({ kind: 'friend:request', handle: 'ada_l', userId: 'u_ada' }),
+    );
+  });
+
   it('treats a handle and an account id as different ways to name someone', () => {
     // An unsent request has never had an id to collapse against, which is why
     // requests key on what was typed.

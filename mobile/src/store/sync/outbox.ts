@@ -25,7 +25,18 @@ import { makeId } from '@/lib/ids';
  */
 
 export type Intent =
-  | { readonly kind: 'friend:request'; readonly handle: string }
+  | {
+      readonly kind: 'friend:request';
+      /** What they were found under. Only used when there is no id. */
+      readonly handle: string;
+      /**
+       * Who they are, when the request was sent from their profile - which
+       * is now always. A username can change between the tap and the signal,
+       * and a request sent by name would then reach nobody, or whoever took
+       * the name. Optional because requests queued by older builds have none.
+       */
+      readonly userId?: string;
+    }
   | { readonly kind: 'friend:accept'; readonly userId: string }
   | { readonly kind: 'friend:remove'; readonly userId: string }
   | { readonly kind: 'friend:block'; readonly userId: string };
@@ -64,15 +75,16 @@ const MAX_QUEUED = 200;
 /**
  * What two intents are about, when they are about the same thing.
  *
- * Used to collapse the queue rather than to identify an intent, so friend
- * requests key on the handle typed and everything else on the account id -
- * they are the two ways this app names a person, and an unsent request has
- * never had an id to use.
+ * Used to collapse the queue rather than to identify an intent. Everything
+ * keys on the account id; only a request from an older build, which never had
+ * one, falls back to the username that was typed.
  */
 export function subjectOf(intent: Intent): string {
   switch (intent.kind) {
     case 'friend:request':
-      return `handle:${intent.handle.trim().toLowerCase()}`;
+      return intent.userId
+        ? `user:${intent.userId}`
+        : `handle:${intent.handle.trim().toLowerCase()}`;
     case 'friend:accept':
     case 'friend:remove':
     case 'friend:block':

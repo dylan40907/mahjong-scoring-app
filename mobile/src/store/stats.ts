@@ -1,5 +1,6 @@
-import type { AwayGame, HandRecord, Session, SessionPlayer } from './types';
+import type { AwayGame, HandRecord, Session, SessionPlayer, StoredHand } from './types';
 import type { TileCode } from '@/tiles/tileset';
+import { scoreHand, type RuleSet } from '@/scoring';
 
 /**
  * What a person's history adds up to, across every table they sat at.
@@ -130,6 +131,37 @@ export function bestHandFor(games: readonly PlayedGame[], me: Identity): BestHan
     }
   }
   return best;
+}
+
+/**
+ * A hand laid out the way it scored: one group per set, the pair, and the
+ * flowers last.
+ *
+ * Grouped because a flat row does not fit a phone. The profile used to show
+ * the first nine tiles and drop the rest, which was worse than showing
+ * nothing - the tiles that made the hand worth showing were as likely to be in
+ * the missing half. Groups wrap whole, so a set is never split across two
+ * lines and even a sixteen-tile hand with a kong reads at a glance.
+ *
+ * The grouping is the reading the scorer paid out on, worked out again because
+ * a hand record keeps its tiles and not its reading. Null when the tiles no
+ * longer form a hand under these rules - a ruleset edited since, or a record
+ * older than `exposed` - and the screen falls back to every tile in one
+ * wrapping row.
+ */
+export function handGroups(hand: StoredHand, rules: RuleSet | undefined): TileCode[][] | null {
+  if (!rules) return null;
+  try {
+    const reading = scoreHand(
+      { ...hand, exposed: hand.exposed ?? [], bonus: hand.bonus ?? [] },
+      rules,
+    ).reading;
+    if (!reading) return null;
+    const groups = reading.melds.map((meld) => [...meld.tiles]);
+    return hand.bonus?.length ? [...groups, [...hand.bonus]] : groups;
+  } catch {
+    return null;
+  }
 }
 
 /** Owned sessions and away games as one list, newest first. */

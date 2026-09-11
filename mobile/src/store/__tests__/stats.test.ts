@@ -1,5 +1,6 @@
-import { bestHandFor, mySeat, playedGames, playerStats } from '../stats';
-import type { HandRecord, Session, SessionPlayer } from '../types';
+import { HONG_KONG_OLD_STYLE } from '@/scoring';
+import { bestHandFor, handGroups, mySeat, playedGames, playerStats } from '../stats';
+import type { HandRecord, Session, SessionPlayer, StoredHand } from '../types';
 
 /**
  * The arithmetic behind a profile.
@@ -149,5 +150,32 @@ describe('the combined list', () => {
     // Newest first, regardless of whose phone it came off.
     expect(games.map((g) => g.session.id)).toEqual(['s5', 's3']);
     expect(games.map((g) => g.away)).toEqual([true, false]);
+  });
+});
+
+describe('laying out a best hand', () => {
+  // Three dragon pungs, a pung of one circle and a pair of fives: fourteen
+  // tiles, which the old nine-tile slice cut off after the first circles.
+  const hand: StoredHand = {
+    concealed: [
+      'red', 'red', 'red', 'green', 'green', 'green', 'white', 'white', 'white',
+      'pin1', 'pin1', 'pin1', 'pin5', 'pin5',
+    ],
+    exposed: [],
+    bonus: ['flower_plum'],
+    winningTile: 'pin5',
+    context: { selfDrawn: true, seatWind: 'east', roundWind: 'east', isDealer: false },
+  };
+
+  it('shows every tile, one group per set, with the flowers last', () => {
+    const groups = handGroups(hand, HONG_KONG_OLD_STYLE)!;
+    expect(groups.flat()).toHaveLength(15);
+    expect(groups.at(-1)).toEqual(['flower_plum']);
+    // Groups are sets, never a line's worth of tiles: nothing bigger than a kong.
+    expect(groups.every((group) => group.length <= 4)).toBe(true);
+  });
+
+  it('gives up on grouping, not on tiles, when there are no rules to read it by', () => {
+    expect(handGroups(hand, undefined)).toBeNull();
   });
 });

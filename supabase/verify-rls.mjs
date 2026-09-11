@@ -423,6 +423,46 @@ check(
   `saw ${peekHands.body?.length ?? '?'} rows`,
 );
 
+// ---------------------------------------------------------------------------
+// Renames and blocks: people are named by account once they are known
+// ---------------------------------------------------------------------------
+
+console.log('');
+
+// A renames. C is their friend and must still reach them - by the id the app
+// holds, not by a username that no longer exists.
+const renamed = `ren_${stamp}`;
+await asA(`profiles?id=eq.${a.id}`, { method: 'PATCH', body: JSON.stringify({ handle: renamed }) });
+const byId = await rpc(asC)('view_profile_by_id', { target: a.id });
+check(
+  'a friend who renames is still found by id, under the new name',
+  byId.body?.[0]?.handle === renamed && byId.body?.[0]?.relation === 'friend',
+  `got ${JSON.stringify(byId.body?.[0] ?? null)?.slice(0, 80)}`,
+);
+const oldName = await rpc(asC)('view_profile', { lookup: messy.body });
+check('the old username leads nowhere, rather than to a ghost', oldName.body?.length === 0);
+
+// A request sent by id survives the name it was found under changing.
+const byIdRequest = await rpc(asB)('request_friend_by_id', { target: c.id });
+check('a request can be sent by account id', byIdRequest.body === 'sent', `said ${byIdRequest.body}`);
+
+// view_profile_by_id used to call every pending request 'friend'.
+const incomingView = await rpc(asC)('view_profile_by_id', { target: b.id });
+check(
+  'a pending request is labelled as one, not as a friend',
+  incomingView.body?.[0]?.relation === 'incoming',
+  `relation ${incomingView.body?.[0]?.relation}`,
+);
+
+// C blocks B. Neither should be able to open the other any more.
+await rpc(asC)('block_user', { other: b.id });
+const blockedByName = await rpc(asB)('view_profile', { lookup: claimedC.body });
+check('somebody blocked cannot open the blocker by name', blockedByName.body?.length === 0);
+const blockerById = await rpc(asC)('view_profile_by_id', { target: b.id });
+check('the blocker does not keep seeing them by id', blockerById.body?.length === 0);
+const retry = await rpc(asB)('request_friend_by_id', { target: c.id });
+check('and cannot send another request', retry.body === 'unknown', `said ${retry.body}`);
+
 // Search is the one read that answers a partial name, so it is the one that
 // could become a directory. Everything it returns is proven in
 // `verify-search.sql`, as real accounts; what can be proven from here is who

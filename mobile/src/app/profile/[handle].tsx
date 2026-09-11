@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Alert, StyleSheet, View } from 'react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   BodyStrong,
   Button,
@@ -13,13 +13,21 @@ import {
   Row,
   Screen,
   Section,
-  TileFace,
   Title,
 } from '@/design/components';
 import { FriendsIcon, PersonIcon, SparkIcon, TrophyIcon } from '@/design/icons';
-import { colors, space, tileSize } from '@/design/tokens';
+import { colors, space } from '@/design/tokens';
+import { BestHandTiles } from '@/components/BestHandTiles';
 import { findRuleSet } from '@/store/store';
-import { acceptFriend, lookupProfile, requestFriend, type PublicProfile } from '@/store/friends';
+import {
+  acceptFriend,
+  blockUser,
+  lookupProfile,
+  lookupProfileById,
+  removeFriend,
+  requestFriend,
+  type PublicProfile,
+} from '@/store/friends';
 import { syncNow } from '@/store/sync/engine';
 import { relativeDate, signed } from '@/lib/format';
 import type { TileCode } from '@/tiles/tileset';
@@ -31,12 +39,19 @@ import type { TileCode } from '@/tiles/tileset';
  * profile is public by default and what it shows is what its owner sees, so
  * there is no second idea of "the public version" to keep in step.
  *
+ * Opened two ways. From search, by the username that was just found. From the
+ * friends list, by account id (`?id=`), and only by id: the username in that
+ * list is whatever it was at the last sync, and if the friend has renamed since
+ * and somebody else has taken the old name, falling back to it would open a
+ * stranger's page with a friend's name on the way in.
+ *
  * A username that does not exist and a username that is private answer the
  * same way. That is deliberate - if the two answers differed, the difference
  * would itself tell a stranger that somebody is there and hiding.
  */
 export default function PublicProfileScreen() {
-  const { handle } = useLocalSearchParams<{ handle: string }>();
+  const router = useRouter();
+  const { handle, id } = useLocalSearchParams<{ handle: string; id?: string }>();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [note, setNote] = useState<string | null>(null);
@@ -53,7 +68,8 @@ export default function PublicProfileScreen() {
    */
   useEffect(() => {
     let alive = true;
-    void lookupProfile(handle ?? '').then((found) => {
+    const read = id ? lookupProfileById(id) : lookupProfile(handle ?? '');
+    void read.then((found) => {
       if (!alive) return;
       setProfile(found);
       setLoading(false);
@@ -61,9 +77,16 @@ export default function PublicProfileScreen() {
     return () => {
       alive = false;
     };
-  }, [handle, reloads]);
+  }, [handle, id, reloads]);
 
   const load = useCallback(() => setReloads((n) => n + 1), []);
+
+  // After ending a friendship there is nothing left here for us, and the list
+  // we came from is where the change shows.
+  const leave = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/friends');
+  }, [router]);
 
   if (loading) {
     return (
@@ -85,8 +108,12 @@ export default function PublicProfileScreen() {
         </PageHeader>
         <EmptyState
           icon={<PersonIcon size={28} color={colors.inkFaint} />}
-          title="Nobody by that name"
-          body="Check the spelling. Somebody with a private profile cannot be found."
+          title={id ? 'This profile is not available' : 'Nobody by that name'}
+          body={
+            id
+              ? 'They may have made their profile private.'
+              : 'Check the spelling. Somebody with a private profile cannot be found.'
+          }
         />
       </Screen>
     );
@@ -109,11 +136,10 @@ export default function PublicProfileScreen() {
         <Section title="Best hand" icon={<TrophyIcon size={15} color={colors.brass} />}>
           {best ? (
             <Panel style={styles.best}>
-              <View style={styles.bestTiles}>
-                {best.tiles.slice(0, 9).map((code, index) => (
-                  <TileFace key={`${code}-${index}`} code={code as TileCode} width={tileSize.sm} />
-                ))}
-              </View>
+              <BestHandTiles
+                groups={best.groups as TileCode[][] | null | undefined}
+                tiles={best.tiles as TileCode[]}
+              />
               <View style={styles.bestLine}>
                 <BodyStrong tone="accent" numeric>
                   {best.total} {best.unit}
@@ -150,6 +176,8 @@ export default function PublicProfileScreen() {
             <Row title="People they play with" value={String(profile.friendCount)} />
           </Panel>
         </Section>
+
+        {profile.relation === 'friend' ? <FriendActions profile={profile} onDone={leave} /> : null}
       </View>
     </Screen>
   );
@@ -198,7 +226,7 @@ function Relation({
           block
           onPress={() =>
             act(
-              () => requestFriend(profile.handle ?? ''),
+              () => requestFriend(profile),
               'Sent. They will see it next time you are both online.',
             )
           }
@@ -209,11 +237,67 @@ function Relation({
   );
 }
 
+/**
+ * Ending a friendship, at the bottom of the friend's own page.
+ *
+ * These used to be a menu that opened when a friend was tapped in the list, so
+ * "Block" and "Remove friend" stood between you and their profile every time
+ * you only wanted to look at it. Here they are after everything you came to
+ * see, where somebody looking for them will find them, and only on the page of
+ * somebody who is actually a friend.
+ */
+function FriendActions({ profile, onDone }: { profile: PublicProfile; onDone: () => void }) {
+  const name = profile.displayName || profile.handle || 'them';
+
+  const confirmRemove = () =>
+    Alert.alert(
+      `Remove ${name}?`,
+      'They stop seeing the games you put them in, and you stop seeing theirs. Nothing already scored changes.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            removeFriend(profile.id);
+            void syncNow();
+            onDone();
+          },
+        },
+      ],
+    );
+
+  const confirmBlock = () =>
+    Alert.alert(
+      `Block ${name}?`,
+      'They are removed as a friend, stop seeing any game you put them in, and can no longer find you or send you a request.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: () => {
+            blockUser(profile.id);
+            void syncNow();
+            onDone();
+          },
+        },
+      ],
+    );
+
+  return (
+    <View style={styles.actions}>
+      <Button label="Remove friend" block onPress={confirmRemove} />
+      <Button label="Block" variant="danger" block onPress={confirmBlock} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   body: { paddingHorizontal: space.xl },
   relation: { gap: space.sm },
   best: { gap: space.sm },
-  bestTiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 3 },
   bestLine: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   empty: { alignItems: 'center', gap: space.sm, paddingVertical: space.lg },
+  actions: { gap: space.sm, marginTop: space.xxxl },
 });

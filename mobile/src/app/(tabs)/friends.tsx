@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import {
   Body,
@@ -19,7 +19,6 @@ import {
   MIN_SEARCH,
   acceptFriend,
   acceptedFriends,
-  blockUser,
   incomingRequests,
   outgoingRequests,
   removeFriend,
@@ -95,44 +94,23 @@ export default function FriendsScreen() {
     );
   }
 
-  const confirmRemove = (friend: Friend) => {
-    Alert.alert(
-      `Remove ${nameOf(friend)}?`,
-      'They stop seeing the games you put them in, and you stop seeing theirs. Nothing already scored changes.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => {
-            removeFriend(friend.id);
-            void syncNow();
-          },
-        },
-      ],
-    );
-  };
-
-  const openFriend = (friend: Friend) => {
-    Alert.alert(nameOf(friend), friend.handle ?? undefined, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'View profile',
-        onPress: () => {
-          if (friend.handle) router.push(`/profile/${friend.handle}`);
-        },
-      },
-      {
-        text: 'Block',
-        style: 'destructive',
-        onPress: () => {
-          blockUser(friend.id);
-          void syncNow();
-        },
-      },
-      { text: 'Remove friend', style: 'destructive', onPress: () => confirmRemove(friend) },
-    ]);
-  };
+  /*
+   * Straight to their profile, by account id.
+   *
+   * It used to open a menu - view profile, block, remove - which put two
+   * destructive choices between you and their page every time you only wanted
+   * to look at it. Those now sit at the bottom of the profile itself.
+   *
+   * By id because the username in this list is whatever it was at the last
+   * sync. A friend who has renamed since would open as nobody, or as whoever
+   * took their old name; the handle rides along only as a title to show while
+   * the page loads.
+   */
+  const openProfile = (friend: Friend) =>
+    router.push({
+      pathname: '/profile/[handle]',
+      params: { handle: friend.handle ?? nameOf(friend), id: friend.id },
+    });
 
   return (
     <Screen scroll motif="wall">
@@ -147,6 +125,7 @@ export default function FriendsScreen() {
                 <Row
                   title={nameOf(friend)}
                   subtitle={friend.handle ?? undefined}
+                  onPress={() => openProfile(friend)}
                   trailing={
                     <View style={styles.answer}>
                       <Button
@@ -193,7 +172,7 @@ export default function FriendsScreen() {
                   trailing={
                     friend.local ? <CheckIcon size={16} color={colors.inkFaint} /> : undefined
                   }
-                  onPress={() => openFriend(friend)}
+                  onPress={() => openProfile(friend)}
                 />
               </View>
             ))}

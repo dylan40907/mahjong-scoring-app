@@ -37,11 +37,13 @@ export interface Friend {
   /** 'out' when we asked, 'in' when they did. Meaningless once accepted. */
   readonly direction: FriendDirection;
   /**
-   * True while this exists only on this device.
+   * True while this exists only on this device - a request or an answer that
+   * has not reached the server yet. The next refresh replaces it with the real
+   * row, or drops it if the server refused.
    *
-   * A request typed offline has no account id to hang on yet, so it is held
-   * under the handle that was typed and shown as pending. The next refresh
-   * replaces it with the real row, or - if the handle was nobody - drops it.
+   * Older builds held an offline request under `pending:<username>` because
+   * it was addressed by name; those ids still turn up in cached lists, and
+   * `removeFriend` knows not to send them anywhere.
    */
   readonly local?: boolean;
 }
@@ -146,29 +148,36 @@ export async function refreshFriends(): Promise<void> {
 }
 
 /**
- * Ask somebody to be a friend, by the handle they would say out loud.
+ * Send somebody a friend request, from their profile.
  *
- * A handle rather than an email address, because it is the thing you can read
- * off somebody's phone across a table, and because an email address is a fact
- * about a person this app has no business being a directory of.
+ * By account id, never by username. The request can sit in the queue for as
+ * long as the phone has no signal, and a username can change in that time: a
+ * request addressed by name would then reach nobody, or reach whoever claimed
+ * the name next. The id is the one thing about a person that does not move.
+ *
+ * The optimistic entry carries the real id for the same reason. It used to be
+ * keyed by the username typed, which is how a rename left a pending request
+ * nobody could match to anyone.
  */
-export function requestFriend(handle: string): void {
-  const wanted = handle.trim().toLowerCase();
-  if (!wanted) return;
-  if (!state.friends.some((friend) => friend.handle === wanted)) {
+export function requestFriend(person: {
+  id: string;
+  handle: string | null;
+  displayName: string | null;
+}): void {
+  if (!state.friends.some((friend) => friend.id === person.id)) {
     commit([
       ...state.friends,
       {
-        id: `pending:${wanted}`,
-        displayName: null,
-        handle: wanted,
+        id: person.id,
+        displayName: person.displayName,
+        handle: person.handle,
         status: 'pending',
         direction: 'out',
         local: true,
       },
     ]);
   }
-  queueIntent({ kind: 'friend:request', handle: wanted });
+  queueIntent({ kind: 'friend:request', handle: person.handle ?? '', userId: person.id });
 }
 
 export function acceptFriend(userId: string): void {
@@ -255,6 +264,8 @@ export interface ProfileStats {
     readonly unit: string;
     readonly patterns: string[];
     readonly tiles: string[];
+    /** The hand as it scored, one group per set. Absent from older builds. */
+    readonly groups?: string[][] | null;
     readonly ruleSetId: string;
     readonly at: string;
   } | null;
@@ -285,6 +296,21 @@ function toProfile(row: RawProfile): PublicProfile {
 export async function lookupProfile(handle: string): Promise<PublicProfile | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.rpc('view_profile', { lookup: handle.trim().toLowerCase() });
+  if (error || !Array.isArray(data) || data.length === 0) return null;
+  return toProfile(data[0] as RawProfile);
+}
+
+/**
+ * Somebody's profile, by the account id we already hold for them.
+ *
+ * What the friends list opens a friend with. Their username in the cached list
+ * can be out of date - they renamed since the last sync - and opening by that
+ * name would show "nobody by that name", or somebody else entirely if the old
+ * name has been taken since. The same visibility rules as the lookup by name.
+ */
+export async function lookupProfileById(id: string): Promise<PublicProfile | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('view_profile_by_id', { target: id });
   if (error || !Array.isArray(data) || data.length === 0) return null;
   return toProfile(data[0] as RawProfile);
 }
