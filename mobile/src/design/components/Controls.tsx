@@ -245,6 +245,11 @@ export interface TextFieldProps {
    * field where the characters are the whole value.
    */
   autoCorrect?: boolean;
+  /**
+   * Select what is there when the field is focused, for a value that is
+   * usually replaced rather than edited - "Player 3" is typed over, not into.
+   */
+  selectTextOnFocus?: boolean;
   style?: ViewStyle;
 }
 
@@ -269,6 +274,7 @@ export function TextField({
   secureTextEntry,
   autoCapitalize,
   autoCorrect,
+  selectTextOnFocus,
 }: TextFieldProps) {
   return (
     <View style={style}>
@@ -284,6 +290,7 @@ export function TextField({
       autoCorrect={autoCorrect}
       onBlur={onBlur}
       onSubmitEditing={onSubmitEditing}
+      selectTextOnFocus={selectTextOnFocus}
       maxLength={maxLength}
         keyboardType={keyboardType}
         selectionColor={colors.brass}

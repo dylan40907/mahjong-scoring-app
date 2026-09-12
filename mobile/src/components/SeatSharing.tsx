@@ -9,6 +9,7 @@ import {
   Panel,
   Row,
   Section,
+  TextField,
   TileFace,
 } from '@/design/components';
 import { CheckIcon, FriendsIcon } from '@/design/icons';
@@ -16,7 +17,7 @@ import { colors, space } from '@/design/tokens';
 import { useAccount } from '@/store/account';
 import { acceptedFriends, useFriends, type Friend } from '@/store/friends';
 import { mySeat } from '@/store/stats';
-import { leaveSeat, linkSeat, takeSeat, unlinkSeat } from '@/store/store';
+import { leaveSeat, linkSeat, renamePlayer, takeSeat, unlinkSeat } from '@/store/store';
 import { syncNow } from '@/store/sync/engine';
 import { WIND_LABEL } from '@/lib/format';
 import type { Session, SessionPlayer } from '@/store/types';
@@ -34,8 +35,10 @@ import type { Session, SessionPlayer } from '@/store/types';
  *
  * So every seat opens onto the same short list: you, each of your friends,
  * and a guest - a name on the seat and no account behind it, which is what
- * every seat is until somebody says otherwise. It is a choice of one, and
- * whatever is picked
+ * every seat is until somebody says otherwise. A guest's name is typed right
+ * there, under Guest, which is where anybody looking to name a seat already
+ * is; it used to be a long press on the table, which nobody found. It is a
+ * choice of one, and whatever is picked
  * replaces what was there - that is what makes taking yourself out of a game
  * the same gesture as putting yourself in one.
  *
@@ -53,6 +56,8 @@ export function SeatSharing({ session }: { session: Session }) {
   const me = useAccount(useCallback((account) => account.userId, []));
   const myName = useAccount(useCallback((account) => account.displayName, []));
   const [openSeat, setOpenSeat] = useState<string | null>(null);
+  /** A guest's name while it is being typed; null means "as saved". */
+  const [draftName, setDraftName] = useState<string | null>(null);
 
   const available = acceptedFriends(friends);
   const shared = session.players.filter(
@@ -75,6 +80,15 @@ export function SeatSharing({ session }: { session: Session }) {
     void syncNow();
   };
 
+  // Saved when the field is left or submitted. Empty keeps the name it had,
+  // because a seat with no name at all is a seat nobody can find on the table.
+  const commitName = (player: SessionPlayer) => {
+    if (draftName === null) return;
+    const name = draftName.trim();
+    if (name && name !== player.name) renamePlayer(session.id, player.id, name);
+    setDraftName(null);
+  };
+
   return (
     <Section
       title="Who's here"
@@ -93,7 +107,10 @@ export function SeatSharing({ session }: { session: Session }) {
                 title={player.name}
                 leading={<TileFace code={player.seat} width={20} />}
                 value={whoIs(player)}
-                onPress={() => setOpenSeat(open ? null : player.id)}
+                onPress={() => {
+                  setOpenSeat(open ? null : player.id);
+                  setDraftName(null);
+                }}
                 chevron={!open}
               />
               {/*
@@ -154,17 +171,35 @@ export function SeatSharing({ session }: { session: Session }) {
                         ? 'Takes you out of this game'
                         : player.accountId
                           ? 'They stop seeing this game'
-                          : 'Just a name, not linked to anyone'
+                          : undefined
                     }
                     trailing={isNobody ? <CheckIcon size={18} color={colors.melded} /> : undefined}
                     chevron={false}
-                    onPress={() =>
-                      choose(() => {
-                        if (isMe) leaveSeat(session.id, player.id);
-                        else if (player.accountId) unlinkSeat(session.id, player.id);
-                      })
-                    }
+                    onPress={() => {
+                      // Already a guest: the name field below is what to use.
+                      if (isNobody) return;
+                      if (isMe) leaveSeat(session.id, player.id);
+                      else if (player.accountId) unlinkSeat(session.id, player.id);
+                      // Left open, so the field for their name is right there.
+                      setDraftName(null);
+                      void syncNow();
+                    }}
                   />
+                  {isNobody ? (
+                    <View style={styles.guestName}>
+                      <TextField
+                        label="Their name"
+                        value={draftName ?? player.name}
+                        onChangeText={setDraftName}
+                        onBlur={() => commitName(player)}
+                        onSubmitEditing={() => commitName(player)}
+                        placeholder="Their name"
+                        maxLength={18}
+                        autoCorrect={false}
+                        selectTextOnFocus
+                      />
+                    </View>
+                  ) : null}
 
                   {available.length === 0 ? (
                     <View style={styles.none}>
@@ -197,7 +232,7 @@ export function SeatSharing({ session }: { session: Session }) {
         </CaptionStrong>
         <Caption tone="faint">
           {shared === 0
-            ? 'Tap a seat to say who sat there, including which one was you. Friends you add get this game in their own history.'
+            ? 'Tap a seat to say who sat there: you, a friend, or a guest you can name. Friends you add get this game in their own history.'
             : 'They can see this game and nothing else of yours. Remove them and it goes from their phone too.'}
         </Caption>
       </View>
@@ -211,5 +246,6 @@ function label(friend: Friend): string {
 
 const styles = StyleSheet.create({
   none: { padding: space.lg, gap: space.md, borderTopWidth: 1, borderTopColor: colors.line },
+  guestName: { paddingHorizontal: space.lg, paddingBottom: space.lg },
   note: { marginTop: space.md, paddingHorizontal: space.xs, gap: 2 },
 });

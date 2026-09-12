@@ -95,10 +95,9 @@ export default function AwayGameScreen() {
           dealerStreak={session.dealerStreak ?? 0}
           roundWind={session.roundWind}
           handCount={session.hands.length}
-          // Read-only: there is nothing here to select or rename, and a control
-          // that appears to work and does not is worse than no control.
+          // Read-only: there is nothing here to select, and a control that
+          // appears to work and does not is worse than no control.
           onSelect={() => {}}
-          onRename={() => {}}
         />
 
         <Section

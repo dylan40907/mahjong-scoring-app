@@ -30,7 +30,6 @@ import {
   deleteHand,
   deleteSession,
   findRuleSet,
-  renamePlayer,
   renameSession,
   sessionIn,
   sessionTotals,
@@ -197,7 +196,14 @@ export default function SessionScreen() {
         </Pressable>
       </PageHeader>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {/* Adjusts for the keyboard, so a guest's name being typed in Who's
+          here - near the bottom of the screen - is not typed blind. */}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
+      >
 
         {pickingRules ? (
           <View style={styles.ruleChips}>
@@ -232,7 +238,6 @@ export default function SessionScreen() {
           handCount={session.hands.length}
           selectedId={winnerId}
           onSelect={(id) => setWinnerId(id === winnerId ? null : id)}
-          onRename={(playerId, name) => renamePlayer(session.id, playerId, name)}
         />
 
         {/*

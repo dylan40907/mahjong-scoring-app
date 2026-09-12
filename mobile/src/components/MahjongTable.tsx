@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import React from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { BodyStrong, Caption, CaptionStrong, CountUp, TileFace } from '@/design/components';
 import { colors, radius, shadow, space } from '@/design/tokens';
 import type { SessionPlayer } from '@/store/types';
@@ -21,8 +21,10 @@ import { WIND_LABEL } from '@/lib/format';
  * as a panel until it stops pretending otherwise. That palette lives here and
  * does not leak into the rest of the app.
  *
- * Names start as Player 1 through 4 and are edited in place, because naming
- * four people is a thing you do once somebody wins, not before the game starts.
+ * Names start as Player 1 through 4 and are set from the Who's here list
+ * under the table, not here. Holding a seat to rename it was a gesture nobody
+ * found, on a card whose tap already means "this person won"; the list is
+ * where the seats are about who is sitting in them.
  */
 
 interface Props {
@@ -36,7 +38,6 @@ interface Props {
   /** Highlighted while choosing who a hand was won by. */
   selectedId?: string | null;
   onSelect: (playerId: string) => void;
-  onRename: (playerId: string, name: string) => void;
 }
 
 /** Seat positions, clockwise from the near side. */
@@ -69,7 +70,6 @@ function Seat({
   selected,
   slot,
   onSelect,
-  onRename,
 }: {
   player: SessionPlayer;
   total: number;
@@ -78,17 +78,7 @@ function Seat({
   selected: boolean;
   slot: Slot;
   onSelect: () => void;
-  onRename: (name: string) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(player.name);
-
-  const commit = () => {
-    const trimmed = text.trim();
-    onRename(trimmed.length > 0 ? trimmed : player.name);
-    setEditing(false);
-  };
-
   return (
     <Pressable
       accessibilityRole="button"
@@ -97,11 +87,6 @@ function Seat({
         (isDealer ? `, dealing${streak > 0 ? ` for ${streak + 1} hands` : ''}` : '')
       }
       onPress={onSelect}
-      onLongPress={() => {
-        setText(player.name);
-        setEditing(true);
-      }}
-      accessibilityHint="Hold to rename"
       style={({ pressed }) => [
         styles.seat,
         styles[slot],
@@ -133,26 +118,12 @@ function Seat({
         ) : null}
       </View>
 
-      {editing ? (
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          onBlur={commit}
-          onSubmitEditing={commit}
-          autoFocus
-          selectTextOnFocus
-          style={styles.nameInput}
-          maxLength={18}
-          accessibilityLabel="Player name"
-        />
-      ) : (
-        /*
-         * Plain text, not a pressable. The whole seat is the button - a name
-         * that handled its own presses left the middle of the card dead to the
-         * tap that selects the player, which is the thing you do every hand.
-         */
-        <BodyStrong numberOfLines={2}>{player.name}</BodyStrong>
-      )}
+      {/*
+        * Plain text, not a pressable. The whole seat is the button - a name
+        * that handled its own presses left the middle of the card dead to the
+        * tap that selects the player, which is the thing you do every hand.
+        */}
+      <BodyStrong numberOfLines={2}>{player.name}</BodyStrong>
 
       {/* Ticks from its old value when a hand lands, so you see who moved. */}
       <CountUp
@@ -174,7 +145,6 @@ export function MahjongTable({
   handCount,
   selectedId,
   onSelect,
-  onRename,
 }: Props) {
   return (
     <View style={styles.table}>
@@ -204,7 +174,6 @@ export function MahjongTable({
           selected={selectedId === player.id}
           slot={SLOTS[index]}
           onSelect={() => onSelect(player.id)}
-          onRename={(name) => onRename(player.id, name)}
         />
       ))}
     </View>
@@ -278,14 +247,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.brass,
     alignItems: 'center',
-  },
-  nameInput: {
-    color: colors.ink,
-    fontSize: 15,
-    fontWeight: '600',
-    paddingVertical: 0,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.brass,
   },
 
   bottom: { bottom: 0, alignSelf: 'center' },
