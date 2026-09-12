@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { AppState, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Stack } from 'expo-router';
+import { DarkTheme, Stack, ThemeProvider, type Theme } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { TileScanner } from '@/design/components';
 import { colors } from '@/design/tokens';
@@ -24,6 +24,31 @@ import { hydrate } from '@/store/store';
  * restarted itself - hence the panel, which is the only thing standing between
  * a silent reload and looking like a crash.
  */
+/**
+ * The navigators' own background, in the ground colour.
+ *
+ * Every screen paints its own green, but the navigators underneath them ran on
+ * the library's default light theme - rgb(242, 242, 242) - and a fast swipe
+ * back uncovered it as a grey strip down the edge of the screen while the
+ * next one slid in. Naming the ground here makes whatever shows between two
+ * screens the same colour as both of them.
+ *
+ * Dark as the base, for the parts nothing here overrides; every bar is drawn
+ * by the app itself, so the rest of the theme is never seen.
+ */
+const THEME: Theme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: colors.ground,
+    card: colors.ground,
+    text: colors.ink,
+    border: colors.line,
+    primary: colors.brass,
+    notification: colors.brass,
+  },
+};
+
 export default function RootLayout() {
   useEffect(() => {
     void hydrate();
@@ -54,17 +79,19 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          // Nothing on this stack draws a platform bar; every screen brings
-          // its own `PageHeader`, so the back arrow is the same arrow
-          // everywhere instead of whatever the phone supplies.
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.ground },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      </Stack>
+      <ThemeProvider value={THEME}>
+        <Stack
+          screenOptions={{
+            // Nothing on this stack draws a platform bar; every screen brings
+            // its own `PageHeader`, so the back arrow is the same arrow
+            // everywhere instead of whatever the phone supplies.
+            headerShown: false,
+            contentStyle: { backgroundColor: colors.ground },
+          }}
+        >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        </Stack>
+      </ThemeProvider>
 
       {updateStatus === 'applying' ? (
         <View style={styles.updating}>
