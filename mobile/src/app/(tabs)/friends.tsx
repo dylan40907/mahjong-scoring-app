@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   Body,
   Button,
@@ -54,6 +54,13 @@ export default function FriendsScreen() {
   const router = useRouter();
   const friends = useFriends(useCallback((state) => state.friends, []));
   const status = useAccount(useCallback((account) => account.status, []));
+
+  // Requests and answers arrive through sync, so looking is a reason to ask.
+  useFocusEffect(
+    useCallback(() => {
+      void syncNow();
+    }, []),
+  );
 
   const accepted = acceptedFriends(friends);
   const incoming = incomingRequests(friends);

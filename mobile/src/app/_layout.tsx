@@ -8,7 +8,7 @@ import { colors } from '@/design/tokens';
 import { useOtaUpdates } from '@/lib/updates';
 import { initAccount } from '@/store/account';
 import { hydrateFriends } from '@/store/friends';
-import { syncNow } from '@/store/sync/engine';
+import { startAutoSync, syncNow } from '@/store/sync/engine';
 import { hydrate } from '@/store/store';
 
 /**
@@ -41,7 +41,12 @@ export default function RootLayout() {
     const sub = AppState.addEventListener('change', (status) => {
       if (status === 'active') void syncNow();
     });
-    return () => sub.remove();
+    // After every change made here, and every few minutes while open.
+    const stop = startAutoSync();
+    return () => {
+      sub.remove();
+      stop();
+    };
   }, []);
 
   const updateStatus = useOtaUpdates();

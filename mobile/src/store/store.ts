@@ -63,6 +63,28 @@ function set(partial: Partial<AppState>): void {
   emit();
 }
 
+/*
+ * Something a person did, as opposed to something sync did.
+ *
+ * Sync listens for these so a change goes to the server as soon as it is made,
+ * rather than whenever the app next happens to launch - which left a deleted
+ * game showing on a friend's phone for as long as the phone that deleted it
+ * stayed open. Only the write paths a person drives call it: scoring,
+ * correcting and deleting hands, starting, renaming and deleting sessions,
+ * seating somebody, a friend request. Never the ones sync runs itself -
+ * `applySync`, rekeying, parking - or every sync would schedule the next.
+ */
+const editListeners = new Set<() => void>();
+
+export function onLocalEdit(listener: () => void): () => void {
+  editListeners.add(listener);
+  return () => editListeners.delete(listener);
+}
+
+function edited(): void {
+  for (const listener of editListeners) listener();
+}
+
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -172,6 +194,7 @@ export function createSession(input: {
   const next = [session, ...state.sessions];
   set({ sessions: next });
   void saveSessions(next);
+  edited();
   return session;
 }
 
@@ -203,6 +226,7 @@ function replaceSession(id: string, update: (session: Session) => Session): void
   );
   set({ sessions: next });
   void saveSessions(next);
+  edited();
 }
 
 // ---------------------------------------------------------------------------
@@ -653,6 +677,7 @@ export function deleteSession(requested: string): void {
   set({ sessions: next, deletedSessions: stones });
   void saveSessions(next);
   void saveDeletedSessions(stones);
+  edited();
 }
 
 // ---------------------------------------------------------------------------
@@ -804,6 +829,7 @@ export function queueIntent(intent: Intent): void {
   const next = enqueue(state.outbox, intent);
   set({ outbox: next });
   void saveOutbox(next);
+  edited();
 }
 
 export function applyOutbox(queue: QueuedIntent[]): void {

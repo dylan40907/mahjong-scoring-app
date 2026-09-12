@@ -197,10 +197,14 @@ function Relation({
 }) {
   if (profile.relation === 'self') return null;
 
+  // What happened, said once the answer is in: "sent" is only true once it
+  // has gone, and offline it waits in the queue and goes on its own.
   const act = (run: () => void, said: string) => {
     run();
-    onNote(said);
-    void syncNow().then(onChanged);
+    void syncNow().then((outcome) => {
+      onNote(outcome === 'offline' ? 'Saved. It goes as soon as you are back online.' : said);
+      onChanged();
+    });
   };
 
   return (
@@ -227,7 +231,7 @@ function Relation({
           onPress={() =>
             act(
               () => requestFriend(profile),
-              'Sent. They will see it next time you are both online.',
+              'Friend request sent.',
             )
           }
         />

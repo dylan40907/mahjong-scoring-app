@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   Caption,
   Divider,
@@ -17,6 +17,7 @@ import { HandSummary } from '@/components/HandSummary';
 import { MahjongTable } from '@/components/MahjongTable';
 import { findRuleSet, sessionTotals, useAppState } from '@/store/store';
 import { useFriends } from '@/store/friends';
+import { syncNow } from '@/store/sync/engine';
 import { plural } from '@/lib/format';
 
 /**
@@ -40,6 +41,13 @@ export default function AwayGameScreen() {
     useCallback((state) => state.awayGames.find((g) => g.session.id === id), [id]),
   );
   const friends = useFriends(useCallback((state) => state.friends, []));
+
+  // Opening it is asking for the latest version of it.
+  useFocusEffect(
+    useCallback(() => {
+      void syncNow();
+    }, []),
+  );
 
   if (!game) {
     return (
@@ -115,7 +123,7 @@ export default function AwayGameScreen() {
         </Section>
 
         <Caption tone="faint" style={styles.note}>
-          Only {scorer} can change this game. Your copy updates when you are both online.
+          Only {scorer} can change this game. Anything they change shows up here on its own.
         </Caption>
       </View>
     </Screen>

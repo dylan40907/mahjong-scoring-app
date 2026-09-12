@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
   PageHeader,
   Body,
@@ -22,6 +22,7 @@ import {
 } from '@/store/store';
 import { useFriends, type Friend } from '@/store/friends';
 import type { AwayGame, Session } from '@/store/types';
+import { syncNow } from '@/store/sync/engine';
 import { plural, relativeDate, signed } from '@/lib/format';
 
 /**
@@ -47,6 +48,15 @@ export default function SessionsScreen() {
     const session = createQuickSession();
     router.push(`/session/${session.id}`);
   };
+  // Every time the list comes into view: it is where a friend's new game, or
+  // one they deleted, is looked for, and waiting for the next launch to find
+  // out meant it could be wrong for as long as the app stayed open.
+  useFocusEffect(
+    useCallback(() => {
+      void syncNow();
+    }, []),
+  );
+
   const sessions = useAppState(useCallback((state) => state.sessions, []));
   const awayGames = useAppState(useCallback((state) => state.awayGames, []));
   const friends = useFriends(useCallback((state) => state.friends, []));

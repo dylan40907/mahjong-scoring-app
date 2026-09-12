@@ -45,7 +45,7 @@ import {
   useAccount,
   type Account,
 } from '@/store/account';
-import { syncNow } from '@/store/sync/engine';
+import { flushSync, syncNow } from '@/store/sync/engine';
 import { isCloudConfigured } from '@/lib/supabase';
 import { emailTaken, resetProblem, signInProblem } from '@/lib/authErrors';
 import { relativeDate } from '@/lib/format';
@@ -365,6 +365,7 @@ function VisibilityPicker({
 }
 
 function AccountActions({ account }: { account: Account }) {
+  const [leaving, setLeaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
 
@@ -402,7 +403,20 @@ function AccountActions({ account }: { account: Account }) {
         onClose={() => setPicking(false)}
       />
       <View style={styles.accountActions}>
-        <Button label="Sign out" block onPress={() => void signOut()} />
+        <Button
+          label="Sign out"
+          block
+          loading={leaving}
+          disabled={leaving}
+          onPress={() => {
+            // Send what is waiting first. Once signed out, this account's games
+            // are set aside, and anything unsent waits with them until it signs
+            // in here again - a game deleted just before would stay on a
+            // friend's phone until then.
+            setLeaving(true);
+            void flushSync().then(signOut);
+          }}
+        />
         {/* Required in the app by both stores, not merely polite. */}
         <Button label="Delete account" variant="danger" block onPress={confirmDelete} />
       </View>

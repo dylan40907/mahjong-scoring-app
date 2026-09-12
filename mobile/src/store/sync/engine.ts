@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import { rootId } from '@/lib/ids';
 import { supabase } from '@/lib/supabase';
 import { getAccount } from '../account';
@@ -10,6 +11,7 @@ import {
   getState,
   hydrate,
   rekeySession,
+  onLocalEdit,
   parkSome,
   setSyncOwner,
 } from '../store';
@@ -62,7 +64,12 @@ interface SeatRowRaw {
 const byId = (row: { id: string }) => row.id;
 const bySeat = (row: SeatRowRaw) => `${row.session_id}|${row.user_id}`;
 
-let running = false;
+/** The exchange under way, if there is one. Only ever one at a time. */
+let inflight: Promise<SyncOutcome> | null = null;
+/** Something asked for an exchange while one was running. */
+let again = false;
+/** When the latest exchange started, so a change it already read is not sent twice. */
+let lastStart = 0;
 
 /** A session as the `sessions` table holds it, without its hands. */
 interface SessionRow {
@@ -680,11 +687,9 @@ async function pushDeletes(userId: string, ids: readonly string[]): Promise<Set<
  * the whole thing is a few tens of kilobytes - splitting the bookkeeping would
  * buy nothing and cost a second set of conflict rules.
  */
-export async function syncNow(): Promise<SyncOutcome> {
+async function exchange(): Promise<SyncOutcome> {
   const account = getAccount();
   if (!supabase || !account.userId) return 'offline';
-  if (running) return 'busy';
-  running = true;
   const userId = account.userId;
 
   try {
@@ -752,10 +757,104 @@ export async function syncNow(): Promise<SyncOutcome> {
     // unexpected. All of them mean the same thing here: try later.
     return 'offline';
   } finally {
-    running = false;
     // A sync the account changed under gave up, and the new account's own
-    // sync was turned away as busy while it ran. Start that one now.
+    // sync was turned away as busy while it ran. Ask for that one now.
     const signedIn = getAccount().userId;
-    if (signedIn && signedIn !== userId) void syncNow();
+    if (signedIn && signedIn !== userId) again = true;
   }
+}
+
+/**
+ * Exchange with the server now, or join the exchange already under way.
+ *
+ * One at a time: two running at once would reconcile against each other's
+ * half-written results. A request that arrives while one runs is not simply
+ * turned away, though. The running exchange may have read the store before a
+ * hand was scored or a game deleted - `settle` keeps that change dirty, but
+ * nothing would send it until the next trigger - so exactly one more runs
+ * when it finishes, and that one picks up everything still waiting.
+ */
+export function syncNow(): Promise<SyncOutcome> {
+  if (inflight) {
+    again = true;
+    return Promise.resolve('busy');
+  }
+  lastStart = Date.now();
+  inflight = exchange().finally(() => {
+    inflight = null;
+    if (again) {
+      again = false;
+      void syncNow();
+    }
+  });
+  return inflight;
+}
+
+/**
+ * Send everything waiting, before the account it belongs to leaves the phone.
+ *
+ * Signing out sets the account's games aside, and anything unsent goes aside
+ * with them - a game deleted a moment before signing out stayed on a friend's
+ * phone until the deleter signed back in. So this waits out any exchange
+ * already running, then runs one more for whatever it missed.
+ *
+ * Bounded, because a sign-out must not hang on a basement connection. What is
+ * still unsent when time runs out goes aside with the account and is sent the
+ * next time it signs in here.
+ */
+export async function flushSync(timeoutMs = 8000): Promise<void> {
+  const deadline = new Promise<void>((resolve) => setTimeout(resolve, timeoutMs));
+  const attempt = (async () => {
+    while (inflight) await inflight;
+    await syncNow();
+    // A follow-up the last one asked for.
+    while (inflight) await inflight;
+  })();
+  await Promise.race([attempt, deadline]);
+}
+
+/** Long enough that scoring a hand is one exchange, not one per tap. */
+const AFTER_EDIT_MS = 1500;
+/**
+ * The safety net, not the main path. Every exchange reads the account's whole
+ * history - a heavy one is a megabyte or two - so a short interval would cost
+ * real data on a phone plan while nothing changed. Edits, opening the sessions
+ * list or a friend's game, and returning to the app carry the freshness.
+ */
+const WHILE_OPEN_MS = 5 * 60 * 1000;
+
+/**
+ * Sync whenever there is a connection and a reason.
+ *
+ * It used to run at launch, on return to the app, and after a friend request -
+ * and never after scoring, correcting or deleting. A game deleted on one phone
+ * sat there unsent while it stayed open, and the friend it was shared with
+ * kept seeing it. Now every change goes shortly after it is made, and the app
+ * checks in every few minutes while it is on screen. Offline, each attempt is
+ * one failed request and nothing else.
+ *
+ * Returns a function that stops it all.
+ */
+export function startAutoSync(): () => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const stopEdits = onLocalEdit(() => {
+    const editedAt = Date.now();
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      // A screen that syncs straight after its own change - a friend
+      // request, a seat - has already sent it: an exchange that started
+      // after the change read the store with it in.
+      if (lastStart >= editedAt) return;
+      void syncNow();
+    }, AFTER_EDIT_MS);
+  });
+  const tick = setInterval(() => {
+    if (AppState.currentState === 'active') void syncNow();
+  }, WHILE_OPEN_MS);
+  return () => {
+    stopEdits();
+    clearInterval(tick);
+    if (timer) clearTimeout(timer);
+  };
 }
