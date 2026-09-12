@@ -696,8 +696,20 @@ export function deleteSession(requested: string): void {
  * it.
  *
  * One account per table. Somebody cannot be two of the four players, and the
- * server's primary key says so too, so moving a friend from one seat to
- * another has to clear the old one rather than leaving them in both.
+ * server's primary key says so too.
+ *
+ * So picking a person for a seat moves them there, whole. The seat takes
+ * their name, and the seat they left - if they were at the table - goes back
+ * to being a guest, called what it would have been called had nobody signed
+ * in: "Player 1" for the first chair. Whoever the seat was linked to before is
+ * taken off the table, to be seated somewhere else if they are still playing.
+ *
+ * It used to keep a seat's name unless the name was a placeholder, to spare
+ * a typed "Dad" from being replaced. But it could not tell a typed name from
+ * one a person had brought with them, so moving yourself into a friend's
+ * chair kept the friend's name on it, left yours on the chair you had left,
+ * and the list read "Dylan - You" and "Jacob - Dylan". A seat with a person on
+ * it now says who they are; a guest's name is the one thing that is typed.
  */
 export function linkSeat(
   sessionId: string,
@@ -705,30 +717,16 @@ export function linkSeat(
   accountId: string,
   name?: string,
 ): void {
-  replaceSession(sessionId, (session) => {
-    const target = session.players.find((player) => player.id === playerId);
-    // Adopt their name only over a placeholder. Somebody who typed "Dad"
-    // meant "Dad", and having the app quietly replace it with the name on an
-    // account is a correction nobody asked for.
-    const adopted = name && target && isPlaceholder(target.name) ? name : undefined;
-
-    return {
-      ...session,
-      players: session.players.map((player, index) => {
-        if (player.id === playerId) {
-          return { ...player, accountId, name: adopted ?? player.name };
-        }
-        if (player.accountId !== accountId) return player;
-        // Moving somebody to another chair takes their name with them. Left
-        // behind, the table shows the same person twice - once in the seat
-        // they are in and once in the seat they are not - and the empty one
-        // reads as a second player called Wei. Only when the name actually
-        // moved, though: a seat whose name was typed keeps it.
-        const moved = adopted !== undefined && player.name.trim() === adopted.trim();
-        return { ...player, accountId: undefined, name: moved ? placeholderFor(index) : player.name };
-      }),
-    };
-  });
+  replaceSession(sessionId, (session) => ({
+    ...session,
+    players: session.players.map((player, index) => {
+      if (player.id === playerId) {
+        return { ...player, accountId, name: name?.trim() || player.name };
+      }
+      if (player.accountId !== accountId) return player;
+      return { ...player, accountId: undefined, name: placeholderFor(index) };
+    }),
+  }));
 }
 
 /**
@@ -802,11 +800,6 @@ export function unlinkSeat(sessionId: string, playerId: string): void {
       player.id === playerId ? { ...player, accountId: undefined } : player,
     ),
   }));
-}
-
-/** A seat nobody has bothered to name yet. */
-function isPlaceholder(name: string): boolean {
-  return /^player\s*\d+$/i.test(name.trim());
 }
 
 /** What a seat is called until somebody names it, by its place at the table. */

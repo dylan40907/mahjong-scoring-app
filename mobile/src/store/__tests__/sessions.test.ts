@@ -210,14 +210,44 @@ describe('who is sitting where', () => {
     expect(mySeat(after, ME)).toBeUndefined();
   });
 
-  it('leaves a typed name where it was when a friend moves', () => {
+  it('gives a seat the name of whoever is put in it', () => {
+    // A guest's name is typed; a seat with a person on it says who they are.
     const session = table(['Ada', 'Dad', '', '']);
 
-    linkSeat(session.id, session.players[1].id, 'u_dad', 'Wei');
-    expect(names(session.id)).toEqual(['Ada', 'Dad', 'Player 3', 'Player 4']);
+    linkSeat(session.id, session.players[1].id, 'u_wei', 'Wei');
 
-    linkSeat(session.id, session.players[3].id, 'u_dad', 'Wei');
-    expect(names(session.id)).toEqual(['Ada', 'Dad', 'Player 3', 'Wei']);
+    expect(names(session.id)).toEqual(['Ada', 'Wei', 'Player 3', 'Player 4']);
+  });
+
+  it('moves you into a friend’s chair, and hands yours back to a guest', () => {
+    // Jacob starts a game (seat one), seats Dylan in seat two,
+    // then says he is in seat two after all.
+    setLocalIdentity('Jacob', 'u_jacob');
+    const session = table(['Jacob', '', '', '']);
+    linkSeat(session.id, session.players[1].id, 'u_dylan', 'Dylan');
+    expect(names(session.id)).toEqual(['Jacob', 'Dylan', 'Player 3', 'Player 4']);
+
+    takeSeat(session.id, session.players[1].id);
+
+    const after = reload(session.id);
+    expect(names(session.id)).toEqual(['Player 1', 'Jacob', 'Player 3', 'Player 4']);
+    expect(after.players[1].accountId).toBe('u_jacob');
+    expect(after.players[0].accountId).toBeUndefined();
+    // Dylan was in the chair Jacob took, so he is off the table until seated.
+    expect(after.players.some((player) => player.accountId === 'u_dylan')).toBe(false);
+
+    // And seating Dylan in the chair Jacob left puts his name on it.
+    linkSeat(session.id, session.players[0].id, 'u_dylan', 'Dylan');
+    expect(names(session.id)).toEqual(['Dylan', 'Jacob', 'Player 3', 'Player 4']);
+  });
+
+  it('hands a friend’s old chair back to a guest when they move', () => {
+    const session = table(['Ada', '', '', '']);
+    linkSeat(session.id, session.players[1].id, 'u_wei', 'Wei');
+
+    linkSeat(session.id, session.players[3].id, 'u_wei', 'Wei');
+
+    expect(names(session.id)).toEqual(['Ada', 'Player 2', 'Player 3', 'Wei']);
     expect(reload(session.id).players[1].accountId).toBeUndefined();
   });
 
