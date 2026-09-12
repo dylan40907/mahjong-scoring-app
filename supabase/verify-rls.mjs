@@ -10,7 +10,8 @@
  * Signs in three throwaway anonymous users and walks the whole social path:
  * one writes a session, and the others try to reach it as a stranger, as a
  * friend, as somebody seated at that table, and as somebody who has just been
- * taken back out of it. Run against the real project:
+ * taken back out of it. A fourth sits at the same table, to be the guest who
+ * would see anything the others managed to add. Run against the real project:
  *
  *   node supabase/verify-rls.mjs
  *
@@ -208,14 +209,16 @@ await asA('sessions', {
     players: [
       { id: 'p1', name: 'Ada', seat: 'east' },
       { id: 'p2', name: 'Bao', seat: 'south' },
+      { id: 'p3', name: 'Dee', seat: 'west' },
     ],
     updated_at: new Date().toISOString(),
   }),
 });
-await asA('hands', {
+const ownerHand = `h_social_${stamp}`;
+const scored = await asA('hands', {
   method: 'POST',
   body: JSON.stringify({
-    id: `h_social_${stamp}`,
+    id: ownerHand,
     session_id: gameId,
     owner_id: a.id,
     winner_id: 'p2',
@@ -223,6 +226,7 @@ await asA('hands', {
     updated_at: new Date().toISOString(),
   }),
 });
+check('the owner can add a hand to their own game', scored.status === 201, `status ${scored.status}`);
 
 // Being friends on its own shares nothing. This is the promise the friends
 // screen makes in as many words.
@@ -273,6 +277,71 @@ check(
   'a guest cannot change the game',
   afterEdit.body?.[0]?.name === 'Friday',
   `status ${guestEdit.status}`,
+);
+
+// Nor add to it. A seat is also how somebody learns a game's id, and a hand's
+// foreign key to its session is checked without row-level security, so the
+// hand policy has to ask whose session it is. When it did not, anybody holding
+// the id could put a hand in the night: every other guest's totals changed,
+// while the owner - who only ever pulls their own hands - never saw it and had
+// no way to take it out. D is that other guest.
+const d = await anonUser();
+const asD = rest(d);
+await rpc(asA)('request_friend_by_id', { target: d.id });
+await rpc(asD)('accept_friend', { other: a.id });
+const seatedD = await asA('session_players', { method: 'POST', body: seat({ user_id: d.id, player_id: 'p3' }) });
+check('a second friend can be seated at the same table', seatedD.status === 201, `status ${seatedD.status}`);
+
+// The refusal has to be the policy's. A 400 for a malformed row would pass a
+// bare status check without proving anything.
+const refused = (res) => res.status === 403 && res.body?.code === '42501';
+const said = (res) => `status ${res.status}, code ${res.body?.code ?? 'none'}`;
+const handIn = (session, owner, id) =>
+  JSON.stringify({
+    id,
+    session_id: session,
+    owner_id: owner.id,
+    winner_id: 'p2',
+    payload: {},
+    deltas: { p1: -300, p2: 300 },
+    updated_at: new Date().toISOString(),
+  });
+
+const guestForged = await asB('hands', { method: 'POST', body: handIn(gameId, b, `h_forged_b_${stamp}`) });
+check('a seated guest cannot add a hand to the game', refused(guestForged), said(guestForged));
+
+const strangerForged = await asC('hands', { method: 'POST', body: handIn(gameId, c, `h_forged_c_${stamp}`) });
+check('nor can a stranger who knows its id', refused(strangerForged), said(strangerForged));
+
+// The same hole through an update: score a hand in a game of your own, then
+// move it across.
+const decoyGame = `s_decoy_${stamp}`;
+const decoyHand = `h_decoy_${stamp}`;
+await asB('sessions', {
+  method: 'POST',
+  body: JSON.stringify({
+    id: decoyGame,
+    owner_id: b.id,
+    ruleset_id: 'taiwanese-common',
+    updated_at: new Date().toISOString(),
+  }),
+});
+const decoy = await asB('hands', { method: 'POST', body: handIn(decoyGame, b, decoyHand) });
+check('a guest can still score a hand in a game of their own', decoy.status === 201, `status ${decoy.status}`);
+const movedIn = await asB(`hands?id=eq.${decoyHand}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ session_id: gameId }),
+});
+check('but cannot move it into somebody else’s', refused(movedIn), said(movedIn));
+await asB(`sessions?id=eq.${decoyGame}`, { method: 'DELETE' });
+
+// Read the way `pullAwayGames` reads, by session alone, which is the read that
+// would have shown a forged hand.
+const besideThem = await asD(`hands?select=id&session_id=eq.${gameId}`);
+check(
+  'so another guest at the table sees only the owner’s hands',
+  besideThem.body?.length === 1 && besideThem.body[0].id === ownerHand,
+  `saw ${list(besideThem.body).map((row) => row.id).join(', ') || 'none'}`,
 );
 
 // The third user still sees nothing, which is what makes the seat the boundary
