@@ -219,9 +219,9 @@ describe('who is sitting where', () => {
     expect(names(session.id)).toEqual(['Ada', 'Wei', 'Player 3', 'Player 4']);
   });
 
-  it('moves you into a friend’s chair, and hands yours back to a guest', () => {
+  it('swaps you and a friend when you take their chair', () => {
     // Jacob starts a game (seat one), seats Dylan in seat two,
-    // then says he is in seat two after all.
+    // then says he was in seat two. They were sitting the other way round.
     setLocalIdentity('Jacob', 'u_jacob');
     const session = table(['Jacob', '', '', '']);
     linkSeat(session.id, session.players[1].id, 'u_dylan', 'Dylan');
@@ -230,15 +230,36 @@ describe('who is sitting where', () => {
     takeSeat(session.id, session.players[1].id);
 
     const after = reload(session.id);
-    expect(names(session.id)).toEqual(['Player 1', 'Jacob', 'Player 3', 'Player 4']);
-    expect(after.players[1].accountId).toBe('u_jacob');
-    expect(after.players[0].accountId).toBeUndefined();
-    // Dylan was in the chair Jacob took, so he is off the table until seated.
-    expect(after.players.some((player) => player.accountId === 'u_dylan')).toBe(false);
-
-    // And seating Dylan in the chair Jacob left puts his name on it.
-    linkSeat(session.id, session.players[0].id, 'u_dylan', 'Dylan');
     expect(names(session.id)).toEqual(['Dylan', 'Jacob', 'Player 3', 'Player 4']);
+    expect(after.players.map((player) => player.accountId)).toEqual([
+      'u_dylan',
+      'u_jacob',
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it('swaps two friends when one is moved into the other’s chair', () => {
+    const session = table(['Ada', '', '', '']);
+    linkSeat(session.id, session.players[1].id, 'u_wei', 'Wei');
+    linkSeat(session.id, session.players[2].id, 'u_bo', 'Bo');
+
+    linkSeat(session.id, session.players[2].id, 'u_wei', 'Wei');
+
+    expect(names(session.id)).toEqual(['Ada', 'Bo', 'Wei', 'Player 4']);
+    expect(reload(session.id).players[1].accountId).toBe('u_bo');
+  });
+
+  it('takes somebody off the table when a friend who was not seated takes their chair', () => {
+    // No chair to swap into, because the newcomer was not sitting anywhere.
+    const session = table(['Ada', '', '', '']);
+    linkSeat(session.id, session.players[1].id, 'u_wei', 'Wei');
+
+    linkSeat(session.id, session.players[1].id, 'u_bo', 'Bo');
+
+    const after = reload(session.id);
+    expect(names(session.id)).toEqual(['Ada', 'Bo', 'Player 3', 'Player 4']);
+    expect(after.players.some((player) => player.accountId === 'u_wei')).toBe(false);
   });
 
   it('hands a friend’s old chair back to a guest when they move', () => {

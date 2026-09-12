@@ -698,11 +698,13 @@ export function deleteSession(requested: string): void {
  * One account per table. Somebody cannot be two of the four players, and the
  * server's primary key says so too.
  *
- * So picking a person for a seat moves them there, whole. The seat takes
- * their name, and the seat they left - if they were at the table - goes back
- * to being a guest, called what it would have been called had nobody signed
- * in: "Player 1" for the first chair. Whoever the seat was linked to before is
- * taken off the table, to be seated somewhere else if they are still playing.
+ * So picking a person for a seat moves them there, whole, and the seat takes
+ * their name. If the seat already held a person and the mover was at the
+ * table, the two swap chairs - moving somebody into a friend's seat is nearly
+ * always "they were sitting the other way round". Otherwise the chair the
+ * mover left goes back to being a guest, called what it would have been
+ * called had nobody signed in ("Player 1" for the first), and a person the
+ * seat held is taken off the table, to be seated again if they are playing.
  *
  * It used to keep a seat's name unless the name was a placeholder, to spare
  * a typed "Dad" from being replaced. But it could not tell a typed name from
@@ -717,16 +719,31 @@ export function linkSeat(
   accountId: string,
   name?: string,
 ): void {
-  replaceSession(sessionId, (session) => ({
-    ...session,
-    players: session.players.map((player, index) => {
-      if (player.id === playerId) {
-        return { ...player, accountId, name: name?.trim() || player.name };
-      }
-      if (player.accountId !== accountId) return player;
-      return { ...player, accountId: undefined, name: placeholderFor(index) };
-    }),
-  }));
+  replaceSession(sessionId, (session) => {
+    const target = session.players.find((player) => player.id === playerId);
+    // Where they were sitting, if anywhere.
+    const from = session.players.find(
+      (player) => player.accountId === accountId && player.id !== playerId,
+    );
+    // Somebody already in the chair they are moving to, who takes theirs.
+    const displaced =
+      from && target?.accountId && target.accountId !== accountId
+        ? { accountId: target.accountId, name: target.name }
+        : null;
+
+    return {
+      ...session,
+      players: session.players.map((player, index) => {
+        if (player.id === playerId) {
+          return { ...player, accountId, name: name?.trim() || player.name };
+        }
+        if (player.id !== from?.id) return player;
+        return displaced
+          ? { ...player, ...displaced }
+          : { ...player, accountId: undefined, name: placeholderFor(index) };
+      }),
+    };
+  });
 }
 
 /**
@@ -748,7 +765,9 @@ export function takeSeat(sessionId: string, playerId: string): void {
 
   const byName = mySeat(session, localIdentity());
   if (byName && byName.id !== playerId && !byName.accountId) {
-    leaveSeat(sessionId, byName.id);
+    // Made ours properly first, so the move below knows where we were
+    // sitting - and can swap whoever is in the chair we are taking into it.
+    linkSeat(sessionId, byName.id, localAccountId, localPlayerName ?? undefined);
   }
   linkSeat(sessionId, playerId, localAccountId, localPlayerName ?? undefined);
 }
