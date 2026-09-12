@@ -1,5 +1,5 @@
-import React, { useCallback } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   Caption,
@@ -13,12 +13,14 @@ import {
 } from '@/design/components';
 import { AwayIcon, HistoryIcon, PlayersIcon } from '@/design/icons';
 import { colors, space } from '@/design/tokens';
-import { HandSummary } from '@/components/HandSummary';
+import { HandBreakdown } from '@/components/HandBreakdown';
+import { HandSummary, sheetForHand } from '@/components/HandSummary';
 import { MahjongTable } from '@/components/MahjongTable';
 import { findRuleSet, sessionTotals, useAppState } from '@/store/store';
 import { useFriends } from '@/store/friends';
 import { syncNow } from '@/store/sync/engine';
 import { plural } from '@/lib/format';
+import type { HandRecord } from '@/store/types';
 
 /**
  * A game somebody else scored.
@@ -41,6 +43,9 @@ export default function AwayGameScreen() {
     useCallback((state) => state.awayGames.find((g) => g.session.id === id), [id]),
   );
   const friends = useFriends(useCallback((state) => state.friends, []));
+  // Kept after the sheet closes, so it does not go blank while it slides away.
+  const [shownHand, setShownHand] = useState<HandRecord | null>(null);
+  const [showingHand, setShowingHand] = useState(false);
 
   // Opening it is asking for the latest version of it.
   useFocusEffect(
@@ -113,9 +118,17 @@ export default function AwayGameScreen() {
               {session.hands.map((hand, index) => (
                 <View key={hand.id}>
                   {index > 0 ? <Divider inset={space.lg} /> : null}
-                  <View style={styles.hand}>
-                    <HandSummary hand={hand} session={session} />
-                  </View>
+                  {/* Opens the breakdown; there is nothing here to edit. */}
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => {
+                      setShownHand(hand);
+                      setShowingHand(true);
+                    }}
+                    style={({ pressed }) => [styles.hand, pressed && styles.pressed]}
+                  >
+                    <HandSummary hand={hand} session={session} rules={rules} />
+                  </Pressable>
                 </View>
               ))}
             </Panel>
@@ -126,6 +139,12 @@ export default function AwayGameScreen() {
           Only {scorer} can change this game. Anything they change shows up here on its own.
         </Caption>
       </View>
+
+      <HandBreakdown
+        visible={showingHand}
+        sheet={shownHand ? sheetForHand(shownHand, session, rules) : null}
+        onClose={() => setShowingHand(false)}
+      />
     </Screen>
   );
 }
@@ -137,5 +156,6 @@ const styles = StyleSheet.create({
   emptyNote: { marginTop: space.xs },
   // The session screen's row, less the room its bin takes on the right.
   hand: { gap: 2, paddingHorizontal: space.lg, paddingVertical: space.md },
+  pressed: { backgroundColor: colors.surfaceHigh },
   note: { marginTop: space.lg, paddingHorizontal: space.xs },
 });

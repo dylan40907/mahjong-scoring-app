@@ -5,27 +5,30 @@ import { tileSize } from '@/design/tokens';
 import type { TileCode } from '@/tiles/tileset';
 
 /**
- * Every tile of a best hand, on a profile - yours or somebody else's.
+ * Every tile of a hand, laid out as it scored - on a session's hand rows, a
+ * profile's best hand, and the breakdown sheet.
  *
- * Grouped by set when the grouping is known (`handGroups`), so the rows break
+ * Grouped by set when the grouping is known (`groupsFrom`), so rows break
  * between sets rather than through them. Otherwise every tile in one row that
- * wraps. Never a slice: a best hand with its second half missing is not the
- * hand, and the half that was cut was often the half that made it the best.
+ * wraps. Never a slice: a hand with its second half missing is not the hand,
+ * and the half that was cut was often the half that made it worth showing.
  */
-export function BestHandTiles({
+export function HandTiles({
   groups,
   tiles,
+  width = tileSize.sm,
 }: {
   groups?: readonly (readonly TileCode[])[] | null;
   tiles: readonly TileCode[];
+  width?: number;
 }) {
   if (groups && groups.length > 0) {
-    return <TileRow groups={groups} width={tileSize.sm} />;
+    return <TileRow groups={groups} width={width} />;
   }
   return (
     <View style={styles.flat}>
       {tiles.map((code, index) => (
-        <TileFace key={`${code}-${index}`} code={code} width={tileSize.sm} />
+        <TileFace key={`${code}-${index}`} code={code} width={width} />
       ))}
     </View>
   );

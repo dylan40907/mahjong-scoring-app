@@ -10,6 +10,7 @@ import {
   isMcr,
   isRiichi,
   isTai,
+  limitFaan,
   limitPoints,
   riichiBasePoints,
   settleFaan,
@@ -247,7 +248,8 @@ function scoreReading(reading: Decomposition, hand: HandInput, rules: RuleSet): 
       return {
         ...base,
         valid: true,
-        total: scoringTotal,
+        // What it is paid as, not what its other patterns happen to sum to.
+        total: limitFaan(payout),
         unit: 'faan',
         limitName: 'Limit hand',
         settlement: settleFaan(payout, limitPoints(payout), hand.context),

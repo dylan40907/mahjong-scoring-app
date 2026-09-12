@@ -37,9 +37,11 @@ import {
   setSessionRuleSet,
   useAppState,
 } from '@/store/store';
-import { HandSummary } from '@/components/HandSummary';
+import { HandBreakdown } from '@/components/HandBreakdown';
+import { HandSummary, sheetForHand } from '@/components/HandSummary';
 import { MahjongTable } from '@/components/MahjongTable';
 import { SeatSharing } from '@/components/SeatSharing';
+import type { RuleSet } from '@/scoring';
 import type { HandRecord, Session } from '@/store/types';
 import { editHand, resetDraft } from '@/store/draft';
 import { discardPhoto } from '@/lib/photos';
@@ -69,6 +71,10 @@ export default function SessionScreen() {
   const [pickingRules, setPickingRules] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleText, setTitleText] = useState(session?.name ?? '');
+  // The hand whose breakdown is showing. Kept after the sheet closes, so it
+  // does not go blank while it slides away.
+  const [shownHand, setShownHand] = useState<HandRecord | null>(null);
+  const [showingHand, setShowingHand] = useState(false);
 
   if (!session) {
     return (
@@ -287,16 +293,14 @@ export default function SessionScreen() {
                   <HandRow
                     hand={hand}
                     session={session}
+                    rules={rules}
                     onDelete={() => {
                       void discardPhoto(hand.photoUri);
                       deleteHand(session.id, hand.id);
                     }}
-                    onEdit={() => {
-                      // Straight to the tiles: the photograph and everything
-                      // read from it are already known, so there is nothing to
-                      // capture unless the user asks to retake it.
-                      editHand(hand, session.id, session.ruleSetId);
-                      router.push('/hand/review');
+                    onOpen={() => {
+                      setShownHand(hand);
+                      setShowingHand(true);
                     }}
                   />
                 </View>
@@ -314,19 +318,42 @@ export default function SessionScreen() {
         </Section>
       </ScrollView>
 
+      <HandBreakdown
+        visible={showingHand}
+        sheet={shownHand ? sheetForHand(shownHand, session, rules) : null}
+        onClose={() => setShowingHand(false)}
+        action={
+          shownHand
+            ? {
+                label: 'Edit hand',
+                onPress: () => {
+                  setShowingHand(false);
+                  // Straight to the tiles: the photograph and everything read
+                  // from it are already known, so there is nothing to capture
+                  // unless the user asks to retake it.
+                  editHand(shownHand, session.id, session.ruleSetId);
+                  router.push('/hand/review');
+                },
+              }
+            : undefined
+        }
+      />
+
     </Screen>
   );
 }
 function HandRow({
   hand,
   session,
+  rules,
   onDelete,
-  onEdit,
+  onOpen,
 }: {
   hand: HandRecord;
   session: Session;
+  rules: RuleSet | undefined;
   onDelete: () => void;
-  onEdit: () => void;
+  onOpen: () => void;
 }) {
   const winner = session.players.find((p) => p.id === hand.winnerId);
 
@@ -340,17 +367,16 @@ function HandRow({
   return (
     <View style={styles.hand}>
       {/*
-        * The body opens the hand; only the bin deletes it. A scored hand is the
-        * one thing in the app that could previously not be corrected, which
-        * made every misread tile permanent.
+        * The body opens the hand's breakdown, which is also where it is
+        * corrected; only the bin deletes it.
         */}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Edit the hand ${winner?.name ?? ''} won`}
-        onPress={onEdit}
+        accessibilityLabel={`Open the hand ${winner?.name ?? ''} won`}
+        onPress={onOpen}
         style={({ pressed }) => [styles.handBody, pressed && styles.pressedChip]}
       >
-        <HandSummary hand={hand} session={session} />
+        <HandSummary hand={hand} session={session} rules={rules} />
       </Pressable>
       <Button label="" variant="ghost" onPress={confirm} icon={<TrashIcon size={18} color={colors.inkFaint} />} style={styles.handDelete} />
     </View>

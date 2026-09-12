@@ -1,6 +1,6 @@
 import type { AwayGame, HandRecord, Session, SessionPlayer, StoredHand } from './types';
 import type { TileCode } from '@/tiles/tileset';
-import { scoreHand, type RuleSet } from '@/scoring';
+import { scoreHand, type HandInput, type RuleSet, type ScoreResult } from '@/scoring';
 
 /**
  * What a person's history adds up to, across every table they sat at.
@@ -93,6 +93,8 @@ export function playerStats(games: readonly PlayedGame[], me: Identity): PlayerS
 
 export interface BestHand {
   readonly record: HandRecord;
+  /** The game it was won in, for who was at the table and what they paid. */
+  readonly session: Session;
   readonly ruleSetId: string;
   readonly tiles: TileCode[];
   /** True when it was scored on somebody else's phone. */
@@ -121,9 +123,10 @@ export function bestHandFor(games: readonly PlayedGame[], me: Identity): BestHan
     if (!seat) continue;
     for (const record of game.session.hands) {
       if (record.winnerId !== seat.id) continue;
-      if (best && record.summary.total <= best.record.summary.total) continue;
+      if (best && !beats(record, best.record)) continue;
       best = {
         record,
+        session: game.session,
         ruleSetId: game.session.ruleSetId,
         tiles: [...(record.hand.exposed ?? []), ...record.hand.concealed],
         away: game.away,
@@ -150,18 +153,56 @@ export function bestHandFor(games: readonly PlayedGame[], me: Identity): BestHan
  * wrapping row.
  */
 export function handGroups(hand: StoredHand, rules: RuleSet | undefined): TileCode[][] | null {
+  const result = scoreStored(hand, rules);
+  return result ? groupsFrom(result, hand) : null;
+}
+
+/** A stored hand in the shape the scorer takes, whatever build wrote it. */
+export function asHandInput(hand: StoredHand): HandInput {
+  return { ...hand, exposed: hand.exposed ?? [], bonus: hand.bonus ?? [] };
+}
+
+/**
+ * Score a stored hand again, under the rules it was played to.
+ *
+ * What every screen showing a hand's worth reads now, rather than the summary
+ * saved with it, so a hand reads the same everywhere and a hand saved by an
+ * older scorer - a limit hand saved as the four faan its patterns summed to -
+ * shows what it is actually worth. The payments are not recalculated: they
+ * are what changed hands at the table, and they stay as stored.
+ *
+ * Null when there are no rules to read it by (a friend's own ruleset, not on
+ * this phone) or the tiles no longer form a hand under them.
+ */
+export function scoreStored(hand: StoredHand, rules: RuleSet | undefined): ScoreResult | null {
   if (!rules) return null;
   try {
-    const reading = scoreHand(
-      { ...hand, exposed: hand.exposed ?? [], bonus: hand.bonus ?? [] },
-      rules,
-    ).reading;
-    if (!reading) return null;
-    const groups = reading.melds.map((meld) => [...meld.tiles]);
-    return hand.bonus?.length ? [...groups, [...hand.bonus]] : groups;
+    const result = scoreHand(asHandInput(hand), rules);
+    return result.reading ? result : null;
   } catch {
     return null;
   }
+}
+
+/** The hand laid out as a result read it: its sets, its pair, then the flowers. */
+export function groupsFrom(result: ScoreResult, hand: StoredHand): TileCode[][] | null {
+  if (!result.reading) return null;
+  const groups = result.reading.melds.map((meld) => [...meld.tiles]);
+  return hand.bonus?.length ? [...groups, [...hand.bonus]] : groups;
+}
+
+/**
+ * Whether one winning hand outranks another: what it paid first, then its count.
+ *
+ * Paid first because the count can undersell. A limit hand saved by an older
+ * scorer carried the few faan its other patterns summed to, and ranked below
+ * hands a fraction of its worth; what the other players handed over is the
+ * one number that was never in doubt.
+ */
+function beats(candidate: HandRecord, current: HandRecord): boolean {
+  const paid = candidate.summary.winnerReceives - current.summary.winnerReceives;
+  if (paid !== 0) return paid > 0;
+  return candidate.summary.total > current.summary.total;
 }
 
 /** Owned sessions and away games as one list, newest first. */

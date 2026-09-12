@@ -26,9 +26,19 @@ import {
   TrophyIcon,
 } from '@/design/icons';
 import { colors, radius, space } from '@/design/tokens';
-import { BestHandTiles } from '@/components/BestHandTiles';
+import { HandBreakdown } from '@/components/HandBreakdown';
+import { sheetForHand } from '@/components/HandSummary';
+import { HandTiles } from '@/components/HandTiles';
+import { breakdownOf, scoreText } from '@/scoring';
 import { findRuleSet, useAppState } from '@/store/store';
-import { bestHandFor, handGroups, playedGames, playerStats } from '@/store/stats';
+import {
+  asHandInput,
+  bestHandFor,
+  groupsFrom,
+  playedGames,
+  playerStats,
+  scoreStored,
+} from '@/store/stats';
 import {
   deleteAccount,
   isAppleSignInAvailable,
@@ -84,10 +94,27 @@ export default function ProfileScreen() {
   const games = useMemo(() => playedGames(sessions, awayGames), [sessions, awayGames]);
   const best = useMemo(() => bestHandFor(games, me), [games, me]);
   const stats = useMemo(() => playerStats(games, me), [games, me]);
-  const bestGroups = useMemo(
-    () => (best ? handGroups(best.record.hand, findRuleSet(best.ruleSetId)) : null),
+  /*
+   * Scored again under its rules rather than read from what was saved: what it
+   * was worth, how it grouped and every line of the breakdown then come from
+   * one reading, and a limit hand saved by an older scorer as four faan shows
+   * the ten it was paid as.
+   */
+  const bestResult = useMemo(
+    () => (best ? scoreStored(best.record.hand, findRuleSet(best.ruleSetId)) : null),
     [best],
   );
+  const bestGroups = useMemo(
+    () => (best && bestResult ? groupsFrom(bestResult, best.record.hand) : null),
+    [best, bestResult],
+  );
+  const bestBreakdown = useMemo(() => {
+    const rules = best ? findRuleSet(best.ruleSetId) : undefined;
+    return best && bestResult && rules
+      ? breakdownOf(bestResult, asHandInput(best.record.hand), rules)
+      : null;
+  }, [best, bestResult]);
+  const [showingBest, setShowingBest] = useState(false);
   const bestTiles = useMemo(
     () => (best ? [...best.tiles, ...(best.record.hand.bonus ?? [])] : []),
     [best],
@@ -110,9 +137,12 @@ export default function ProfileScreen() {
       net: stats.net,
       best: best
         ? {
-            total: best.record.summary.total,
-            unit: best.record.summary.unit,
+            total: bestResult?.total ?? best.record.summary.total,
+            unit: bestResult?.unit ?? best.record.summary.unit,
+            limitName: bestResult?.limitName ?? best.record.summary.limitName ?? null,
+            // Kept for friends on older builds, which still list these.
             patterns: best.record.summary.topPatterns,
+            breakdown: bestBreakdown,
             // All of it. This used to be cut at eighteen, which is short of a
             // Taiwanese hand with a kong and its flowers.
             tiles: bestTiles,
@@ -122,7 +152,7 @@ export default function ProfileScreen() {
           }
         : null,
     });
-  }, [signedIn, stats, best, bestTiles, bestGroups]);
+  }, [signedIn, stats, best, bestTiles, bestGroups, bestResult, bestBreakdown]);
 
   if (!isCloudConfigured()) {
     return (
@@ -146,19 +176,31 @@ export default function ProfileScreen() {
 
       <Section title="Best hand" icon={<TrophyIcon size={15} color={colors.brass} />}>
         {best ? (
-          <Panel style={styles.best}>
-            <BestHandTiles groups={bestGroups} tiles={bestTiles} />
-            <View style={styles.bestLine}>
-              <BodyStrong tone="accent" numeric>
-                {best.record.summary.total} {best.record.summary.unit}
-              </BodyStrong>
-              <Caption tone="faint">{relativeDate(best.record.createdAt)}</Caption>
-            </View>
-            {best.record.summary.topPatterns.length > 0 ? (
-              <Caption tone="muted">{best.record.summary.topPatterns.join(' · ')}</Caption>
-            ) : null}
-            <Caption tone="faint">{findRuleSet(best.ruleSetId)?.name ?? ''}</Caption>
-          </Panel>
+          // What it scored and why is one tap away, in the breakdown, rather
+          // than a list of pattern names under the tiles.
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open your best hand"
+            onPress={() => setShowingBest(true)}
+            style={({ pressed }) => pressed && styles.pressed}
+          >
+            <Panel style={styles.best}>
+              <HandTiles groups={bestGroups} tiles={bestTiles} />
+              <View style={styles.bestLine}>
+                <BodyStrong tone="accent" numeric>
+                  {bestResult
+                    ? scoreText(bestResult.total, bestResult.unit, bestResult.limitName)
+                    : scoreText(
+                        best.record.summary.total,
+                        best.record.summary.unit,
+                        best.record.summary.limitName,
+                      )}
+                </BodyStrong>
+                <Caption tone="faint">{relativeDate(best.record.createdAt)}</Caption>
+              </View>
+              <Caption tone="faint">{findRuleSet(best.ruleSetId)?.name ?? ''}</Caption>
+            </Panel>
+          </Pressable>
         ) : (
           <Panel style={styles.empty}>
             <SparkIcon size={24} color={colors.inkFaint} />
@@ -170,6 +212,19 @@ export default function ProfileScreen() {
           </Panel>
         )}
       </Section>
+
+      <HandBreakdown
+        visible={showingBest}
+        sheet={
+          best
+            ? {
+                ...sheetForHand(best.record, best.session, findRuleSet(best.ruleSetId)),
+                title: 'Your best hand',
+              }
+            : null
+        }
+        onClose={() => setShowingBest(false)}
+      />
 
       <Section title="All time">
         <Panel flush>
@@ -682,6 +737,7 @@ const styles = StyleSheet.create({
   nameField: { gap: space.sm },
   best: { gap: space.sm },
   bestLine: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  pressed: { opacity: 0.8 },
   empty: { alignItems: 'center', gap: space.sm, paddingVertical: space.lg },
   accountActions: { gap: space.sm, marginTop: space.md },
 

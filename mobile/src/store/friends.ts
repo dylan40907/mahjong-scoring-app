@@ -1,5 +1,6 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import { supabase } from '@/lib/supabase';
+import type { Breakdown } from '@/scoring';
 import { loadFriends, saveFriends } from './persistence';
 import { queueIntent } from './store';
 
@@ -306,6 +307,14 @@ export interface ProfileStats {
     readonly tiles: string[];
     /** The hand as it scored, one group per set. Absent from older builds. */
     readonly groups?: string[][] | null;
+    /** 'Limit hand', 'Mangan', ... when a ceiling set what it paid. */
+    readonly limitName?: string | null;
+    /**
+     * Line by line, worked out on its owner's phone - where the ruleset it was
+     * scored under lives. A viewer may not have that ruleset at all, so this
+     * cannot be worked out on their side. Absent from older builds.
+     */
+    readonly breakdown?: Breakdown | null;
     readonly ruleSetId: string;
     readonly at: string;
   } | null;

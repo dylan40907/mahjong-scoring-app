@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   BodyStrong,
@@ -17,7 +17,9 @@ import {
 } from '@/design/components';
 import { FriendsIcon, PersonIcon, SparkIcon, TrophyIcon } from '@/design/icons';
 import { colors, space } from '@/design/tokens';
-import { BestHandTiles } from '@/components/BestHandTiles';
+import { HandBreakdown } from '@/components/HandBreakdown';
+import { HandTiles } from '@/components/HandTiles';
+import { scoreText } from '@/scoring';
 import { findRuleSet } from '@/store/store';
 import {
   acceptFriend,
@@ -57,6 +59,7 @@ export default function PublicProfileScreen() {
   const [note, setNote] = useState<string | null>(null);
   /** Bumped to ask for a fresh read after sending or accepting a request. */
   const [reloads, setReloads] = useState(0);
+  const [showingBest, setShowingBest] = useState(false);
 
   /*
    * Nothing is set until the answer comes back.
@@ -135,22 +138,30 @@ export default function PublicProfileScreen() {
 
         <Section title="Best hand" icon={<TrophyIcon size={15} color={colors.brass} />}>
           {best ? (
-            <Panel style={styles.best}>
-              <BestHandTiles
-                groups={best.groups as TileCode[][] | null | undefined}
-                tiles={best.tiles as TileCode[]}
-              />
-              <View style={styles.bestLine}>
-                <BodyStrong tone="accent" numeric>
-                  {best.total} {best.unit}
-                </BodyStrong>
-                <Caption tone="faint">{relativeDate(best.at)}</Caption>
-              </View>
-              {best.patterns.length > 0 ? (
-                <Caption tone="muted">{best.patterns.join(' · ')}</Caption>
-              ) : null}
-              <Caption tone="faint">{findRuleSet(best.ruleSetId)?.name ?? ''}</Caption>
-            </Panel>
+            // Opens only once their phone has published a breakdown; an older
+            // build sent the names alone, and a sheet of bare names is less
+            // than the card already says.
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open their best hand"
+              disabled={!best.breakdown}
+              onPress={() => setShowingBest(true)}
+              style={({ pressed }) => pressed && styles.pressed}
+            >
+              <Panel style={styles.best}>
+                <HandTiles
+                  groups={best.groups as TileCode[][] | null | undefined}
+                  tiles={best.tiles as TileCode[]}
+                />
+                <View style={styles.bestLine}>
+                  <BodyStrong tone="accent" numeric>
+                    {scoreText(best.total, best.unit, best.limitName)}
+                  </BodyStrong>
+                  <Caption tone="faint">{relativeDate(best.at)}</Caption>
+                </View>
+                <Caption tone="faint">{findRuleSet(best.ruleSetId)?.name ?? ''}</Caption>
+              </Panel>
+            </Pressable>
           ) : (
             <Panel style={styles.empty}>
               <SparkIcon size={24} color={colors.inkFaint} />
@@ -179,6 +190,22 @@ export default function PublicProfileScreen() {
 
         {profile.relation === 'friend' ? <FriendActions profile={profile} onDone={leave} /> : null}
       </View>
+
+      <HandBreakdown
+        visible={showingBest}
+        sheet={
+          best?.breakdown
+            ? {
+                title: `${profile.displayName || profile.handle || 'Their'}’s best hand`,
+                subtitle: findRuleSet(best.ruleSetId)?.name,
+                groups: (best.groups ?? null) as TileCode[][] | null,
+                tiles: best.tiles as TileCode[],
+                breakdown: best.breakdown,
+              }
+            : null
+        }
+        onClose={() => setShowingBest(false)}
+      />
     </Screen>
   );
 }
@@ -302,6 +329,7 @@ const styles = StyleSheet.create({
   relation: { gap: space.sm },
   best: { gap: space.sm },
   bestLine: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
+  pressed: { opacity: 0.8 },
   empty: { alignItems: 'center', gap: space.sm, paddingVertical: space.lg },
   actions: { gap: space.sm, marginTop: space.xxxl },
 });

@@ -129,6 +129,19 @@ export function limitPoints(config: FaanPayout): number {
   return config.table[config.table.length - 1]?.points ?? 64;
 }
 
+/**
+ * The faan a limit hand counts as: the row the table tops out at.
+ *
+ * What a limit hand is paid as, and so the number to show for it. Its own
+ * patterns might add up to four faan on the way - Big Three Dragons is worth
+ * nothing of itself here, it only makes the hand a limit - and showing that
+ * four beside a payment worth ten made the best hand of the night look like a
+ * modest one.
+ */
+export function limitFaan(config: FaanPayout): number {
+  return config.table[config.table.length - 1]?.faan ?? 10;
+}
+
 export function settleFaan(
   config: FaanPayout,
   points: number,

@@ -1,6 +1,8 @@
 export * from './hand';
 export * from './decompose';
 export * from './score';
+export * from './breakdown';
+export { evidenceFor } from './patterns/evidence';
 export { PATTERNS, PATTERN_LIST, patternById } from './patterns/library';
 export type { PatternDefinition, PatternGroup } from './patterns/library';
 export * from './patterns/custom';
