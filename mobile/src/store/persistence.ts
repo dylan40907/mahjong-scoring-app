@@ -6,8 +6,9 @@ import {
   type Session,
   type Settings,
   type StoredHand,
+  ParkedGames,
 } from './types';
-import { pruneTombstones, type Tombstone } from './sync/meta';
+import { pruneTombstones, type SyncOwner, type Tombstone } from './sync/meta';
 import type { QueuedIntent } from './sync/outbox';
 
 /**
@@ -31,6 +32,8 @@ const KEYS = {
   awayGames: 'mj.awayGames',
   outbox: 'mj.outbox',
   friends: 'mj.friends',
+  syncOwner: 'mj.syncOwner',
+  parked: 'mj.parked',
 } as const;
 
 const SCHEMA_VERSION = 3;
@@ -78,8 +81,10 @@ export async function loadAll(): Promise<{
   settings: Settings;
   awayGames: AwayGame[];
   outbox: QueuedIntent[];
+  syncOwner?: SyncOwner;
+  parked: Record<string, ParkedGames>;
 }> {
-  const [sessions, deletedSessions, customRuleSets, settings, awayGames, outbox] =
+  const [sessions, deletedSessions, customRuleSets, settings, awayGames, outbox, syncOwner, parked] =
     await Promise.all([
       readJson<Session[]>(KEYS.sessions, []),
       readJson<Tombstone[]>(KEYS.deletedSessions, []),
@@ -89,6 +94,8 @@ export async function loadAll(): Promise<{
       // It is a cache of the server's copy, so nothing is lost if it is not.
       readJson<AwayGame[]>(KEYS.awayGames, []),
       readJson<QueuedIntent[]>(KEYS.outbox, []),
+      readJson<SyncOwner | null>(KEYS.syncOwner, null),
+      readJson<Record<string, ParkedGames>>(KEYS.parked, {}),
     ]);
 
   await writeJson(KEYS.version, SCHEMA_VERSION);
@@ -107,7 +114,38 @@ export async function loadAll(): Promise<{
       ? awayGames.filter((game) => isPlausibleSession(game?.session))
       : [],
     outbox: Array.isArray(outbox) ? outbox.filter((queued) => !!queued?.intent) : [],
+    // Unreadable reads as absent, which `carryOver` treats as "could have been
+    // anybody": the safe direction, since it pushes rather than strands.
+    syncOwner:
+      typeof syncOwner?.userId === 'string'
+        ? { userId: syncOwner.userId, anonymous: !!syncOwner.anonymous }
+        : undefined,
+    parked: plausibleParked(parked),
   };
+}
+
+/**
+ * Each account's set-aside games, with anything unreadable dropped per record
+ * rather than per account - one bad session should cost that session, not
+ * every game somebody signed out with.
+ */
+function plausibleParked(value: unknown): Record<string, ParkedGames> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  const out: Record<string, ParkedGames> = {};
+  for (const [userId, games] of Object.entries(value as Record<string, Partial<ParkedGames>>)) {
+    const sessions = Array.isArray(games?.sessions) ? games.sessions.filter(isPlausibleSession) : [];
+    const deletedSessions = Array.isArray(games?.deletedSessions) ? games.deletedSessions : [];
+    if (sessions.length > 0 || deletedSessions.length > 0) {
+      out[userId] = {
+        sessions: sessions.map((session) => ({
+          ...session,
+          hands: session.hands.map((record) => ({ ...record, hand: migrateHand(record.hand) })),
+        })),
+        deletedSessions,
+      };
+    }
+  }
+  return out;
 }
 
 function isPlausibleSession(value: unknown): value is Session {
@@ -128,6 +166,9 @@ export const saveCustomRuleSets = (rules: CustomRuleSet[]) => writeJson(KEYS.cus
 export const saveSettings = (settings: Settings) => writeJson(KEYS.settings, settings);
 export const saveAwayGames = (games: AwayGame[]) => writeJson(KEYS.awayGames, games);
 export const saveOutbox = (queue: QueuedIntent[]) => writeJson(KEYS.outbox, queue);
+export const saveSyncOwner = (owner: SyncOwner | null) => writeJson(KEYS.syncOwner, owner);
+export const saveParked = (parked: Readonly<Record<string, ParkedGames>>) =>
+  writeJson(KEYS.parked, parked);
 
 /**
  * The friends list, cached.

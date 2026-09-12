@@ -40,7 +40,7 @@ import {
 } from '@/design/icons';
 import { colors, radius, space, tileSize } from '@/design/tokens';
 import type { HandContext } from '@/scoring';
-import { findRuleSet, useAppState } from '@/store/store';
+import { findRuleSet, sessionIn, useAppState } from '@/store/store';
 import { getDraft, updateDraft, useDraft } from '@/store/draft';
 import { orderDetections } from '@/vision/ordering';
 import { fullFrame } from '@/vision/boundary';
@@ -112,7 +112,8 @@ export default function CaptureScreen() {
 
   const draft = useDraft(useCallback((d) => d, []));
   const session = useAppState(
-    useCallback((state) => state.sessions.find((s) => s.id === draft.sessionId), [draft.sessionId]),
+    // Followed if sync has moved it to a new id since the hand began.
+    useCallback((state) => sessionIn(state.sessions, draft.sessionId), [draft.sessionId]),
   );
   const rules = findRuleSet(draft.ruleSetId);
   const family = rules?.family ?? 'taiwanese';

@@ -1,4 +1,5 @@
-import { reconcile, type LocalState, type RemoteState } from '../reconcile';
+import { isDirty } from '../meta';
+import { reconcile, settle, type LocalState, type RemoteState } from '../reconcile';
 import type { Session } from '../../types';
 
 /**
@@ -143,5 +144,104 @@ describe('a device that has been away for a week', () => {
     expect(out.keep.map((s) => s.id).sort()).toEqual(['mine', 'shared', 'theirs']);
     expect(out.push.map((s) => s.id)).toEqual(['mine']);
     expect(out.keep.find((s) => s.id === 'shared')!.updatedAt).toBe('2026-09-02T10:00:00.000Z');
+  });
+});
+
+describe('writing the answer back while the table keeps scoring', () => {
+  // A sync reads, spends a while on the network, then writes. Anything done in
+  // between used to be overwritten by the copy it read at the start.
+  const at = '2026-09-03T10:00:00.000Z';
+  const later = '2026-09-03T10:05:00.000Z';
+
+  function run(started: Session[], remote: RemoteState = empty) {
+    return reconcile({ sessions: started, tombstones: [] }, remote);
+  }
+
+  it('marks what landed as synced', () => {
+    const mine = session('s1', at);
+    const plan = run([mine]);
+    const out = settle({ started: [mine], current: [mine], plan, landed: new Map([['s1', at]]) });
+    expect(isDirty(out[0])).toBe(false);
+  });
+
+  it('leaves dirty what did not land', () => {
+    const mine = session('s1', at);
+    const out = settle({ started: [mine], current: [mine], plan: run([mine]), landed: new Map() });
+    expect(isDirty(out[0])).toBe(true);
+  });
+
+  it('keeps a hand scored while the push was in flight', () => {
+    const mine = session('s1', at);
+    const plan = run([mine]);
+    const scored = { ...mine, name: 'with the new hand', updatedAt: later };
+
+    const out = settle({ started: [mine], current: [scored], plan, landed: new Map([['s1', at]]) });
+
+    expect(out[0].name).toBe('with the new hand');
+    // The server has the copy from before the hand, so this one is still owed.
+    expect(isDirty(out[0])).toBe(true);
+  });
+
+  it('does not bring back a session deleted while the sync ran', () => {
+    const mine = session('s1', at);
+    const out = settle({ started: [mine], current: [], plan: run([mine]), landed: new Map([['s1', at]]) });
+    expect(out).toEqual([]);
+  });
+
+  it('keeps a session started while the sync ran', () => {
+    const mine = session('s1', at, at);
+    const started = session('s_new', later);
+    const out = settle({ started: [mine], current: [started, mine], plan: run([mine]), landed: new Map() });
+    expect(out.map((s) => s.id)).toEqual(['s_new', 's1']);
+  });
+
+  it('keeps a session re-keyed by adoption, and not the id it left', () => {
+    const refused = session('s1', at);
+    const adopted = { ...refused, id: 's1~x' };
+    const out = settle({
+      started: [refused],
+      current: [adopted],
+      plan: run([refused]),
+      landed: new Map([['s1~x', at]]),
+    });
+    expect(out.map((s) => s.id)).toEqual(['s1~x']);
+    expect(isDirty(out[0])).toBe(false);
+  });
+
+  it('takes the server’s copy when it won and nothing here changed', () => {
+    const mine = session('s1', at, at);
+    const theirs = session('s1', later, later);
+    const plan = run([mine], { sessions: [theirs], tombstones: [] });
+    const out = settle({ started: [mine], current: [mine], plan, landed: new Map() });
+    expect(out[0].updatedAt).toBe(later);
+  });
+
+  it('keeps an edit made during the sync over an older server copy', () => {
+    const mine = session('s1', at, at);
+    const theirs = session('s1', '2026-09-03T10:01:00.000Z');
+    const plan = run([mine], { sessions: [theirs], tombstones: [] });
+    const edited = { ...mine, updatedAt: later };
+    const out = settle({ started: [mine], current: [edited], plan, landed: new Map() });
+    expect(out[0].updatedAt).toBe(later);
+  });
+
+  it('drops a session deleted on another device, even one edited meanwhile', () => {
+    const mine = session('s1', at, at);
+    const plan = run([mine], { sessions: [], tombstones: [{ id: 's1', deletedAt: at }] });
+    const out = settle({ started: [mine], current: [{ ...mine, updatedAt: later }], plan, landed: new Map() });
+    expect(out).toEqual([]);
+  });
+
+  it('adds what another device made', () => {
+    const theirs = session('s2', at, at);
+    const plan = run([], { sessions: [theirs], tombstones: [] });
+    const out = settle({ started: [], current: [], plan, landed: new Map() });
+    expect(out.map((s) => s.id)).toEqual(['s2']);
+  });
+
+  it('lets a deleted account’s game follow accounts again once it has landed', () => {
+    const played = { ...session('s1', later, at), leftBehind: true };
+    const out = settle({ started: [played], current: [played], plan: run([played]), landed: new Map([['s1', later]]) });
+    expect(out[0].leftBehind).toBeFalsy();
   });
 });

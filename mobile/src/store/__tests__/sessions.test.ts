@@ -1,18 +1,26 @@
 import {
   addHand,
+  applySync,
   createSession,
   createSessionLike,
+  deleteHand,
   deleteSession,
   getSession,
   getState,
   leaveSeat,
+  leaveSessionsBehind,
   linkSeat,
+  rekeySession,
+  sessionIn,
   sessionTotals,
   setLocalIdentity,
   takeSeat,
   unlinkSeat,
+  updateHand,
 } from '../store';
 import { mySeat } from '../stats';
+import { adopt, planAdoption } from '../sync/adopt';
+import { isDirty } from '../sync/meta';
 import type { HandRecord, Session } from '../types';
 
 /**
@@ -230,5 +238,95 @@ describe('who is sitting where', () => {
 
     expect(names(session.id)).toEqual(['Ada', 'Wei', 'Player 3', 'Player 4']);
     expect(reload(session.id).players[1].accountId).toBeUndefined();
+  });
+});
+
+describe('a session sync gives a new id', () => {
+  // Adoption and collapsing copies both re-key a session, and either can
+  // happen with the session on screen or a hand half entered against it. Both
+  // hold the old id. Missing it drops the hand without a word.
+  let n = 0;
+  const nextCopy = (id: string) => `${id.split('~')[0]}~t${(n += 1)}`;
+
+  async function move(session: Session): Promise<Session> {
+    const adoption = planAdoption(session, 'session', nextCopy);
+    const moved = await rekeySession(
+      session.id,
+      (current) => adopt(current, adoption, 'u_new'),
+      adoption.renames,
+    );
+    return moved!;
+  }
+
+  it('still takes a hand saved against the id it had when the hand began', async () => {
+    const session = fresh();
+    addHand(session.id, hand(session.players[1].id));
+    const moved = await move(reload(session.id));
+
+    addHand(session.id, hand(session.players[2].id, 'h_after'));
+
+    expect(getState().sessions.some((s) => s.id === session.id)).toBe(false);
+    expect(getSession(moved.id)!.hands.map((h) => h.id)[0]).toBe('h_after');
+    expect(getSession(moved.id)!.hands).toHaveLength(2);
+  });
+
+  it('corrects a hand opened for editing before it moved', async () => {
+    const session = fresh();
+    addHand(session.id, hand(session.players[1].id, 'h_edit'));
+    await move(reload(session.id));
+
+    updateHand(session.id, hand(session.players[3].id, 'h_edit'));
+
+    const [only] = reload(session.id).hands;
+    expect(only.winnerId).toBe(session.players[3].id);
+    expect(only.id).not.toBe('h_edit');
+  });
+
+  it('deletes a hand by the id it had before it moved', async () => {
+    const session = fresh();
+    addHand(session.id, hand(session.players[1].id, 'h_gone'));
+    await move(reload(session.id));
+
+    deleteHand(session.id, 'h_gone');
+    expect(reload(session.id).hands).toEqual([]);
+  });
+
+  it('tombstones the session it moved to, not the id it left', async () => {
+    const session = fresh();
+    const moved = await move(session);
+
+    deleteSession(session.id);
+
+    expect(getSession(moved.id)).toBeUndefined();
+    expect(getState().deletedSessions.map((s) => s.id)).toContain(moved.id);
+    expect(getState().deletedSessions.map((s) => s.id)).not.toContain(session.id);
+  });
+
+  it('follows a game out to another account and back without going in circles', async () => {
+    const session = fresh();
+    const out = await move(session);
+
+    // Home again: the copy collapses back into the original.
+    applySync(
+      getState().sessions.map((s) => (s.id === out.id ? session : s)),
+      getState().deletedSessions,
+      new Map([[out.id, session.id]]),
+    );
+
+    expect(sessionIn(getState().sessions, session.id)?.id).toBe(session.id);
+    expect(sessionIn(getState().sessions, out.id)?.id).toBe(session.id);
+  });
+});
+
+describe('deleting the account the games synced to', () => {
+  it('leaves them here, owing nothing, and marked so they are not carried on', () => {
+    const session = fresh();
+    expect(isDirty(reload(session.id))).toBe(true);
+
+    leaveSessionsBehind();
+
+    const after = reload(session.id);
+    expect(isDirty(after)).toBe(false);
+    expect(after.leftBehind).toBe(true);
   });
 });

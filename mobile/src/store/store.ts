@@ -10,16 +10,19 @@ import {
   saveDeletedSessions,
   saveOutbox,
   saveSessions,
+  saveParked,
   saveSettings,
+  saveSyncOwner,
 } from './persistence';
 import { mySeat } from './stats';
-import { pruneTombstones, type Tombstone } from './sync/meta';
+import { markSynced, pruneTombstones, type SyncOwner, type Tombstone } from './sync/meta';
 import { enqueue, type Intent, type QueuedIntent } from './sync/outbox';
 import {
   DEFAULT_SETTINGS,
   type AppState,
   type AwayGame,
   type HandRecord,
+  type ParkedGames,
   type Session,
   type SessionPlayer,
   type Settings,
@@ -42,6 +45,7 @@ let state: AppState = {
   ready: false,
   sessions: [],
   deletedSessions: [],
+  parked: {},
   awayGames: [],
   outbox: [],
   customRuleSets: [],
@@ -193,11 +197,65 @@ export function createSessionLike(source: Session): Session {
 }
 
 function replaceSession(id: string, update: (session: Session) => Session): void {
+  const target = currentId(id);
   const next = state.sessions.map((session) =>
-    session.id === id ? { ...update(session), updatedAt: new Date().toISOString() } : session,
+    session.id === target ? { ...update(session), updatedAt: new Date().toISOString() } : session,
   );
   set({ sessions: next });
   void saveSessions(next);
+}
+
+// ---------------------------------------------------------------------------
+// Ids that moved
+// ---------------------------------------------------------------------------
+
+/**
+ * Where a session or a hand went when sync gave it a new id.
+ *
+ * Sync re-keys records in two cases - a session another account owns on the
+ * server, and a stale copy of a game the server already has (`sync/adopt.ts`)
+ * - and either can happen while the session is on screen or a hand is half
+ * entered against it. Both of those hold the old id: a route parameter, the
+ * draft. Without this the session screen says "not found", and a hand saved a
+ * moment later is written to a session that is no longer there, which drops it
+ * without a word.
+ *
+ * In memory only. Nothing holds an id across a restart except storage, and
+ * storage is rewritten with the new ones.
+ */
+const moved = new Map<string, string>();
+
+/** The id a record goes by now, following any moves since this one was read. */
+export function currentId(id: string): string {
+  let at = id;
+  // `recordMoves` never leaves a cycle; the bound is a guard, not a limit.
+  for (let hop = 0; hop < 16; hop += 1) {
+    const next = moved.get(at);
+    if (next === undefined) return at;
+    at = next;
+  }
+  return at;
+}
+
+function recordMoves(renames: Iterable<readonly [string, string]>): void {
+  for (const [from, to] of renames) {
+    if (from === to) continue;
+    moved.set(from, to);
+    // The target is current now, so it forwards nowhere. That is also what
+    // stops a game that goes out to another account and comes back from
+    // forwarding to itself in a loop.
+    moved.delete(to);
+  }
+}
+
+/** The session an id names, following it if sync has moved it since. */
+export function sessionIn(
+  sessions: readonly Session[],
+  id: string | null | undefined,
+): Session | undefined {
+  if (!id) return undefined;
+  const target = currentId(id);
+  return sessions.find((session) => session.id === target);
 }
 
 /**
@@ -214,8 +272,206 @@ function replaceSession(id: string, update: (session: Session) => Session): void
  * a merge - two things reconciling the same records by different rules is how
  * they end up disagreeing.
  */
-export function applySync(sessions: Session[], deletedSessions: Tombstone[]): void {
+export function applySync(
+  sessions: Session[],
+  deletedSessions: Tombstone[],
+  renames: ReadonlyMap<string, string> = new Map(),
+): void {
+  recordMoves(renames);
   set({ sessions, deletedSessions });
+}
+
+/**
+ * Give one session new ids, keeping everything that has happened to it.
+ *
+ * Applied to the session as it is now rather than as sync last read it,
+ * because sync spends a while on the network and a hand may have been scored
+ * in between; `rekey` builds the new version from whichever copy is current.
+ *
+ * Awaited, unlike every other write here. The caller is about to put the new
+ * id on the server, and a copy the server has that this device has forgotten
+ * - the app killed between the two - would be adopted a second time on the
+ * next sync and the game would arrive twice.
+ */
+export async function rekeySession(
+  id: string,
+  rekey: (current: Session) => Session,
+  renames: ReadonlyMap<string, string>,
+): Promise<Session | undefined> {
+  const current = getSession(id);
+  if (!current) return undefined;
+  const next = rekey(current);
+  recordMoves(renames);
+  const sessions = state.sessions.map((session) => (session === current ? next : session));
+  set({ sessions });
+  await saveSessions(sessions);
+  return next;
+}
+
+/**
+ * Record whose server the sessions' `syncedAt` stamps now describe.
+ *
+ * Only after the sessions it describes are saved: written first and followed
+ * by a crash, it would say the switch had been handled when the sessions on
+ * disk still said otherwise, and they would never be carried over.
+ */
+export async function setSyncOwner(owner: SyncOwner): Promise<void> {
+  set({ syncOwner: owner });
+  await saveSyncOwner(owner);
+}
+
+// ---------------------------------------------------------------------------
+// Whose games these are
+// ---------------------------------------------------------------------------
+
+/**
+ * Set an account's games aside, when it signs out.
+ *
+ * A game belongs to the account that scored it. Signing out used to leave
+ * them in the list, and whoever signed in next - a second account on a shared
+ * phone - had every one carried over and adopted as their own: an editable
+ * copy under the new account, beside the original that still belonged to the
+ * first. Two accounts on one phone each ended up owning the other's nights.
+ *
+ * Aside rather than deleted. They stay exactly as they were - unsynced edits
+ * and unsent deletes included - and come back when that account signs in here
+ * again (`restoreParkedSessions`). Nothing on them is touched on the way, not
+ * `updatedAt` and not `syncedAt`: moving a record is not editing it, and a
+ * copy that looked newer than the server's would win the next reconcile and
+ * take the server's extra hands down with it.
+ *
+ * A deleted account's games stay where they are. They follow nobody, which
+ * is what `leftBehind` already says.
+ *
+ * The owner record goes too. What is left in the list was scored with nobody
+ * signed in, and belongs to whoever signs in next - the rule `carryOver`
+ * applies when it does not know who the device last synced as.
+ */
+export async function parkSessions(userId: string): Promise<void> {
+  await hydrate();
+  const leaving = state.sessions.filter((session) => !session.leftBehind);
+  const staying = state.sessions.filter((session) => session.leftBehind);
+  const parked =
+    leaving.length > 0 || state.deletedSessions.length > 0
+      ? parkInto(state.parked, userId, leaving, state.deletedSessions)
+      : state.parked;
+  set({ parked, sessions: staying, deletedSessions: [], syncOwner: undefined });
+  await Promise.all([
+    saveParked(parked),
+    saveSessions(staying),
+    saveDeletedSessions([]),
+    saveSyncOwner(null),
+  ]);
+}
+
+/**
+ * Set aside some sessions for an account that is not the one signed in.
+ *
+ * What sync does when it finds the device was last synced as a different real
+ * account and nothing set its games aside - a sign-out on a build older than
+ * `parkSessions`, or a session that simply expired. Synchronous in memory, so
+ * the caller can take the same sessions out of the list in the same tick and
+ * nothing renders both.
+ */
+export function parkSome(userId: string, sessions: readonly Session[]): Promise<void> {
+  const parked = parkInto(state.parked, userId, sessions, []);
+  set({ parked });
+  return saveParked(parked);
+}
+
+/**
+ * Bring an account's games back when it signs in on this phone again.
+ *
+ * Merged into what is here rather than replacing it: anything scored while
+ * nobody was signed in stays, and is this account's from now on. Their stamps
+ * still describe this account's server, so the next sync reconciles them as
+ * though nobody had ever signed out.
+ */
+export async function restoreParkedSessions(userId: string): Promise<void> {
+  await hydrate();
+  const mine = state.parked[userId];
+  if (!mine) return;
+  const parked = Object.fromEntries(
+    Object.entries(state.parked).filter(([id]) => id !== userId),
+  );
+  const sessions = mergeSessions(state.sessions, mine.sessions);
+  const deletedSessions = mergeTombstones(state.deletedSessions, mine.deletedSessions);
+  set({ parked, sessions, deletedSessions });
+  await Promise.all([
+    saveParked(parked),
+    saveSessions(sessions),
+    saveDeletedSessions(deletedSessions),
+  ]);
+}
+
+/**
+ * Tie every game on the phone that no account holds to the one signing in.
+ *
+ * Games scored with no account signed in - as a guest, or after signing out -
+ * belong to the first real account that signs in on this phone, and from then
+ * on they are its games like any other: synced to it, set aside with it when
+ * it signs out, and invisible to every other account. Guest games need nothing
+ * done here; they are already in the list, so they go wherever this account's
+ * games go. A deleted account's games do: `leftBehind` is what kept them
+ * following nobody, so it comes off, and they are marked unsynced - never
+ * re-dated, since moving a record is not editing it - so the next sync sends
+ * them to their new owner.
+ */
+export async function claimUnowned(): Promise<void> {
+  await hydrate();
+  if (!state.sessions.some((session) => session.leftBehind)) return;
+  const sessions = state.sessions.map((session) =>
+    session.leftBehind ? { ...session, leftBehind: undefined, syncedAt: null } : session,
+  );
+  set({ sessions });
+  await saveSessions(sessions);
+}
+
+function parkInto(
+  parked: Readonly<Record<string, ParkedGames>>,
+  userId: string,
+  sessions: readonly Session[],
+  deletedSessions: readonly Tombstone[],
+): Record<string, ParkedGames> {
+  const had = parked[userId];
+  return {
+    ...parked,
+    [userId]: {
+      sessions: mergeSessions(had?.sessions ?? [], sessions),
+      deletedSessions: mergeTombstones(had?.deletedSessions ?? [], deletedSessions),
+    },
+  };
+}
+
+/** One copy per id, the later edit where there are two. */
+function mergeSessions(base: readonly Session[], extra: readonly Session[]): Session[] {
+  const byId = new Map(base.map((session) => [session.id, session]));
+  for (const session of extra) {
+    const had = byId.get(session.id);
+    byId.set(session.id, had && had.updatedAt > session.updatedAt ? had : session);
+  }
+  return [...byId.values()];
+}
+
+function mergeTombstones(base: readonly Tombstone[], extra: readonly Tombstone[]): Tombstone[] {
+  const seen = new Set(base.map((stone) => stone.id));
+  return [...base, ...extra.filter((stone) => !seen.has(stone.id))];
+}
+
+/**
+ * Keep the games on this device from following it to the next account.
+ *
+ * For deleting an account, which promises that what was stored with it is
+ * gone. The next launch signs a fresh anonymous account in, and without this
+ * the first sync would carry every game straight back up under it. Each
+ * session is marked as owing nothing to any server, and `leftBehind` keeps
+ * `carryOver` away from it; changing one is playing it again, and it syncs
+ * from then on like any other.
+ */
+export function leaveSessionsBehind(): void {
+  const sessions = state.sessions.map((session) => ({ ...markSynced(session), leftBehind: true }));
+  set({ sessions });
+  void saveSessions(sessions);
 }
 
 /**
@@ -256,7 +512,7 @@ export function getState(): AppState {
 }
 
 export function getSession(id: string): Session | undefined {
-  return state.sessions.find((session) => session.id === id);
+  return sessionIn(state.sessions, id);
 }
 
 export function addHand(sessionId: string, record: HandRecord): void {
@@ -290,16 +546,19 @@ function nextDealer(session: Session): string {
  * the game being played.
  */
 export function updateHand(sessionId: string, record: HandRecord): void {
+  // The draft may have opened this hand under an id sync has since moved.
+  const id = currentId(record.id);
   replaceSession(sessionId, (session) => ({
     ...session,
-    hands: session.hands.map((hand) => (hand.id === record.id ? record : hand)),
+    hands: session.hands.map((hand) => (hand.id === id ? { ...record, id } : hand)),
   }));
 }
 
 export function deleteHand(sessionId: string, handId: string): void {
+  const id = currentId(handId);
   replaceSession(sessionId, (session) => ({
     ...session,
-    hands: session.hands.filter((hand) => hand.id !== handId),
+    hands: session.hands.filter((hand) => hand.id !== id),
   }));
 }
 
@@ -379,7 +638,10 @@ export function defaultSessionName(now: Date = new Date()): string {
   return `${day}, ${time}`;
 }
 
-export function deleteSession(id: string): void {
+export function deleteSession(requested: string): void {
+  // A tombstone naming an id sync has moved away from would delete nothing
+  // and leave the session where it was.
+  const id = currentId(requested);
   const next = state.sessions.filter((session) => session.id !== id);
   // The row goes, but a note that it went stays behind, so the delete can
   // travel to the other devices instead of looking like a session they have

@@ -58,6 +58,25 @@ export function winner<T extends SyncMeta>(local: T, remote: T): T {
   return remote.updatedAt > local.updatedAt ? remote : local;
 }
 
+/**
+ * The account this device's `syncedAt` stamps were acknowledged by.
+ *
+ * Clean only means something relative to one account. After the device signs
+ * in as somebody else, a session stamped clean is clean on a server it is no
+ * longer talking to - and without this it would never be pushed to the one it
+ * is. Absent on a device that has not synced since this was added, which
+ * `carryOver` treats as "could have been anybody".
+ */
+export interface SyncOwner {
+  readonly userId: string;
+  /**
+   * Whether it was anonymous at the time. An anonymous account nobody can
+   * sign back into was the same person as whoever signed in over it, which
+   * decides whose seat it was.
+   */
+  readonly anonymous: boolean;
+}
+
 /** A record id that has been deleted, and when. */
 export interface Tombstone {
   readonly id: string;

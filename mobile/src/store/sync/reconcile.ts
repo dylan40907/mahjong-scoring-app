@@ -1,5 +1,5 @@
 import type { Session } from '../types';
-import { isDirty, winner, type Tombstone } from './meta';
+import { isDirty, markSynced, winner, type Tombstone } from './meta';
 
 /**
  * Deciding what to send and what to keep, with no network in sight.
@@ -105,4 +105,66 @@ export function reconcile(local: LocalState, remote: RemoteState): Reconciliatio
   }
 
   return { keep, push, pushDeletes, dropLocal, learnedDeletes };
+}
+
+/**
+ * Fold what a sync decided into what the device holds now.
+ *
+ * A sync reads the sessions, spends a while on the network, then writes its
+ * answer back - and the table does not stop scoring in between. Writing the
+ * answer over the top, which is what this replaced, lost any hand added while
+ * the push was in flight. That window used to be one request; falling back to
+ * one session at a time, and adopting sessions another account holds, can
+ * make it many.
+ *
+ * So the device's current copy is the starting point, and the sync's decisions
+ * apply only to sessions nobody touched while it ran:
+ *
+ * - Unchanged since `started`: take the decision - the server's copy if it
+ *   won, the local one otherwise, marked synced if it landed.
+ * - Edited meanwhile: last write wins against the decision, which is almost
+ *   always the edit. It stays dirty and goes next time.
+ * - Deleted on another device: gone, edited or not. A tombstone beats an edit.
+ * - New, or re-keyed by adoption, while it ran: kept as it is now.
+ * - Deleted or re-keyed here while it ran: not brought back from `started`.
+ *
+ * `landed` is the `updatedAt` the server acknowledged for each id, so a
+ * session edited after its push is not marked clean on the strength of an
+ * older copy.
+ */
+export function settle(input: {
+  readonly started: readonly Session[];
+  readonly current: readonly Session[];
+  readonly plan: Reconciliation;
+  readonly landed: ReadonlyMap<string, string>;
+}): Session[] {
+  const { started, current, plan, landed } = input;
+  const startedById = new Map(started.map((session) => [session.id, session]));
+  const decided = new Map(plan.keep.map((session) => [session.id, session]));
+  const dropped = new Set(plan.dropLocal);
+  const here = new Set(current.map((session) => session.id));
+
+  const out: Session[] = [];
+  for (const now of current) {
+    const before = startedById.get(now.id);
+    let next = now;
+    if (before) {
+      if (dropped.has(now.id)) continue;
+      const answer = decided.get(now.id) ?? now;
+      next = now.updatedAt === before.updatedAt ? answer : winner(now, answer);
+    }
+    out.push(landed.get(next.id) === next.updatedAt ? acknowledged(next) : next);
+  }
+
+  // Sessions another device made, which were never here to be touched.
+  for (const session of plan.keep) {
+    if (!startedById.has(session.id) && !here.has(session.id)) out.push(session);
+  }
+  return out;
+}
+
+/** Marked clean, and following its account again if it had been left behind. */
+function acknowledged(session: Session): Session {
+  const synced = markSynced(session);
+  return session.leftBehind ? { ...synced, leftBehind: undefined } : synced;
 }

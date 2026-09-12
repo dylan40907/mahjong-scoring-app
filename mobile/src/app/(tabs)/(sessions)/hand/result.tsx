@@ -28,6 +28,7 @@ import {
   addHand,
   findRuleSet,
   makeId,
+  sessionIn,
   updateHand,
   useAppState,
 } from '@/store/store';
@@ -50,8 +51,11 @@ export default function ResultScreen() {
   const [explaining, setExplaining] = useState<string | null>(null);
   const router = useRouter();
   const draft = useDraft(useCallback((d) => d, []));
+  // Through `sessionIn`: a sync can move the session to a new id while the
+  // hand is being entered, and missing it here would turn "Add to Session"
+  // into "Done" and throw the hand away.
   const session = useAppState(
-    useCallback((state) => state.sessions.find((s) => s.id === draft.sessionId), [draft.sessionId]),
+    useCallback((state) => sessionIn(state.sessions, draft.sessionId), [draft.sessionId]),
   );
   const rules = findRuleSet(draft.ruleSetId);
 

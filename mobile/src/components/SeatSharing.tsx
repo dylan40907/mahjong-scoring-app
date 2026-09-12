@@ -33,7 +33,9 @@ import type { Session, SessionPlayer } from '@/store/types';
  * history too, with their own totals worked out from their seat.
  *
  * So every seat opens onto the same short list: you, each of your friends,
- * and somebody without the app. It is a choice of one, and whatever is picked
+ * and a guest - a name on the seat and no account behind it, which is what
+ * every seat is until somebody says otherwise. It is a choice of one, and
+ * whatever is picked
  * replaces what was there - that is what makes taking yourself out of a game
  * the same gesture as putting yourself in one.
  *
@@ -146,13 +148,13 @@ export function SeatSharing({ session }: { session: Session }) {
 
                   <Divider inset={space.lg} />
                   <Row
-                    title="Someone without the app"
+                    title="Guest"
                     subtitle={
                       isMe
                         ? 'Takes you out of this game'
                         : player.accountId
                           ? 'They stop seeing this game'
-                          : undefined
+                          : 'Just a name, not linked to anyone'
                     }
                     trailing={isNobody ? <CheckIcon size={18} color={colors.melded} /> : undefined}
                     chevron={false}

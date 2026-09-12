@@ -32,6 +32,7 @@ import {
   findRuleSet,
   renamePlayer,
   renameSession,
+  sessionIn,
   sessionTotals,
   setSessionRuleSet,
   useAppState,
@@ -55,9 +56,9 @@ import { plural } from '@/lib/format';
 export default function SessionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const session = useAppState(
-    useCallback((state) => state.sessions.find((s) => s.id === id), [id]),
-  );
+  // Followed through `sessionIn`, because sync can give the session a new id
+  // while this screen is open (`sync/adopt.ts`).
+  const session = useAppState(useCallback((state) => sessionIn(state.sessions, id), [id]));
 
   /*
    * Above the not-found branch on purpose. Hooks have to run in the same order

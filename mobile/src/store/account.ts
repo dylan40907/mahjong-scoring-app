@@ -5,8 +5,16 @@ import { Platform } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { identityTaken } from '@/lib/authErrors';
 import { supabase } from '@/lib/supabase';
+import { resetDraft } from './draft';
 import { clearFriends } from './friends';
-import { clearAccountScopedState, setLocalIdentity } from './store';
+import {
+  claimUnowned,
+  clearAccountScopedState,
+  leaveSessionsBehind,
+  parkSessions,
+  restoreParkedSessions,
+  setLocalIdentity,
+} from './store';
 
 /**
  * Who is signed in, and what they are called.
@@ -156,6 +164,7 @@ export async function initAccount(): Promise<void> {
     }
 
     set({ status: statusFor(user), userId: user.id, email: user.email ?? null });
+    await enterAccount(user);
     await refreshIdentity();
   } finally {
     set({ busy: false });
@@ -164,12 +173,57 @@ export async function initAccount(): Promise<void> {
   supabase.auth.onAuthStateChange((_event, session) => {
     const user = session?.user;
     if (!user) {
-      forgetAccountData();
-      set(EMPTY);
+      // Signed out here, or a session that expired or was revoked elsewhere.
+      // Either way the account has gone, and its games go with it.
+      void leaveAccount();
       return;
     }
     set({ status: statusFor(user), userId: user.id, email: user.email ?? null });
+    // Every event, token refreshes included; a no-op unless something changed.
+    void enterAccount(user);
   });
+}
+
+/**
+ * Make the games on this phone match whoever just signed in.
+ *
+ * A game belongs to one account. Their own come back from wherever signing
+ * out set them aside, and a real account claims whatever on the phone belongs
+ * to nobody - games scored as a guest or while signed out, and a deleted
+ * account's - so those are tied to it from now on and leave with it when it
+ * signs out. An anonymous account claims nothing: it is the "nobody" those
+ * games are waiting in.
+ *
+ * Idempotent, and run from every place a session can arrive - the launch, the
+ * auth listener, and each sign-in path - because the listener is only
+ * registered once a launch has reached the server, and a sign-in on a phone
+ * that started offline would otherwise never bring anybody's games back.
+ */
+async function enterAccount(user: { id: string; is_anonymous?: boolean }): Promise<void> {
+  await restoreParkedSessions(user.id);
+  if (!user.is_anonymous) await claimUnowned();
+}
+
+/**
+ * The account has gone from this phone: forget what was only its business,
+ * and set its games aside for when it comes back.
+ *
+ * Setting aside happens after the account is cleared rather than before: a
+ * sync still on the network checks who is signed in before it writes, and
+ * from here the answer is nobody, so nothing it read can land after this
+ * account's games have left. Run twice on a sign-out - once by the listener,
+ * once by `signOut` for a phone whose listener never registered - and the
+ * second run finds nothing to do.
+ */
+async function leaveAccount(): Promise<void> {
+  // Only a real account has games to set aside. An anonymous one cannot sign
+  // out from the app, and its games belong to whoever signs in next.
+  const leaving = account.status === 'identified' ? account.userId : null;
+  forgetAccountData();
+  set(EMPTY);
+  if (leaving) await parkSessions(leaving);
+  // A hand half-entered for one of its games has nowhere to land now.
+  resetDraft();
 }
 
 async function loadProfile(): Promise<void> {
@@ -242,7 +296,9 @@ async function refreshIdentity(): Promise<void> {
   if (!supabase) return;
   await loadProfile();
   const { data } = await supabase.auth.getUser();
-  if (data.user) await ensureIdentity(data.user);
+  if (!data.user) return;
+  await enterAccount(data.user);
+  await ensureIdentity(data.user);
 }
 
 /** Findable, or not. Everything else about a profile stays as it is. */
@@ -415,6 +471,9 @@ export async function deleteAccount(): Promise<string | null> {
   const { error } = await supabase.rpc('delete_own_account');
   if (error) return error.message;
 
+  // The games stay on the phone, as the confirmation says - but not on their
+  // way back up to the anonymous account the next launch signs in.
+  leaveSessionsBehind();
   await supabase.auth.signOut();
   forgetAccountData();
   set(EMPTY);
@@ -557,8 +616,10 @@ export async function signInWithApple(): Promise<string | null> {
 export async function signOut(): Promise<void> {
   if (!supabase) return;
   await supabase.auth.signOut();
-  forgetAccountData();
-  set(EMPTY);
+  // Usually the listener has done this already, from inside `signOut`, and
+  // this finds nobody signed in. A phone whose listener never registered - a
+  // launch that could not reach the server - depends on it happening here.
+  await leaveAccount();
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { TileCode, Wind } from '@/tiles/tileset';
 import type { HandContext, Meld } from '@/scoring';
-import type { Tombstone } from './sync/meta';
+import type { SyncOwner, Tombstone } from './sync/meta';
 import type { QueuedIntent } from './sync/outbox';
 
 /**
@@ -97,6 +97,17 @@ export interface Session {
    * See `sync/meta.ts` for why dirtiness is derived rather than flagged.
    */
   readonly syncedAt?: string | null;
+  /**
+   * Set on every session here when the account it synced to is deleted.
+   *
+   * Deleting an account promises its games are gone from the server, and the
+   * app signs a new anonymous account in at the next launch. Without this the
+   * first sync would carry every one of them straight back up under that
+   * account (`sync/adopt.ts`). They stay on the phone and follow no account
+   * until one is changed, at which point it is being played again and syncs
+   * like anything else - which is also when the flag comes off.
+   */
+  readonly leftBehind?: boolean;
 }
 
 /**
@@ -135,6 +146,13 @@ export interface AwayGame {
   readonly fetchedAt: string;
 }
 
+/** One account's games, exactly as they were when it signed out. */
+export interface ParkedGames {
+  readonly sessions: Session[];
+  /** Deletes made here that its server may not have heard about yet. */
+  readonly deletedSessions: Tombstone[];
+}
+
 export interface AppState {
   /**
    * Sessions deleted here, kept so the delete can travel.
@@ -144,6 +162,13 @@ export interface AppState {
    * session arriving, and it comes back.
    */
   readonly deletedSessions: Tombstone[];
+  /** Whose server the sessions' `syncedAt` stamps describe. See `sync/meta.ts`. */
+  readonly syncOwner?: SyncOwner;
+  /**
+   * Other accounts' games, set aside while they are signed out on this phone.
+   * Keyed by account id. See `parkSessions` in the store.
+   */
+  readonly parked: Readonly<Record<string, ParkedGames>>;
   readonly ready: boolean;
   readonly sessions: Session[];
   /** Games scored on somebody else's phone that we played in. Read-only. */
