@@ -14,5 +14,8 @@ npm-debug.*
 expo-env.d.ts
 # @end expo-cli
 
-# Local copy of the EXPO_PUBLIC_ values; the real ones live in eas.json.
+# Local EXPO_PUBLIC_ values (see .env.example)
 .env
+
+# Output of npm run screenshots
+screenshots/

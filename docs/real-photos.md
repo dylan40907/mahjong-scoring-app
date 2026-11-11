@@ -1,11 +1,8 @@
 # Photographing a real tile set
 
-Every number in `model-card.md` comes from rendered tiles. This document is the
-route from that to numbers that mean something, and the order matters: build the
-evaluation set before the training set. Until the gap is measured, nobody knows
-whether it is two percent or forty, and that number decides everything
-downstream — how much synthetic data to mix in, how long to fine-tune, and
-which of the two models is actually broken.
+How to add photographs of your own tile set, for evaluation or fine-tuning.
+Build the evaluation set before the training set, so the gap between rendered
+and real tiles is measured before anything is trained on it.
 
 ## Why labelling is cheap here
 

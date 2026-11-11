@@ -11,8 +11,7 @@ import * as Updates from 'expo-updates';
  * about a minute against the fifteen a build costs, so the only thing standing
  * between a fix and the phone is whether the phone picks it up.
  *
- * Unlike apps that ask before restarting, this one does
- * not: a scoring app is opened for a few minutes at a time between hands, and
+ * The app does not ask before restarting: a scoring app is opened for a few minutes at a time between hands, and
  * a dialog that appears while somebody is mid-hand is a worse interruption
  * than the restart it is trying to warn about. Downloaded updates already
  * apply silently on the next cold launch; forcing the reload only changes

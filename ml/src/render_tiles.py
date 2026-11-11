@@ -144,7 +144,7 @@ def contact_sheet(tile_dir: Path, out_path: Path, cols: int = 9, scale: float = 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--svg-dir", type=Path, default=Path("tiles-src/Regular"))
+    parser.add_argument("--svg-dir", type=Path, required=True, help="Regular/ folder of the FluffyStuff/riichi-mahjong-tiles SVG set")
     parser.add_argument("--out", type=Path, default=Path(__file__).resolve().parents[1] / "assets" / "tiles")
     parser.add_argument("--sheet", type=Path, default=None)
     args = parser.parse_args()

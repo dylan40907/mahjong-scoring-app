@@ -147,7 +147,7 @@ describe('games scored with no account signed in', () => {
     await parkSessions('u_dylan');
     expect(getState().sessions).toEqual([]);
 
-    // Dylans signs in: not there.
+    // Dylans (a different account) signs in: not there.
     await restoreParkedSessions('u_dylans');
     await claimUnowned();
     expect(getState().sessions).toEqual([]);

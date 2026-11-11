@@ -220,8 +220,8 @@ describe('who is sitting where', () => {
   });
 
   it('swaps you and a friend when you take their chair', () => {
-    // Jacob starts a game (seat one), seats Dylan in seat two,
-    // then says he was in seat two. They were sitting the other way round.
+    // Jacob starts a game (seat one), seats Dylan in seat two, then says he
+    // was in seat two. They were sitting the other way round.
     setLocalIdentity('Jacob', 'u_jacob');
     const session = table(['Jacob', '', '', '']);
     linkSeat(session.id, session.players[1].id, 'u_dylan', 'Dylan');

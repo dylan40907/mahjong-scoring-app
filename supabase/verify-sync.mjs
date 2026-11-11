@@ -19,8 +19,12 @@
  * push marks whatever the session no longer has, and the pull stops bringing
  * it back.
  */
-const URL_ = 'https://your-project-ref.supabase.co';
-const KEY = 'your-publishable-key';
+const URL_ = process.env.SUPABASE_URL;
+const KEY = process.env.SUPABASE_KEY;
+if (!URL_ || !KEY) {
+  console.error('Set SUPABASE_URL and SUPABASE_KEY (the project URL and publishable key). See .env.example.');
+  process.exit(1);
+}
 
 let failures = 0;
 function check(name, passed, detail = '') {

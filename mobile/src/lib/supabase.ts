@@ -24,8 +24,8 @@ const key = process.env.EXPO_PUBLIC_SUPABASE_KEY;
 /**
  * SecureStore in chunks.
  *
- * SecureStore caps a
- * value at about 2 KB and a Supabase session token is comfortably larger, so
+ * SecureStore caps a value at about 2 KB and a Supabase session token is
+ * comfortably larger, so
  * storing one whole silently fails and the user is signed out on every launch.
  * Values are split across numbered keys with a count alongside.
  */

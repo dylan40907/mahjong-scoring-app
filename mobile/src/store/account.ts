@@ -43,8 +43,7 @@ import {
  * That is not only kinder than a registration wall, it is the difference
  * between shipping and not: Apple's guideline 5.1.1(v) forbids requiring
  * registration unless account features are core to the app, and scoring a hand
- * plainly is not. Apps that skip this end up retrofitting a guest
- * path.
+ * plainly is not.
  *
  * Everything here fails soft. No backend configured, no network, a rejected
  * sign-in - each leaves `status: 'local'` and an app that works exactly as it

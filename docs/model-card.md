@@ -178,10 +178,19 @@ of the 42 will be confidently named as whichever it most resembles.
 
 ## Reproducing
 
+The shipped models and the headline results above come from `ml/runs/four`
+(`evaluation-jonchan.json`). That run trains on four real sources: the first
+two in the table above, riichi-6810, and the validation split of
+mahjong-tiles-merged. mahjong-tiles-merged is therefore not a never-seen
+benchmark for the shipped models; the jon-chan test split is still held out. The
+exact arguments for that run were not recorded. The commands below reproduce
+the earlier two-source run in `ml/runs/mixed`; add the extra sources to
+`--train-roots` and `--train-store` to approximate `runs/four`.
+
 ```bash
 cd ml
 pip install -r requirements.txt
-python src/render_tiles.py
+python src/render_tiles.py --svg-dir path/to/riichi-mahjong-tiles/Regular
 
 # Synthetic half
 python src/synth.py --out data/train_a --count 1500 --seed 11

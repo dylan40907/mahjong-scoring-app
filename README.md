@@ -1,114 +1,116 @@
 # Mahjong Scorer
 
-Photograph a winning mahjong hand; get it read, ordered and scored.
+A mobile app that reads a winning mahjong hand from a photo and scores it. Two small custom PyTorch models find and identify the tiles on the phone, a geometry pass puts them in reading order, and a TypeScript rules engine scores the hand under Taiwanese, Hong Kong, Japanese Riichi or Chinese Official (MCR) rules, or a custom ruleset. It also keeps score for a four-player session.
 
-A two-stage computer-vision pipeline finds the tiles in a photograph and
-identifies each one, a geometry pass recovers the order a player would read
-them in, and a rules engine scores the result against any of four regional
-scoring systems — or one you define yourself.
+The app is published under the name Tile Tally.
 
-![Every screen](mobile/screenshots/00-all-screens.png)
+![Session, capture, tile review and scored result screens](docs/images/app-screens.png)
 
----
+## Results
 
-## What it does
+Measured on 568 held-out real photos (7,568 tiles) that neither model saw during training or validation. Source: `ml/runs/four/evaluation-jonchan.json`, details in [docs/model-card.md](docs/model-card.md).
 
-**Reads a hand from a photograph.** A custom detector locates every tile; a
-custom classifier names each one from a full-resolution crop. Both models were
-trained from scratch and together weigh under 2 MB, so inference runs on the
-phone with no network.
+| Metric | Value |
+|---|---|
+| Per-tile accuracy, end to end | 91.1% |
+| Whole hand read with no errors | 66.5% |
+| Detection AP@0.5 | 0.915 |
+| Classifier top-1 / top-3 on detected tiles | 98.8% / 99.6% |
+| Latency, median / p95 (single-threaded CPU, ONNX Runtime) | 18.3 ms / 25.8 ms |
+| Model size (detector + classifier, ONNX) | 1.17 MB + 0.64 MB |
 
-**Puts the tiles in order.** Detections come back in confidence order, which is
-useless for scoring. A geometry pass measures the table's rotation from the
-tiles themselves, groups them into rows, and splits melds from the concealed
-hand on spacing.
+Training mixed procedurally rendered scenes with about 98K real tile instances from three CC BY 4.0 datasets on Roboflow Universe. Fine-tuning on real photos alone reached 52% whole-hand accuracy on real photos but dropped to 9% on synthetic ones; training on both sources kept both.
 
-**Scores it, and shows its working.** Ninety-nine scoring patterns, four
-rulesets, and a settlement for each: who pays whom and how much. Every pattern
-that matched is listed with what it was worth, because the point of an
-automatic scorer at a real table is settling the argument, not just producing a
-number.
+![Detector and classifier output on synthetic test scenes](docs/images/detections-synthetic.png)
 
-**Tracks a session.** Four players, seats and winds, the deal passing on a
-loss, and running totals that always sum to zero.
-
-## Rulesets
-
-| Ruleset | Hand | Scored in | Notes |
-|---|---|---|---|
-| Taiwanese | 16 tiles | 台 (tai) | The everyday table: 30 base, 10 per tai |
-| Taiwanese (Reference Table) | 16 tiles | 台 (tai) | The published Four Winds values, capped at 40 |
-| Hong Kong Old Style | 13 tiles | 番 (faan) | Faan doubling into a flattening table |
-| Hong Kong (3 Faan Minimum) | 13 tiles | 番 (faan) | The same table with a floor |
-| Japanese Riichi | 13 tiles | han + fu | Yaku required; full fu accumulation |
-| Chinese Official (MCR) | 13 tiles | points | 81 fan elements, 8-point minimum |
-
-Any of them can be cloned and edited — every pattern's value, or whether it
-counts at all. A custom ruleset is the same kind of object as a built-in one,
-so nothing about it is second class.
-
-## How it is put together
+## How it works
 
 ```
-ml/                    Python: tile art, synthetic data, training, export
-  src/tileset.py       The 42 classes. Source of truth for both sides.
-  src/render_tiles.py  CC0 SVG set -> 42 PNG faces (flowers drawn in)
-  src/synth.py         Procedural scenes with exact ground truth
-  src/models.py        The detector and classifier, written from scratch
-  src/train_*.py       CPU training, checkpointed and time-bounded
-  src/evaluate.py      Component and end-to-end metrics
-  src/export_onnx.py   ONNX export with numeric verification
-
-mobile/                Expo app (SDK 57, Expo Router, TypeScript)
-  src/tiles/           Generated from ml/src/tileset.py
-  src/scoring/         The rules engine: decomposition, patterns, payouts
-  src/vision/          Preprocessing, inference, spatial ordering
-  src/design/          Tokens, icons, components
-  src/app/             Screens
+photo -> detector (320x320, anchor-free, 1 class) -> tile boxes
+      -> classifier (48x64 crop per box, 42 classes) -> tile names
+      -> ordering (table rotation, rows, meld vs concealed split) -> ordered hand
+      -> rules engine (decomposition, patterns, payouts) -> score and settlement
 ```
 
-Two generated files keep the halves honest. `mobile/src/tiles/tileset.ts` and
-the bundled asset map are emitted from `ml/src/tileset.py`, so the class order
-baked into the classifier cannot drift from the app's idea of it. And
-`mobile/src/vision/__tests__/parity.json` holds reference tensors from the
-training pipeline that the app's preprocessing is checked against.
+- **Detector:** separable-conv backbone with a centre-point head. Peak finding and box decoding are part of the exported ONNX graph, so the app gets boxes and scores directly.
+- **Classifier:** four separable-conv stages, global pool, linear layer, run on full-resolution crops.
+- **Ordering:** estimates the table's rotation from the tiles, groups them into rows and splits melds from the concealed hand by spacing.
+- **Scoring:** rulesets are data. Each pattern has a value and an on/off switch, and any ruleset can be cloned and edited. Every matched pattern is listed with its value.
+- **Accounts (optional):** Supabase auth and Postgres with row-level security for sync, friends and shared sessions. Without Supabase configured the app runs fully offline.
+
+`mobile/src/tiles/tileset.ts` is generated from `ml/src/tileset.py` so the class order cannot drift between training and the app, and `mobile/src/vision/__tests__/parity.json` checks the app's preprocessing against the training pipeline.
+
+More detail: [docs/architecture.md](docs/architecture.md), [docs/rulesets.md](docs/rulesets.md).
+
+## Tech stack
+
+- **ML:** Python, PyTorch, OpenCV, ONNX, ONNX Runtime
+- **App:** TypeScript, React Native, Expo (SDK 57, Expo Router), onnxruntime-react-native, Jest
+- **Backend:** Supabase (Postgres, row-level security, auth)
 
 ## Running it
 
+Requires Node.js. The camera and on-device inference need a development build; the web preview falls back to typing the tiles in.
+
 ```bash
-cd mobile && npm install
-npx expo start            # needs a development build; see EAS.md
+cd mobile
+npm install
+npm test              # Jest: scoring, ordering, sync, preprocessing parity
+npm run typecheck
+npm run web           # browser preview, manual tile entry
 ```
 
-The models are already exported into `mobile/assets/models/`. To rebuild them:
+On a phone, make a development build with EAS and start the dev server. See [EAS.md](EAS.md).
+
+```bash
+eas build --profile development --platform android
+npm start
+```
+
+### Accounts (optional)
+
+1. Create a Supabase project and apply `supabase/migrations/` in order (`supabase db push` or the SQL editor).
+2. Copy `mobile/.env.example` to `mobile/.env` and set the project URL and publishable key.
+3. Check the row-level security policies against the project:
+
+```bash
+SUPABASE_URL=... SUPABASE_KEY=... node supabase/verify-rls.mjs
+SUPABASE_URL=... SUPABASE_KEY=... node supabase/verify-sync.mjs
+```
+
+### Training the models
+
+The exported models are committed in `mobile/assets/models/`. PyTorch checkpoints and datasets are not.
 
 ```bash
 cd ml
 pip install -r requirements.txt
-python src/render_tiles.py
-python src/synth.py --out data/train --count 6000 --seed 11
-python src/build_crops.py --roots data/train --out crops/train
-python src/train_detector.py --train-roots data/train --val-root data/val --out runs
-python src/train_classifier.py --train-store crops/train --val-store crops/val --out runs
-python src/export_onnx.py --out ../mobile/assets/models
 ```
 
-Tests:
+The full pipeline (render tile faces, generate synthetic scenes, fetch the real datasets, build crops, train, evaluate, export) is in the Reproducing section of [docs/model-card.md](docs/model-card.md). Fetching the real datasets needs `ROBOFLOW_API_KEY` (see `.env.example`). To add photos of your own tile set, see [docs/real-photos.md](docs/real-photos.md).
 
-```bash
-cd mobile && npx jest        # scoring, ordering, preprocessing parity
-npx tsc --noEmit             # typecheck
+## Project layout
+
+```
+ml/src/            tile rendering, synthetic scenes, dataset import, training, evaluation, ONNX export
+ml/runs/           training histories and evaluation results
+mobile/src/vision/ preprocessing, inference, tile ordering
+mobile/src/scoring/ rules engine and the six built-in rulesets
+mobile/src/store/  sessions, stats, sync engine
+mobile/src/app/    screens (Expo Router)
+supabase/          migrations and RLS verification scripts
+site/              privacy and terms pages
+docs/              architecture, model card, rulesets
 ```
 
-## Documentation
+## Status and limitations
 
-- [`docs/architecture.md`](docs/architecture.md) — why the pipeline is split in two, and what each stage owes the next
-- [`docs/model-card.md`](docs/model-card.md) — training data, metrics, and where the models fail
-- [`docs/rulesets.md`](docs/rulesets.md) — how scoring is expressed as data, and how to write your own
-- [`EAS.md`](EAS.md) — builds and over-the-air updates
+Working app with 346 passing tests. The models know 42 tile classes and have no "unknown" class; flowers and seasons are the weakest classes, and an unusual tile design is out of distribution. See the limitations section of the model card.
 
 ## Credits
 
-Tile faces derive from [FluffyStuff/riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles)
-(CC0). Flowers, seasons and the framed white dragon are drawn by
-`ml/src/render_tiles.py`, since a Riichi set contains none of them.
+Tile faces come from [FluffyStuff/riichi-mahjong-tiles](https://github.com/FluffyStuff/riichi-mahjong-tiles) (CC0). Real training photos come from the Roboflow Universe datasets listed in the model card (CC BY 4.0).
+
+## License
+
+Released under the MIT License. See [LICENSE](LICENSE).

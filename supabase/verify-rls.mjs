@@ -15,12 +15,15 @@
  *
  *   node supabase/verify-rls.mjs
  *
- * Reads SUPABASE_URL and SUPABASE_KEY from the environment, falling back to
- * the values baked into the app, since the publishable key is public by design.
+ * Reads SUPABASE_URL and SUPABASE_KEY from the environment.
  */
 
-const URL_ = process.env.SUPABASE_URL ?? 'https://your-project-ref.supabase.co';
-const KEY = process.env.SUPABASE_KEY ?? 'your-publishable-key';
+const URL_ = process.env.SUPABASE_URL;
+const KEY = process.env.SUPABASE_KEY;
+if (!URL_ || !KEY) {
+  console.error('Set SUPABASE_URL and SUPABASE_KEY (the project URL and publishable key). See .env.example.');
+  process.exit(1);
+}
 
 let failures = 0;
 

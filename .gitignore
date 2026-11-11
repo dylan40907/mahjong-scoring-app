@@ -9,26 +9,22 @@ ios/
 android/
 *.apk
 *.aab
+*.ipa
 
-# Generated training data. Regenerate with ml/src/synth.py; it is deterministic
-# given the seed, so there is nothing here worth versioning.
+# Generated training data (regenerate with ml/src/synth.py)
 ml/data/
 ml/crops/
 
-# Raw photographs of a physical set. Large, personal, and the derived dataset
-# under ml/data/real/ is what the pipeline actually reads.
+# Raw photographs of a physical set
 ml/photos/
 
-# Third-party dataset downloads. Re-fetchable with ml/src/fetch_public_dataset.py
-# and separately licensed, so they are not vendored here.
+# Third-party dataset downloads (ml/src/fetch_public_dataset.py)
 ml/downloads/
 
-# Training artefacts. The exported ONNX models under mobile/assets/models are
-# committed because the app needs them at build time, and the *_best.pt
-# checkpoints are committed because they are the only way to fine-tune or
-# reproduce the reported metrics without a four-hour retrain. The *_last.pt
-# files carry optimiser state and exist only to resume an interrupted run.
-ml/runs/**/*_last.pt
+# Model checkpoints. The exported ONNX models in mobile/assets/models are committed.
+*.pt
+*.pth
+*.ckpt
 
 # Python
 __pycache__/
@@ -36,13 +32,18 @@ __pycache__/
 .venv/
 venv/
 
-# Editors and OS
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editor and OS
 .DS_Store
 .idea/
+.vscode/
 *.swp
 
 # Logs
 *.log
 npm-debug.*
 yarn-debug.*
-
